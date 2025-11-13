@@ -10,6 +10,7 @@ import { User, Lock } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { FaRegEye, FaRegEyeSlash } from "react-icons/fa";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username is required"),
@@ -75,7 +76,7 @@ export default function LoginPage() {
     <div
       className={clsx(
         "min-h-screen flex items-center justify-center",
-        "bg-linear-to-br from-teal-50 via-blue-100 to-teal-200",
+        "bg-linear-to-br from-teal-50 via-blue-100 md:px-10 px-4 to-teal-200",
         "dark:bg-linear-to-br dark:from-gray-900 dark:via-slate-900 dark:to-teal-900",
         "transition-all relative"
       )}
@@ -85,7 +86,7 @@ export default function LoginPage() {
         animate="visible"
         variants={cardVariants}
         className={clsx(
-          "relative w-full max-w-sm flex flex-col items-center rounded-xl p-8 pt-14",
+          "relative w-full max-w-sm flex flex-col items-center rounded-xl p-5 sm:p-8 pt-14",
           "bg-white/90 border border-teal-200 text-zinc-800 shadow-lg",
           "dark:bg-slate-900 dark:border-slate-800 dark:text-gray-100",
           "shadow-2xl"
@@ -93,12 +94,12 @@ export default function LoginPage() {
       >
         <div
           className={clsx(
-            "absolute -top-8 left-1/2 -translate-x-1/2 px-8 py-2 rounded-lg font-script text-2xl text-center tracking-wide shadow-lg",
+            "absolute -top-8 left-1/2 -translate-x-1/2 px-8 py-2 rounded-lg font-script text-xl sm:text-2xl text-center tracking-wide shadow-lg",
             "bg-teal-400 text-teal-900",
             "dark:bg-teal-600 dark:text-white"
           )}
         >
-          SIGN IN
+          Sign In
         </div>
         <motion.div
           className="mt-5 mb-5"
@@ -116,15 +117,12 @@ export default function LoginPage() {
           </div>
         </motion.div>
         <form
-          className="w-full space-y-4 mt-2 font-sans"
+          className="w-full space-y-4 mt-2 font-lexend"
           onSubmit={handleSubmit(onSubmit)}
         >
           <div>
             <label
-              className={clsx(
-                "font-mono text-md",
-                "text-teal-700 dark:text-teal-200"
-              )}
+              className={clsx("text-md", "text-teal-700 dark:text-teal-200")}
               htmlFor="username"
             >
               Username
@@ -137,7 +135,7 @@ export default function LoginPage() {
                 autoComplete="username"
                 {...register("username")}
                 className={clsx(
-                  "pl-10 h-11 rounded-md mt-1 shadow-sm font-mono w-full outline-none",
+                  "pl-10 h-11 rounded-md mt-1 shadow-sm w-full outline-none",
                   "bg-white text-gray-800 placeholder:text-gray-400 border-teal-200",
                   "dark:bg-slate-800 dark:text-gray-100 dark:placeholder:text-gray-400 dark:border-slate-700"
                 )}
@@ -146,7 +144,7 @@ export default function LoginPage() {
             </div>
             {errors.username && (
               <motion.p
-                className="text-rose-500 text-xs mt-1 ml-1 mb-0 font-semibold font-sans"
+                className="text-rose-500 text-xs mt-1 ml-1 mb-0"
                 initial="hidden"
                 animate="visible"
                 variants={errorVariant}
@@ -191,7 +189,7 @@ export default function LoginPage() {
             </div>
             {errors.password && (
               <motion.p
-                className="text-rose-500 text-xs mt-1 ml-1 mb-0 font-semibold font-sans"
+                className="text-rose-500 text-xs mt-1 ml-1 mb-0"
                 initial="hidden"
                 animate="visible"
                 variants={errorVariant}
@@ -201,8 +199,8 @@ export default function LoginPage() {
             )}
           </div>
           <div className="flex items-center justify-between mt-1">
-            <label className="flex items-center gap-2 font-mono">
-              <input type="checkbox" className="w-4 h-4 accent-teal-400" />
+            <label className="flex items-center gap-2">
+              <Checkbox id="remember" />
               <span
                 className={clsx("text-xs", "text-gray-500 dark:text-gray-400")}
               >
@@ -212,7 +210,7 @@ export default function LoginPage() {
             <a
               href="#"
               className={clsx(
-                "text-xs font-script font-bold transition-colors",
+                "text-xs font-bold transition-colors",
                 "text-teal-700 hover:text-sky-700",
                 "dark:text-sky-400 dark:hover:text-teal-200"
               )}
@@ -225,7 +223,7 @@ export default function LoginPage() {
             disabled={isLoading}
             type="submit"
             className={clsx(
-              "w-full h-11 mt-2 font-script cursor-pointer font-bold text-lg rounded-lg transition-all shadow-xl flex items-center justify-center",
+              "w-full h-11 mt-2 font-lexend cursor-pointer font-bold text-lg rounded-lg transition-all shadow-xl flex items-center justify-center",
               "bg-linear-to-r from-teal-300 to-sky-400 text-teal-900 hover:from-teal-400 hover:to-sky-500",
               "dark:bg-linear-to-r transition-colors duration-150  dark:from-teal-600 dark:to-sky-700 dark:text-white dark:hover:from-teal-800 dark:hover:to-sky-900",
               isLoading && "opacity-60 cursor-not-allowed"
