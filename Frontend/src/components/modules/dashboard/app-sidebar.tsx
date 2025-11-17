@@ -1,7 +1,7 @@
 import {
   BadgePlus,
   BookText,
-  CalendarCheck,
+  CalendarCheck, ChartColumnBig,
   ChevronDown,
   Database,
   FolderDown,
@@ -40,9 +40,14 @@ import { NavUser } from "./nav-user";
 const items = [
   {
     title: "Home",
-    url: "",
+    url: "/login",
     icon: Home,
   },
+  {
+    title: "Analytics",
+    url: "/dashboard/analytics",
+    icon: ChartColumnBig,
+  }
 ];
 
 const dataManagement = [
