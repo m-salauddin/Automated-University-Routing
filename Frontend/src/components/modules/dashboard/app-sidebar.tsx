@@ -124,7 +124,7 @@ export function AppSidebar() {
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton>
                       <Database />
-                      <span>Data Management</span>
+                      <span className="text-nowrap">Data Management</span>
                       <ChevronDown className="ml-auto transition-transform duration-300 group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
@@ -160,7 +160,7 @@ export function AppSidebar() {
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton>
                       <CalendarCheck />
-                      <span>Routine Management</span>
+                      <span className="text-nowrap">Routine Management</span>
                       <ChevronDown className="ml-auto transition-transform duration-300 group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
