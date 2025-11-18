@@ -48,7 +48,7 @@ export default function LoginPage() {
     });
 
     setTimeout(() => {
-      router.push("/dashboard");
+      router.push("/dashboard/analytics");
     }, 500);
   };
 
@@ -245,12 +245,3 @@ export default function LoginPage() {
   );
 }
  
- const page = () => {
-  return (
-    <div>
-      This is page componen
-    </div>
-  )
-};
-
-export default page;

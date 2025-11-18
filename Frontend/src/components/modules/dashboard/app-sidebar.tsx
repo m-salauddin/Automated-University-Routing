@@ -1,7 +1,7 @@
 import {
   BadgePlus,
   BookText,
-  CalendarCheck,
+  CalendarCheck, ChartColumnBig,
   ChevronDown,
   Database,
   FolderDown,
@@ -40,9 +40,14 @@ import { NavUser } from "./nav-user";
 const items = [
   {
     title: "Home",
-    url: "",
+    url: "/login",
     icon: Home,
   },
+  {
+    title: "Analytics",
+    url: "/dashboard/analytics",
+    icon: ChartColumnBig,
+  }
 ];
 
 const dataManagement = [
@@ -124,7 +129,7 @@ export function AppSidebar() {
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton>
                       <Database />
-                      <span>Data Management</span>
+                      <span className="text-nowrap">Data Management</span>
                       <ChevronDown className="ml-auto transition-transform duration-300 group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
@@ -160,7 +165,7 @@ export function AppSidebar() {
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton>
                       <CalendarCheck />
-                      <span>Routine Management</span>
+                      <span className="text-nowrap">Routine Management</span>
                       <ChevronDown className="ml-auto transition-transform duration-300 group-data-[state=open]/collapsible:rotate-180" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
