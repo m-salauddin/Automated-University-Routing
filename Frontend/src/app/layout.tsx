@@ -1,22 +1,9 @@
 import type { Metadata } from "next";
-import {
-  Geist,
-  Geist_Mono,
-  Oswald,
-  Major_Mono_Display,
-  Pacifico,
-  Montserrat,
-} from "next/font/google";
+import { Fugaz_One, Lexend, Oswald, Pacifico } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-
-const mono = Major_Mono_Display({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--font-mono",
-  display: "swap",
-});
+import { AuthProvider } from "@/context/auth-context";
 
 const script = Pacifico({
   subsets: ["latin"],
@@ -25,26 +12,25 @@ const script = Pacifico({
   display: "swap",
 });
 
-const sans = Montserrat({
+const lexend=Lexend({
+  subsets:["latin"],
+  weight:"400",
+  variable:"--font-lexend",
+  display:"swap",
+})
+
+
+const fugaz = Fugaz_One({
   subsets: ["latin"],
-  weight: ["400", "700"],
-  variable: "--font-sans",
+  weight: "400",
+  variable: "--font-fugaz",
   display: "swap",
-});
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
 });
 
 const getOswald = Oswald({
   variable: "--font-oswald",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -59,41 +45,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${getOswald.variable} ${mono.variable} ${script.variable} ${sans.variable} font-sansantialiased`}
-      >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              classNames: {
-                toast:
-                  "bg-white/90 dark:bg-slate-900 border border-teal-200 dark:border-slate-800 shadow-2xl backdrop-blur-sm",
-                title:
-                  "text-zinc-800 dark:text-gray-100 font-sans font-semibold",
-                description:
-                  "text-gray-600 dark:text-gray-400 font-mono text-sm",
-                success:
-                  "bg-white/90 dark:bg-slate-900 border-teal-400 dark:border-teal-600 shadow-2xl",
-                error:
-                  "bg-white/90 dark:bg-slate-900 border-rose-400 dark:border-rose-600 shadow-2xl",
-                warning:
-                  "bg-white/90 dark:bg-slate-900 border-amber-400 dark:border-amber-600 shadow-2xl",
-                info: "bg-white/90 dark:bg-slate-900 border-sky-400 dark:border-sky-600 shadow-2xl",
-                actionButton:
-                  "bg-teal-400 dark:bg-teal-600 text-teal-900 dark:text-white hover:bg-teal-500 dark:hover:bg-teal-700",
-                cancelButton:
-                  "bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300",
-              },
-            }}
-          />
-        </ThemeProvider>
+      <body className={`${getOswald.variable} ${lexend.variable} ${script.variable} ${fugaz.variable} antialiased`}>
+        <AuthProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+            <Toaster position="top-right" />
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );
