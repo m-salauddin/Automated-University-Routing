@@ -72,6 +72,8 @@ import {
   SlidersHorizontal,
   LayoutList,
   Filter,
+  MapPin,
+  GraduationCap,
 } from "lucide-react";
 import { myRoutine } from "./own-routine-data";
 
@@ -82,9 +84,10 @@ type RoutineRow = {
   course: string;
   type: string;
   room: string;
-  batch: string;
+  semester: string;
   status: "on" | "off";
 };
+
 const initialRows: RoutineRow[] = myRoutine.map((r, i) => ({
   id: i + 1,
   status: "on",
@@ -98,9 +101,12 @@ export default function OwnRoutinePage() {
 
   // --- State ---
   const [rows, setRows] = useState<RoutineRow[]>(initialRows);
+
   const [day, setDay] = useState<string>("All");
   const [typeFilter, setTypeFilter] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [roomFilter, setRoomFilter] = useState<string>("All");
+  const [semesterFilter, setSemesterFilter] = useState<string>("All");
 
   const [visibleCols, setVisibleCols] = useState<
     Record<keyof Omit<RoutineRow, "id">, boolean>
@@ -111,7 +117,7 @@ export default function OwnRoutinePage() {
     type: true,
     status: true,
     room: true,
-    batch: true,
+    semester: true,
   });
 
   const sensors = useSensors(
@@ -120,16 +126,30 @@ export default function OwnRoutinePage() {
     useSensor(KeyboardSensor, {})
   );
 
+  // --- Extract Unique Options for Dropdowns ---
+  const uniqueRooms = useMemo(() => {
+    const rooms = new Set(rows.map((r) => r.room));
+    return Array.from(rooms).sort();
+  }, [rows]);
+
+  const uniqueSemesters = useMemo(() => {
+    const sems = new Set(rows.map((r) => r.semester));
+    return Array.from(sems).sort();
+  }, [rows]);
+
   // --- Processing ---
   const processedRows = useMemo(() => {
     return rows.filter((r) => {
-      // Ensure exact match with the short names
       const matchDay = day === "All" || r.day === day;
       const matchType = typeFilter === "All" || r.type === typeFilter;
       const matchStatus = statusFilter === "All" || r.status === statusFilter;
-      return matchDay && matchType && matchStatus;
+      const matchRoom = roomFilter === "All" || r.room === roomFilter;
+      const matchSemester =
+        semesterFilter === "All" || r.semester === semesterFilter;
+
+      return matchDay && matchType && matchStatus && matchRoom && matchSemester;
     });
-  }, [day, typeFilter, statusFilter, rows]);
+  }, [day, typeFilter, statusFilter, roomFilter, semesterFilter, rows]);
 
   // --- Pagination ---
   const pageSizeOptions = [5, 10, 20, 50] as const;
@@ -153,7 +173,7 @@ export default function OwnRoutinePage() {
 
   useEffect(() => {
     setPage(1);
-  }, [day, typeFilter, statusFilter]);
+  }, [day, typeFilter, statusFilter, roomFilter, semesterFilter]);
 
   useEffect(() => {
     const before = () => setShowAllForPrint(true);
@@ -181,6 +201,8 @@ export default function OwnRoutinePage() {
     setDay("All");
     setTypeFilter("All");
     setStatusFilter("All");
+    setRoomFilter("All");
+    setSemesterFilter("All");
   };
 
   function handleDragEnd(event: DragEndEvent) {
@@ -201,7 +223,7 @@ export default function OwnRoutinePage() {
     "type",
     "status",
     "room",
-    "batch",
+    "semester",
   ];
 
   function DragHandle({
@@ -357,6 +379,48 @@ export default function OwnRoutinePage() {
     </div>
   );
 
+  const RoomSelect = () => (
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <MapPin className="w-3 h-3" /> Room
+      </span>
+      <Select value={roomFilter} onValueChange={setRoomFilter}>
+        <SelectTrigger className="w-full h-9 bg-background">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="All">All Rooms</SelectItem>
+          {uniqueRooms.map((r) => (
+            <SelectItem key={r} value={r}>
+              {r}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const SemesterSelect = () => (
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <GraduationCap className="w-3 h-3" /> Semester
+      </span>
+      <Select value={semesterFilter} onValueChange={setSemesterFilter}>
+        <SelectTrigger className="w-full h-9 bg-background">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="All">All Semesters</SelectItem>
+          {uniqueSemesters.map((s) => (
+            <SelectItem key={s} value={s}>
+              {s}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   const ColumnSelect = () => (
     <div className="space-y-1 w-full">
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
@@ -407,8 +471,9 @@ export default function OwnRoutinePage() {
 
   return (
     <div className="w-full font-lexend max-w-full overflow-x-hidden mx-auto p-3 sm:p-6 space-y-4 print:overflow-visible">
+      {/* --- Header / Title --- */}
       <div className="flex flex-row justify-between items-center gap-4 mb-2">
-        <div className="lg:text-center  w-full mb-5">
+        <div className="lg:text-center w-full mb-5">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
             My Routine
           </h1>
@@ -417,6 +482,7 @@ export default function OwnRoutinePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Mobile Filter Sheet */}
           <Sheet>
             <SheetTrigger asChild>
               <Button
@@ -427,7 +493,10 @@ export default function OwnRoutinePage() {
                 <Filter className="h-4 w-4" /> Filters
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+            <SheetContent
+              side="right"
+              className="w-[300px] sm:w-[400px] overflow-y-auto"
+            >
               <SheetHeader>
                 <SheetTitle>Filters & View</SheetTitle>
                 <SheetDescription>
@@ -438,6 +507,9 @@ export default function OwnRoutinePage() {
                 <DaySelect />
                 <TypeSelect />
                 <StatusSelect />
+                <RoomSelect />
+                <SemesterSelect />
+                <div className="my-2 border-t" />
                 <ColumnSelect />
               </div>
               <SheetFooter>
@@ -468,36 +540,41 @@ export default function OwnRoutinePage() {
         </div>
       </div>
 
+      {/* --- Main Content Card --- */}
       <Card className="w-full overflow-hidden border shadow-sm print:border-none print:shadow-none print:overflow-visible">
+        {/* Desktop Filter Bar - IMPROVED RESPONSIVENESS */}
         <CardHeader className="p-4 bg-muted/30 border-b hidden lg:block print:hidden">
-          <div className="flex flex-col lg:flex-row gap-4 justify-between flex-wrap">
-            <div className="flex gap-3 flex-wrap">
-              <div className="min-w-[140px]">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col xl:flex-row gap-4 justify-between items-end">
+              {/* Filters Grid: Adapts from 2 cols to 5 cols based on screen size */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 w-full xl:w-auto flex-1">
                 <DaySelect />
-              </div>
-              <div className="min-w-[140px]">
                 <TypeSelect />
-              </div>
-              <div className="min-w-[140px]">
                 <StatusSelect />
+                <RoomSelect />
+                <SemesterSelect />
               </div>
-            </div>
-            <div className="flex gap-3 items-end shrink-0">
-              <div className="min-w-[150px]">
-                <ColumnSelect />
+
+              {/* Controls Row (Columns + Reset) */}
+              <div className="flex gap-3 items-end shrink-0 w-full xl:w-auto justify-end xl:justify-start">
+                <div className="min-w-[150px]">
+                  <ColumnSelect />
+                </div>
+                {(day !== "All" ||
+                  typeFilter !== "All" ||
+                  statusFilter !== "All" ||
+                  roomFilter !== "All" ||
+                  semesterFilter !== "All") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetFilters}
+                    className="h-9 gap-2"
+                  >
+                    <X className="h-3.5 w-3.5" /> Reset
+                  </Button>
+                )}
               </div>
-              {(day !== "All" ||
-                typeFilter !== "All" ||
-                statusFilter !== "All") && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={resetFilters}
-                  className="h-9 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4 mr-1" /> Reset
-                </Button>
-              )}
             </div>
           </div>
         </CardHeader>

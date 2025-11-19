@@ -27,7 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { ClassSession, routineData } from "./data";
+import { ClassSession, routineData } from "./students-routine-data";
 
 const timeSlots = [
   "8.45-9.35",

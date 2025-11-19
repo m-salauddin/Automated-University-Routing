@@ -22,7 +22,7 @@ export const routineData: Record<string, SemesterData> = {
     "8th": {
         id: "8th",
         label: "8th Semester",
-        session: "2020-2021",
+        session: "July 2025",
         credits: 15,
         schedule: [
             {
