@@ -1,105 +1,641 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useAuth } from "@/context/auth-context";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import * as React from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet";
+import { IconGripVertical } from "@tabler/icons-react";
+import {
+  Printer,
+  MoreVertical,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Check,
+  X,
+  Calendar,
+  BookOpen,
+  SlidersHorizontal,
+  LayoutList,
+  Filter,
+} from "lucide-react";
+import { myRoutine } from "./own-routine-data";
 
-const myRoutine = [
-  { day: "Sunday",    time: "09:00 - 10:30", course: "Math 101", type: "Lecture", room: "R-201", section: "CSE-23" },
-  { day: "Tuesday",   time: "11:00 - 12:30", course: "Programming", type: "Lecture", room: "R-105", section: "CSE-24" },
-  { day: "Wednesday", time: "01:30 - 03:00", course: "DSA", type: "Lab", room: "Lab-2", section: "CSE-24" },
-];
+type RoutineRow = {
+  id: number;
+  day: string;
+  time: string;
+  course: string;
+  type: string;
+  room: string;
+  batch: string;
+  status: "on" | "off";
+};
+const initialRows: RoutineRow[] = myRoutine.map((r, i) => ({
+  id: i + 1,
+  status: "on",
+  ...r,
+}));
 
-const days = ["All", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
+const days = ["All", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function OwnRoutinePage() {
   const { role, username } = { role: "teacher", username: "John Doe" };
+
+  // --- State ---
+  const [rows, setRows] = useState<RoutineRow[]>(initialRows);
   const [day, setDay] = useState<string>("All");
+  const [typeFilter, setTypeFilter] = useState<string>("All");
+  const [statusFilter, setStatusFilter] = useState<string>("All");
+
+  const [visibleCols, setVisibleCols] = useState<
+    Record<keyof Omit<RoutineRow, "id">, boolean>
+  >({
+    day: true,
+    time: true,
+    course: true,
+    type: true,
+    status: true,
+    room: true,
+    batch: true,
+  });
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, {}),
+    useSensor(TouchSensor, {}),
+    useSensor(KeyboardSensor, {})
+  );
+
+  // --- Processing ---
+  const processedRows = useMemo(() => {
+    return rows.filter((r) => {
+      // Ensure exact match with the short names
+      const matchDay = day === "All" || r.day === day;
+      const matchType = typeFilter === "All" || r.type === typeFilter;
+      const matchStatus = statusFilter === "All" || r.status === statusFilter;
+      return matchDay && matchType && matchStatus;
+    });
+  }, [day, typeFilter, statusFilter, rows]);
+
+  // --- Pagination ---
+  const pageSizeOptions = [5, 10, 20, 50] as const;
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [showAllForPrint, setShowAllForPrint] = useState<boolean>(false);
+
+  const totalPages = Math.max(1, Math.ceil(processedRows.length / pageSize));
+  const paged = showAllForPrint
+    ? processedRows
+    : processedRows.slice(
+        (page - 1) * pageSize,
+        Math.min((page - 1) * pageSize + pageSize, processedRows.length)
+      );
+
+  useEffect(() => {
+    const nextTotal = Math.max(1, Math.ceil(processedRows.length / pageSize));
+    if (page > nextTotal) setPage(nextTotal);
+    if (page < 1) setPage(1);
+  }, [processedRows.length, pageSize, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [day, typeFilter, statusFilter]);
+
+  useEffect(() => {
+    const before = () => setShowAllForPrint(true);
+    const after = () => setShowAllForPrint(false);
+    if (typeof window !== "undefined") {
+      window.addEventListener("beforeprint", before);
+      window.addEventListener("afterprint", after);
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("beforeprint", before);
+        window.removeEventListener("afterprint", after);
+      }
+    };
+  }, []);
+
+  const handleColumnToggle = (key: string) => {
+    setVisibleCols((prev) => ({
+      ...prev,
+      [key as keyof typeof visibleCols]: !prev[key as keyof typeof visibleCols],
+    }));
+  };
+
+  const resetFilters = () => {
+    setDay("All");
+    setTypeFilter("All");
+    setStatusFilter("All");
+  };
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!active || !over || active.id === over.id) return;
+    setRows((prev) => {
+      const oldIndex = prev.findIndex((r) => r.id === active.id);
+      const newIndex = prev.findIndex((r) => r.id === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  }
+
+  const columnsOrder: (keyof Omit<RoutineRow, "id">)[] = [
+    "day",
+    "time",
+    "course",
+    "type",
+    "status",
+    "room",
+    "batch",
+  ];
+
+  function DragHandle({
+    attributes,
+    listeners,
+  }: {
+    attributes: React.HTMLAttributes<HTMLElement>;
+    listeners: Record<string, unknown>;
+  }) {
+    return (
+      <button
+        {...attributes}
+        {...listeners}
+        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+      >
+        <IconGripVertical className="size-4" />
+      </button>
+    );
+  }
+
+  function DraggableRow({ row }: { row: RoutineRow }) {
+    const {
+      setNodeRef,
+      attributes,
+      listeners,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: row.id });
+    const style: React.CSSProperties = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+    const setStatus = (status: "on" | "off") => {
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, status } : r))
+      );
+      const isOff = status === "off";
+      toast[isOff ? "warning" : "success"](
+        `${row.course} is now ${isOff ? "OFF" : "ON"}`
+      );
+    };
+
+    return (
+      <TableRow
+        ref={setNodeRef}
+        style={style}
+        className={cn(
+          "whitespace-nowrap transition-colors",
+          isDragging && "opacity-70 bg-muted/50"
+        )}
+      >
+        <TableCell className="w-8 print:hidden p-3">
+          <DragHandle attributes={attributes} listeners={listeners ?? {}} />
+        </TableCell>
+        {columnsOrder.map((key) =>
+          visibleCols[key] ? (
+            <TableCell
+              key={key}
+              className={cn("p-3", key === "course" && "font-medium")}
+            >
+              {key === "type" ? (
+                <Badge variant={row.type === "Lab" ? "secondary" : "default"}>
+                  {row.type}
+                </Badge>
+              ) : key === "status" ? (
+                <Badge
+                  variant={row.status === "on" ? "default" : "destructive"}
+                >
+                  {row.status === "on" ? "On" : "Off"}
+                </Badge>
+              ) : (
+                row[key]
+              )}
+            </TableCell>
+          ) : null
+        )}
+        <TableCell className="w-8 text-right print:hidden p-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuItem
+                onClick={() => setStatus(row.status === "on" ? "off" : "on")}
+              >
+                {row.status === "on" ? "Mark as Off" : "Mark as On"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  // --- Reusable Filter Controls ---
+  const DaySelect = () => (
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <Calendar className="w-3 h-3" /> Day
+      </span>
+      <Select value={day} onValueChange={setDay}>
+        <SelectTrigger className="w-full h-9 bg-background">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {days.map((d) => (
+            <SelectItem key={d} value={d}>
+              {d}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const TypeSelect = () => (
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <BookOpen className="w-3 h-3" /> Type
+      </span>
+      <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <SelectTrigger className="w-full h-9 bg-background">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="All">All Types</SelectItem>
+          <SelectItem value="Lecture">Lecture</SelectItem>
+          <SelectItem value="Lab">Lab</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const StatusSelect = () => (
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <SlidersHorizontal className="w-3 h-3" /> Status
+      </span>
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger className="w-full h-9 bg-background">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="All">All Status</SelectItem>
+          <SelectItem value="on">Active (On)</SelectItem>
+          <SelectItem value="off">Cancelled (Off)</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  const ColumnSelect = () => (
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <LayoutList className="w-3 h-3" /> Columns
+      </span>
+      <Select value="" onValueChange={handleColumnToggle}>
+        <SelectTrigger className="w-full h-9 bg-background text-muted-foreground">
+          <SelectValue placeholder="Customize View" />
+        </SelectTrigger>
+        <SelectContent align="end">
+          {columnsOrder.map((key) => (
+            <SelectItem key={key} value={key}>
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    "flex h-4 w-4 items-center justify-center rounded border",
+                    visibleCols[key]
+                      ? "bg-primary border-primary"
+                      : "opacity-40"
+                  )}
+                >
+                  <Check
+                    className={cn(
+                      "h-3 w-3 text-primary-foreground",
+                      !visibleCols[key] && "hidden"
+                    )}
+                  />
+                </div>
+                <span className="capitalize">{key}</span>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   if (role !== "teacher") {
     return (
-      <div className="w-full max-w-3xl mx-auto p-4 lg:p-6">
+      <div className="p-6">
         <Alert>
           <AlertTitle>Access restricted</AlertTitle>
-          <AlertDescription>
-            This section is only available for teachers. Please switch to a teacher account to view your routine.
-          </AlertDescription>
+          <AlertDescription>Teacher access only.</AlertDescription>
         </Alert>
       </div>
     );
   }
 
-  const filtered = useMemo(() => {
-    return myRoutine.filter((r) => day === "All" || r.day === day);
-  }, [day]);
-
   return (
-    <div className="w-full max-w-6xl mx-auto p-4 lg:p-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <CardTitle className="font-lexend">My Routine</CardTitle>
-              <CardDescription>Teacher: {username || "Unknown"}</CardDescription>
+    <div className="w-full font-lexend max-w-full overflow-x-hidden mx-auto p-3 sm:p-6 space-y-4 print:overflow-visible">
+      <div className="flex flex-row justify-between items-center gap-4 mb-2">
+        <div className="lg:text-center  w-full mb-5">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            My Routine
+          </h1>
+          <p className="text-muted-foreground ">
+            {role === "teacher" ? "Teacher" : "Student"}: {username}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="lg:hidden gap-2 print:hidden"
+              >
+                <Filter className="h-4 w-4" /> Filters
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[300px] sm:w-[400px]">
+              <SheetHeader>
+                <SheetTitle>Filters & View</SheetTitle>
+                <SheetDescription>
+                  Customize your routine table view.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="flex flex-col gap-4 py-6 px-4">
+                <DaySelect />
+                <TypeSelect />
+                <StatusSelect />
+                <ColumnSelect />
+              </div>
+              <SheetFooter>
+                <SheetClose asChild>
+                  <Button
+                    variant="outline"
+                    onClick={resetFilters}
+                    className="w-full"
+                  >
+                    Reset All
+                  </Button>
+                </SheetClose>
+                <SheetClose asChild>
+                  <Button className="w-full mt-2 sm:mt-0">Done</Button>
+                </SheetClose>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.print()}
+            className="hidden lg:flex print:hidden gap-2"
+          >
+            <Printer className="h-4 w-4" /> Print
+          </Button>
+        </div>
+      </div>
+
+      <Card className="w-full overflow-hidden border shadow-sm print:border-none print:shadow-none print:overflow-visible">
+        <CardHeader className="p-4 bg-muted/30 border-b hidden lg:block print:hidden">
+          <div className="flex flex-col lg:flex-row gap-4 justify-between flex-wrap">
+            <div className="flex gap-3 flex-wrap">
+              <div className="min-w-[140px]">
+                <DaySelect />
+              </div>
+              <div className="min-w-[140px]">
+                <TypeSelect />
+              </div>
+              <div className="min-w-[140px]">
+                <StatusSelect />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Day</span>
-              <Select value={day} onValueChange={setDay}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {days.map((d) => (
-                    <SelectItem key={d} value={d}>{d}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button onClick={() => window.print()} className="print:hidden">Print</Button>
+            <div className="flex gap-3 items-end shrink-0">
+              <div className="min-w-[150px]">
+                <ColumnSelect />
+              </div>
+              {(day !== "All" ||
+                typeFilter !== "All" ||
+                statusFilter !== "All") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={resetFilters}
+                  className="h-9 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4 mr-1" /> Reset
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Day</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Course</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Room</TableHead>
-                  <TableHead>Section</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-10">
-                      No classes scheduled.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filtered.map((r, idx) => (
-                    <TableRow key={idx} className={cn(r.type === "Lab" && "bg-primary/5 dark:bg-primary/10")}> 
-                      <TableCell>{r.day}</TableCell>
-                      <TableCell>{r.time}</TableCell>
-                      <TableCell className="font-medium">{r.course}</TableCell>
-                      <TableCell>{r.type}</TableCell>
-                      <TableCell>{r.room}</TableCell>
-                      <TableCell>{r.section}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+
+        <CardContent className="p-0">
+          <div className="grid grid-cols-1 print:block">
+            <div className="w-full overflow-x-auto print:overflow-visible">
+              <div className="min-w-[800px] print:min-w-0 print:w-full">
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <Table>
+                    <TableHeader className="bg-muted/40">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="w-10 print:hidden"></TableHead>
+                        {columnsOrder.map((key) =>
+                          visibleCols[key] ? (
+                            <TableHead
+                              key={key}
+                              className="capitalize select-none h-10"
+                            >
+                              <span className="flex items-center gap-1">
+                                {key}
+                              </span>
+                            </TableHead>
+                          ) : null
+                        )}
+                        <TableHead className="w-12 print:hidden text-right">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {processedRows.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={10}
+                            className="h-32 text-center text-muted-foreground"
+                          >
+                            No classes found matching your filters.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        <SortableContext
+                          items={paged.map((r) => r.id)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          {paged.map((r) => (
+                            <DraggableRow key={r.id} row={r} />
+                          ))}
+                        </SortableContext>
+                      )}
+                    </TableBody>
+                  </Table>
+                </DndContext>
+              </div>
+            </div>
           </div>
+
+          {/* --- Pagination --- */}
+          {processedRows.length > 0 && !showAllForPrint && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-background/50 print:hidden">
+              <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-2 text-sm text-muted-foreground">
+                <span>Rows:</span>
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={(v) => {
+                    setPageSize(Number(v));
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[70px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pageSizeOptions.map((opt) => (
+                      <SelectItem key={opt} value={String(opt)}>
+                        {opt}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-sm font-medium order-3 sm:order-2">
+                Page {page} of {totalPages}
+              </div>
+              <div className="flex items-center gap-1 order-2 sm:order-3">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage(1)}
+                  disabled={page <= 1}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setPage(totalPages)}
+                  disabled={page >= totalPages}
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <Button
+        variant="outline"
+        onClick={() => window.print()}
+        className="w-full lg:hidden print:hidden gap-2 mt-4"
+      >
+        <Printer className="h-4 w-4" /> Print Schedule
+      </Button>
     </div>
   );
 }

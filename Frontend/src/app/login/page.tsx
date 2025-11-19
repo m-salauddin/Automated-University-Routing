@@ -11,7 +11,6 @@ import clsx from "clsx";
 import { toast } from "sonner";
 import { FaRegEye, FaRegEyeSlash } from "react-icons/fa";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/auth-context";
 import type { UserRole } from "@/context/auth-context";
 
@@ -214,18 +213,7 @@ export default function LoginPage() {
                 Remember me
               </span>
             </label>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400">Role</span>
-              <Select value={role} onValueChange={(v) => setRoleLocal(v as UserRole)}>
-                <SelectTrigger className="h-8 w-[130px]">
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="student">Student</SelectItem>
-                  <SelectItem value="teacher">Teacher</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
             <a
               href="#"
               className={clsx(
