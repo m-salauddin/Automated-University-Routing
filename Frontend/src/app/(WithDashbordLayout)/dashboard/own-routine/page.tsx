@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion"; // Import Framer Motion
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Select,
@@ -46,6 +47,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Sheet,
@@ -74,8 +76,39 @@ import {
   Filter,
   MapPin,
   GraduationCap,
+  PowerOff,
 } from "lucide-react";
 import { myRoutine } from "./own-routine-data";
+
+// --- Animation Variants ---
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { type: "spring" as const, stiffness: 100, damping: 10 },
+  },
+};
+
+const tableRowVariants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { type: "spring" as const, stiffness: 120 },
+  },
+};
 
 type RoutineRow = {
   id: number;
@@ -244,6 +277,9 @@ export default function OwnRoutinePage() {
     );
   }
 
+  // --- Animated Draggable Row ---
+  const MotionTableRow = motion(TableRow);
+
   function DraggableRow({ row }: { row: RoutineRow }) {
     const {
       setNodeRef,
@@ -253,10 +289,12 @@ export default function OwnRoutinePage() {
       transition,
       isDragging,
     } = useSortable({ id: row.id });
+
     const style: React.CSSProperties = {
       transform: CSS.Transform.toString(transform),
       transition,
     };
+
     const setStatus = (status: "on" | "off") => {
       setRows((prev) =>
         prev.map((r) => (r.id === row.id ? { ...r, status } : r))
@@ -268,9 +306,13 @@ export default function OwnRoutinePage() {
     };
 
     return (
-      <TableRow
+      <MotionTableRow
         ref={setNodeRef}
         style={style}
+        layout
+        initial="hidden"
+        animate="visible"
+        variants={tableRowVariants}
         className={cn(
           "whitespace-nowrap transition-colors",
           isDragging && "opacity-70 bg-muted/50"
@@ -310,15 +352,18 @@ export default function OwnRoutinePage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
+                className="text-red-400 hover:text-red-400!"
                 onClick={() => setStatus(row.status === "on" ? "off" : "on")}
               >
+                <PowerOff className="size-4 text-red-400" />
                 {row.status === "on" ? "Mark as Off" : "Mark as On"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
-      </TableRow>
+      </MotionTableRow>
     );
   }
 
@@ -470,241 +515,264 @@ export default function OwnRoutinePage() {
   }
 
   return (
-    <div className="w-full font-lexend max-w-full overflow-x-hidden mx-auto p-3 sm:p-6 space-y-4 print:overflow-visible">
-      {/* --- Header / Title --- */}
-      <div className="flex flex-row justify-between items-center gap-4 mb-2">
-        <div className="lg:text-center w-full mb-5">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            My Routine
-          </h1>
-          <p className="text-muted-foreground ">
-            {role === "teacher" ? "Teacher" : "Student"}: {username}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Mobile Filter Sheet */}
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="lg:hidden gap-2 print:hidden"
-              >
-                <Filter className="h-4 w-4" /> Filters
-              </Button>
-            </SheetTrigger>
-            <SheetContent
-              side="right"
-              className="w-[300px] sm:w-[400px] overflow-y-auto"
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="w-full font-lexend max-w-full overflow-x-hidden mx-auto p-5 space-y-4 print:overflow-visible"
+    >
+      {/* --- Header Section with Staggered Animation --- */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden mb-8">
+        <div className="space-y-2">
+          <motion.div variants={itemVariants}>
+            <Badge
+              variant="outline"
+              className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
             >
-              <SheetHeader>
-                <SheetTitle>Filters & View</SheetTitle>
-                <SheetDescription>
-                  Customize your routine table view.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="flex flex-col gap-4 py-6 px-4">
-                <DaySelect />
-                <TypeSelect />
-                <StatusSelect />
-                <RoomSelect />
-                <SemesterSelect />
-                <div className="my-2 border-t" />
-                <ColumnSelect />
-              </div>
-              <SheetFooter>
-                <SheetClose asChild>
-                  <Button
-                    variant="outline"
-                    onClick={resetFilters}
-                    className="w-full"
-                  >
-                    Reset All
-                  </Button>
-                </SheetClose>
-                <SheetClose asChild>
-                  <Button className="w-full mt-2 sm:mt-0">Done</Button>
-                </SheetClose>
-              </SheetFooter>
-            </SheetContent>
-          </Sheet>
+              Faculty Member
+            </Badge>
+          </motion.div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.print()}
-            className="hidden lg:flex print:hidden gap-2"
+          <motion.h1
+            variants={itemVariants}
+            className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"
           >
-            <Printer className="h-4 w-4" /> Print
-          </Button>
+            Department of CSE
+          </motion.h1>
+
+          <motion.div
+            variants={itemVariants}
+            className="flex flex-wrap items-center gap-3"
+          >
+            <p className="text-muted-foreground font-medium ">
+              Class Routine <span className="text-foreground/40 mx-1">•</span>{" "}
+              <span className="text-foreground font-semibold">{username}</span>
+            </p>
+
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="lg:hidden h-6 text-[10px] px-2 gap-1"
+                >
+                  <Filter className="h-3 w-3" /> Filters
+                </Button>
+              </SheetTrigger>
+              <SheetContent
+                side="right"
+                className="w-[300px] sm:w-[400px] overflow-y-auto"
+              >
+                <SheetHeader>
+                  <SheetTitle>Filters & View</SheetTitle>
+                  <SheetDescription>
+                    Customize your routine table view.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="flex flex-col gap-4 py-6 px-4">
+                  <DaySelect />
+                  <TypeSelect />
+                  <StatusSelect />
+                  <RoomSelect />
+                  <SemesterSelect />
+                  <div className="my-2 border-t" />
+                  <ColumnSelect />
+                </div>
+                <SheetFooter>
+                  <SheetClose asChild>
+                    <Button
+                      variant="outline"
+                      onClick={resetFilters}
+                      className="w-full"
+                    >
+                      Reset All
+                    </Button>
+                  </SheetClose>
+                  <SheetClose asChild>
+                    <Button className="w-full mt-2 sm:mt-0">Done</Button>
+                  </SheetClose>
+                </SheetFooter>
+              </SheetContent>
+            </Sheet>
+          </motion.div>
         </div>
+
+        <motion.div variants={itemVariants}>
+          <Button
+            onClick={() => window.print()}
+            variant="outline"
+            className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex"
+          >
+            <Printer className="h-4 w-4" />
+            Print View
+          </Button>
+        </motion.div>
       </div>
 
       {/* --- Main Content Card --- */}
-      <Card className="w-full overflow-hidden border shadow-sm print:border-none print:shadow-none print:overflow-visible">
-        {/* Desktop Filter Bar - IMPROVED RESPONSIVENESS */}
-        <CardHeader className="p-4 bg-muted/30 border-b hidden lg:block print:hidden">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col xl:flex-row gap-4 justify-between items-end">
-              {/* Filters Grid: Adapts from 2 cols to 5 cols based on screen size */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 w-full xl:w-auto flex-1">
-                <DaySelect />
-                <TypeSelect />
-                <StatusSelect />
-                <RoomSelect />
-                <SemesterSelect />
-              </div>
-
-              {/* Controls Row (Columns + Reset) */}
-              <div className="flex gap-3 items-end shrink-0 w-full xl:w-auto justify-end xl:justify-start">
-                <div className="min-w-[150px]">
-                  <ColumnSelect />
+      <motion.div variants={itemVariants}>
+        <Card className="w-full overflow-hidden dark:bg-[#111113] border shadow-sm print:border-none print:shadow-none print:overflow-visible">
+          <CardHeader className="p-4 bg-muted/30 border-b hidden lg:block print:hidden">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col xl:flex-row gap-4 justify-between items-end">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 w-full xl:w-auto flex-1">
+                  <DaySelect />
+                  <TypeSelect />
+                  <StatusSelect />
+                  <RoomSelect />
+                  <SemesterSelect />
                 </div>
-                {(day !== "All" ||
-                  typeFilter !== "All" ||
-                  statusFilter !== "All" ||
-                  roomFilter !== "All" ||
-                  semesterFilter !== "All") && (
+
+                <div className="flex gap-3 items-end shrink-0 w-full xl:w-auto justify-end xl:justify-start">
+                  <div className="min-w-[150px]">
+                    <ColumnSelect />
+                  </div>
+                  {(day !== "All" ||
+                    typeFilter !== "All" ||
+                    statusFilter !== "All" ||
+                    roomFilter !== "All" ||
+                    semesterFilter !== "All") && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={resetFilters}
+                      className="h-9 gap-2"
+                    >
+                      <X className="h-3.5 w-3.5" /> Reset
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="p-0">
+            <div className="grid grid-cols-1 print:block">
+              <div className="w-full overflow-x-auto print:overflow-visible">
+                <div className="min-w-[800px] print:min-w-0 print:w-full">
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <Table>
+                      <TableHeader className="bg-muted/40">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="w-10 print:hidden"></TableHead>
+                          {columnsOrder.map((key) =>
+                            visibleCols[key] ? (
+                              <TableHead
+                                key={key}
+                                className="capitalize select-none h-10"
+                              >
+                                <span className="flex items-center gap-1">
+                                  {key}
+                                </span>
+                              </TableHead>
+                            ) : null
+                          )}
+                          <TableHead className="w-12 print:hidden text-right">
+                            Actions
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {processedRows.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={10}
+                              className="h-32 text-center text-muted-foreground"
+                            >
+                              No classes found matching your filters.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          <SortableContext
+                            items={paged.map((r) => r.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {paged.map((r) => (
+                              <DraggableRow key={r.id} row={r} />
+                            ))}
+                          </SortableContext>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </DndContext>
+                </div>
+              </div>
+            </div>
+
+            {/* --- Pagination --- */}
+            {processedRows.length > 0 && !showAllForPrint && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-background/50 print:hidden">
+                <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-2 text-sm text-muted-foreground">
+                  <span>Rows:</span>
+                  <Select
+                    value={String(pageSize)}
+                    onValueChange={(v) => {
+                      setPageSize(Number(v));
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger className="h-8 w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pageSizeOptions.map((opt) => (
+                        <SelectItem key={opt} value={String(opt)}>
+                          {opt}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="text-sm font-medium order-3 sm:order-2">
+                  Page {page} of {totalPages}
+                </div>
+                <div className="flex items-center gap-1 order-2 sm:order-3">
                   <Button
                     variant="outline"
-                    size="sm"
-                    onClick={resetFilters}
-                    className="h-9 gap-2"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setPage(1)}
+                    disabled={page <= 1}
                   >
-                    <X className="h-3.5 w-3.5" /> Reset
+                    <ChevronsLeft className="h-4 w-4" />
                   </Button>
-                )}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page >= totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setPage(totalPages)}
+                    disabled={page >= totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="p-0">
-          <div className="grid grid-cols-1 print:block">
-            <div className="w-full overflow-x-auto print:overflow-visible">
-              <div className="min-w-[800px] print:min-w-0 print:w-full">
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
-                >
-                  <Table>
-                    <TableHeader className="bg-muted/40">
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-10 print:hidden"></TableHead>
-                        {columnsOrder.map((key) =>
-                          visibleCols[key] ? (
-                            <TableHead
-                              key={key}
-                              className="capitalize select-none h-10"
-                            >
-                              <span className="flex items-center gap-1">
-                                {key}
-                              </span>
-                            </TableHead>
-                          ) : null
-                        )}
-                        <TableHead className="w-12 print:hidden text-right">
-                          Actions
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {processedRows.length === 0 ? (
-                        <TableRow>
-                          <TableCell
-                            colSpan={10}
-                            className="h-32 text-center text-muted-foreground"
-                          >
-                            No classes found matching your filters.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <SortableContext
-                          items={paged.map((r) => r.id)}
-                          strategy={verticalListSortingStrategy}
-                        >
-                          {paged.map((r) => (
-                            <DraggableRow key={r.id} row={r} />
-                          ))}
-                        </SortableContext>
-                      )}
-                    </TableBody>
-                  </Table>
-                </DndContext>
-              </div>
-            </div>
-          </div>
-
-          {/* --- Pagination --- */}
-          {processedRows.length > 0 && !showAllForPrint && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-background/50 print:hidden">
-              <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-2 text-sm text-muted-foreground">
-                <span>Rows:</span>
-                <Select
-                  value={String(pageSize)}
-                  onValueChange={(v) => {
-                    setPageSize(Number(v));
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pageSizeOptions.map((opt) => (
-                      <SelectItem key={opt} value={String(opt)}>
-                        {opt}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="text-sm font-medium order-3 sm:order-2">
-                Page {page} of {totalPages}
-              </div>
-              <div className="flex items-center gap-1 order-2 sm:order-3">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setPage(1)}
-                  disabled={page <= 1}
-                >
-                  <ChevronsLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setPage(totalPages)}
-                  disabled={page >= totalPages}
-                >
-                  <ChevronsRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       <Button
         variant="outline"
@@ -713,6 +781,6 @@ export default function OwnRoutinePage() {
       >
         <Printer className="h-4 w-4" /> Print Schedule
       </Button>
-    </div>
+    </motion.div>
   );
 }

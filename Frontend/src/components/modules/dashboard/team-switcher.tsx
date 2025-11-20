@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { AudioWaveform, ChevronsUpDown, Command, GalleryVerticalEnd } from "lucide-react";
+import {
+  AudioWaveform,
+  ChevronsUpDown,
+  Command,
+  GalleryVerticalEnd,
+  Users,
+} from "lucide-react";
 import logo from "@/assets/logo.svg";
 
 import {
@@ -18,6 +24,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 export function TeamSwitcher() {
   const { isMobile, state } = useSidebar();
@@ -34,17 +41,17 @@ export function TeamSwitcher() {
 
   const data = [
     {
-      name: "Acme Inc",
+      name: "Shuvo Chandra Debnath",
       logo: GalleryVerticalEnd,
       plan: "Enterprise",
     },
     {
-      name: "Acme Corp.",
+      name: "Md Salauddin",
       logo: AudioWaveform,
       plan: "Startup",
     },
     {
-      name: "Evil Corp.",
+      name: "Sribash Rajbongshi",
       logo: Command,
       plan: "Free",
     },
@@ -55,20 +62,37 @@ export function TeamSwitcher() {
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <div className={` ${showContent && "p-2"} cursor-pointer flex font-pacifico hover:bg-sidebar-accent rounded-md items-center gap-2`}>
-              <div>
-                <Image src={logo} width={35} height={35} alt="logo" />
-              </div>
-              {showContent && (
-                <>
-                  <div className="animate-in fade-in slide-in-from-left-2 duration-200">
-                    <span className="text-lg font-script">
-                      Automated Routine
-                    </span>
-                  </div>
-                  <ChevronsUpDown className="ml-auto size-4 animate-in fade-in duration-200" />
-                </>
+            <div
+              className={cn(
+                "group relative overflow-hidden transition-all duration-300 ease-in-out cursor-pointer flex font-pacifico bg-muted/60 hover:bg-sidebar-accent rounded-md items-center gap-2 w-full",
+                showContent ? "p-2" : "justify-center size-8 p-0"
               )}
+            >
+              {state === "expanded" && (
+                <div
+                  className="absolute inset-0 -translate-x-[150%] bg-linear-to-r from-transparent via-white/40 to-transparent 
+                  transition-transform duration-1000 ease-in-out group-hover:translate-x-[150%] 
+                  skew-x-[-20deg] pointer-events-none z-10 dark:via-white/10"
+                />
+              )}
+
+              <div className="relative z-20 flex items-center gap-2 w-full">
+                <div className="shrink-0">
+                  <Image src={logo} width={35} height={35} alt="logo" />
+                </div>
+
+                {showContent && (
+                  <>
+                    <div className="flex-1 animate-in fade-in slide-in-from-left-2 duration-200 overflow-hidden">
+                      <span className="text-lg font-script truncate block">
+                        Automated Routine
+                      </span>
+                    </div>
+
+                    <ChevronsUpDown className="ml-auto size-4 shrink-0 animate-in fade-in duration-200" />
+                  </>
+                )}
+              </div>
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent
@@ -77,16 +101,26 @@ export function TeamSwitcher() {
             side={isMobile ? "bottom" : "right"}
             sideOffset={4}
           >
-            <DropdownMenuLabel className="text-muted-foreground font-lexend py-1 pt-0 text-center text-xs">
-              <span className="relative bottom-0.5 text-dark-primary animate-pulse font-extrabold text-2xl mr-1">
-                .
-              </span>
-              Our Team Members
+            <DropdownMenuLabel className="mx-1 my-1 rounded-md bg-sidebar-accent/50 px-2 py-1.5">
+              <div className="flex items-center gap-2">
+                <div className="flex size-5 items-center justify-center rounded-full bg-background shadow-sm ring-1 ring-border/50">
+                  <Users className="size-3 text-muted-foreground" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-semibold text-foreground">
+                    Team Members
+                  </span>
+                  <span className="text-[10px] font-normal text-muted-foreground leading-none">
+                    Visit account
+                  </span>
+                </div>
+              </div>
             </DropdownMenuLabel>
             {data.map((team, index) => (
               <DropdownMenuItem
                 key={team.name}
-                className="gap-2 p-2 border-t cursor-pointer rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                className="gap-2 p-2 border-t cursor-pointer rounded-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground animate-in fade-in slide-in-from-left-8 duration-500 fill-mode-backwards"
+                style={{ animationDelay: `${index * 150}ms` }}
               >
                 <div className="flex size-6 items-center p-2 justify-center rounded-md border">
                   <team.logo className="size-3.5 shrink-0" />

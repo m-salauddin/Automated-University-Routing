@@ -100,7 +100,7 @@ export const routineData: Record<string, SemesterData> = {
     "7th": {
         id: "7th",
         label: "7th Semester",
-        session: "2021-2022",
+        session: "July 2024",
         credits: 18,
         schedule: [
             {
@@ -178,7 +178,7 @@ export const routineData: Record<string, SemesterData> = {
     "6th": {
         id: "6th",
         label: "6th Semester (New)",
-        session: "2022-2023",
+        session: "October 2023",
         credits: 19,
         schedule: [
             {
@@ -256,7 +256,7 @@ export const routineData: Record<string, SemesterData> = {
     "5th": {
         id: "5th",
         label: "5th Semester (Old)",
-        session: "2022-2023",
+        session: "October 2023",
         credits: 21,
         schedule: [
             {

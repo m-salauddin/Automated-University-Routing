@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion"; // Import Framer Motion
 import {
   Select,
   SelectContent,
@@ -43,6 +44,38 @@ const timeSlots = [
 
 const LUNCH_SLOT_INDEX = 5;
 
+// --- Animation Variants ---
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { 
+      stiffness: 100, 
+      damping: 10 
+    },
+  },
+};
+
+const tableVariants = {
+  hidden: { opacity: 0, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { type: "spring" as const, stiffness: 120, delay: 0.4 },
+  },
+};
 
 export default function DepartmentRoutinePage() {
   const [selectedSemester, setSelectedSemester] = useState<string>("6th");
@@ -63,7 +96,12 @@ export default function DepartmentRoutinePage() {
   const semesterOptions = Object.values(routineData);
 
   return (
-    <div className="min-h-screen font-lexend w-full max-w-full bg-background text-foreground p-5 overflow-x-hidden print:p-0 print:bg-white print:overflow-visible">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="min-h-screen font-lexend w-full max-w-full bg-background text-foreground p-5 overflow-x-hidden print:p-0 print:bg-white print:overflow-visible"
+    >
       <style jsx global>{`
         @media print {
           @page {
@@ -83,35 +121,48 @@ export default function DepartmentRoutinePage() {
       `}</style>
 
       <div className="max-w-[1800px] mx-auto space-y-8 print:space-y-0 print:w-full print:max-w-none">
-        {/* --- Header (Screen) --- */}
+        {/* --- Header --- */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden">
           <div className="space-y-2">
-            <Badge
-              variant="outline"
-              className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
+            <motion.div variants={itemVariants}>
+              <Badge
+                variant="outline"
+                className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
+              >
+                Session {currentRoutine.session}
+              </Badge>
+            </motion.div>
+            <motion.h1
+              variants={itemVariants}
+              className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"
             >
-              Academic Session {currentRoutine.session}
-            </Badge>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
-              Department of Computer Science
-            </h1>
-            <p className="text-muted-foreground font-medium">
-              Class Routine & Academic Schedule
-            </p>
+              Department of CSE
+            </motion.h1>
+            <motion.p
+              variants={itemVariants}
+              className="text-muted-foreground font-medium"
+            >
+              Class Routine
+            </motion.p>
           </div>
-          <Button
-            onClick={() => window.print()}
-            variant="outline"
-            className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex"
-          >
-            <Printer className="h-4 w-4" />
-            Print View
-          </Button>
+          <motion.div variants={itemVariants}>
+            <Button
+              onClick={() => window.print()}
+              variant="outline"
+              className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex"
+            >
+              <Printer className="h-4 w-4" />
+              Print View
+            </Button>
+          </motion.div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 print:hidden">
+        <div className="grid grid-cols-1 mb-5 lg:grid-cols-12 gap-4 print:hidden">
           {/* -- Filter Group -- */}
-          <div className="lg:col-span-8 flex justify-between flex-col sm:flex-row gap-3 bg-card border rounded-xl p-1.5 shadow-sm">
+          <motion.div
+            variants={itemVariants}
+            className="lg:col-span-8 flex justify-between flex-col sm:flex-row gap-3 bg-card border rounded-xl p-1.5 shadow-sm"
+          >
             <div className=" flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all">
               <GraduationCap className="h-4 w-4 text-muted-foreground" />
               <Select
@@ -139,10 +190,13 @@ export default function DepartmentRoutinePage() {
                 {currentRoutine.credits}
               </span>
             </div>
-          </div>
+          </motion.div>
 
           {/* -- Search -- */}
-          <div className="lg:col-span-4 bg-card border rounded-xl p-1.5 shadow-sm">
+          <motion.div
+            variants={itemVariants}
+            className="lg:col-span-4 bg-card border rounded-xl p-1.5 shadow-sm"
+          >
             <div className="flex items-center gap-3 px-3 h-full bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all">
               <Search className="h-4 w-4 text-muted-foreground" />
               <Input
@@ -152,10 +206,10 @@ export default function DepartmentRoutinePage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-          </div>
+          </motion.div>
         </div>
 
-        {/* --- Print Specific Header --- */}
+        {/* --- Specific Header (Print Only) --- */}
         <div className="hidden print:flex flex-col items-center justify-center mb-6 pt-2 text-center w-full font-serif text-black">
           <h1 className="text-3xl font-bold text-black mb-3 tracking-tight">
             Department of Computer Science & Engineering
@@ -163,7 +217,7 @@ export default function DepartmentRoutinePage() {
 
           <div className="border-[3px] border-double border-black px-8 py-1 mb-5">
             <h2 className="text-lg font-bold uppercase text-black tracking-wide">
-              Class Routine – July, 2025
+              Class Routine – {currentRoutine.session}
             </h2>
           </div>
 
@@ -184,7 +238,10 @@ export default function DepartmentRoutinePage() {
         </div>
 
         {/* --- Main Table Container --- */}
-        <div className="rounded-xl font-lexend border bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:border-none print:shadow-none print:bg-transparent print:overflow-visible">
+        <motion.div
+          variants={tableVariants}
+          className="rounded-xl font-lexend border bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:border-none print:shadow-none print:bg-transparent print:overflow-visible"
+        >
           <div className="overflow-x-auto w-full print:overflow-visible">
             <Table className="w-full min-w-[1000px] print:min-w-0 print:w-full border-collapse text-sm print:border-collapse print:border border-black">
               <TableHeader>
@@ -225,7 +282,6 @@ export default function DepartmentRoutinePage() {
                     >
                       <div className="flex flex-col items-center justify-center h-full w-full px-1">
                         {i === LUNCH_SLOT_INDEX ? (
-                          // Screen View for Break
                           <div className="h-full flex items-center justify-center print:hidden">
                             <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background">
                               Break
@@ -267,7 +323,7 @@ export default function DepartmentRoutinePage() {
                             key={index}
                             className="p-0 align-middle border-r-0 relative overflow-hidden bg-muted/20 print:bg-gray-200 print:border-r print:border-black"
                           >
-                            {/* Screen View Pattern */}
+                            {/* -- Screen View Pattern -- */}
                             <div
                               className="absolute inset-0 opacity-10 print:hidden"
                               style={{
@@ -321,7 +377,6 @@ export default function DepartmentRoutinePage() {
                                 </div>
                               </div>
 
-                              {/* --- Print View Text (Exact Match) --- */}
                               <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-snug">
                                 <span className="font-bold text-[11px]">
                                   {session.course}, T-
@@ -345,7 +400,7 @@ export default function DepartmentRoutinePage() {
               </TableBody>
             </Table>
           </div>
-        </div>
+        </motion.div>
 
         {/* -- Mobile Print Hint -- */}
         <div className="text-center mt-6 print:hidden sm:hidden">
@@ -358,6 +413,6 @@ export default function DepartmentRoutinePage() {
           </Button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

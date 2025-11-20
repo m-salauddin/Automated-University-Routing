@@ -1,12 +1,12 @@
 "use client";
 
 import {
-  CalendarCheck, ChartColumnBig,
-  CalendarX,
+  CalendarCheck,
+  ChartColumnBig,
   FolderDown,
-  Home,
   User,
   View,
+  ChevronRight,
 } from "lucide-react";
 
 import {
@@ -20,96 +20,150 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { TeamSwitcher } from "./team-switcher";
 import { NavUser } from "./nav-user";
-import { useAuth } from "@/context/auth-context";
+import { cn } from "@/lib/utils";
 
 const items = [
-  {
-    title: "Home",
-    url: "/login",
-    icon: Home,
-  },
-  {
-    title: "Analytics",
-    url: "/dashboard/analytics",
-    icon: ChartColumnBig,
-  }
+  { title: "Analytics", url: "/dashboard/analytics", icon: ChartColumnBig },
 ];
 
-
 export function AppSidebar() {
+  const pathname = usePathname();
+  const { state } = useSidebar();
   const { role } = { role: "teacher" };
 
   const studentPanel = [
-    { title: "Students routine table", url: "/dashboard/students-routine", icon: View },
+    {
+      title: "Students routine",
+      url: "/dashboard/students-routine",
+      icon: View,
+    },
     { title: "Profile", url: "/dashboard/profile", icon: User },
-    { title: "Routine Export in pdf", url: "/dashboard/export-pdf", icon: FolderDown },
+    {
+      title: "Routine Export in pdf",
+      url: "/dashboard/export-pdf",
+      icon: FolderDown,
+    },
   ];
 
   const teacherPanel = [
-    { title: "Students routine table", url: "/dashboard/students-routine", icon: View },
-    { title: "Own routine table", url: "/dashboard/own-routine", icon: CalendarCheck },
-    { title: "Profile", url: "/dashboard/profile", icon: User },
-    { title: "Routine Export in pdf", url: "/dashboard/export-pdf", icon: FolderDown },
-    { title: "Class off", url: "/dashboard/class-off", icon: CalendarX },
+    {
+      title: "Students routine",
+      url: "/dashboard/students-routine",
+      icon: View,
+    },
+    {
+      title: "Own routine",
+      url: "/dashboard/own-routine",
+      icon: CalendarCheck,
+    },
   ];
 
   const panelItems = role === "teacher" ? teacherPanel : studentPanel;
   const panelTitle = role === "teacher" ? "Teacher Panel" : "Student Panel";
 
+  const isCollapsed = state === "collapsed";
+
+  const isActive = (url: string) => pathname === url;
+
+  const renderMenuItem = (
+    item: { title: string; url: string; icon: React.ElementType },
+    index: number
+  ) => {
+    const active = isActive(item.url);
+
+    return (
+      <SidebarMenuItem
+        key={item.title}
+        className="animate-in border-b pb-1 slide-in-from-left-2 fade-in duration-500 fill-mode-both"
+        style={{ animationDelay: `${index * 100}ms` }}
+      >
+        <SidebarMenuButton
+          asChild
+          tooltip={item.title}
+          className={cn(
+            " transition-all duration-200 group/item",
+            "hover:translate-x-1",
+            active
+              ? "text-primary font-semibold"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Link href={item.url} className="flex items-center w-full">
+            <div
+              className={cn(
+                "relative flex items-center justify-center size-8 rounded-lg transition-all duration-300",
+                active &&
+                  "group-data-[state=collapsed]/side:border group-data-[state=collapsed]/side:border-primary group-data-[state=collapsed]/side:shadow-[0_0_10px_-4px_hsl(var(--primary))] group-data-[state=collapsed]/side:bg-primary/5"
+              )}
+            >
+              <item.icon
+                className={cn(
+                  "size-4.5 transition-transform duration-300",
+                  active && "scale-110"
+                )}
+              />
+            </div>
+
+            <div
+              className={cn(
+                "flex flex-1 items-center overflow-hidden transition-all duration-300 group-data-[state=collapsed]/side:hidden",
+                active ? "translate-x-0" : " -translate-x-2"
+              )}
+            >
+              <ChevronRight
+                className={cn(
+                  "size-4 mr-2 transition-all duration-300 text-primary shrink-0",
+                  active ? "opacity-100 w-4" : "opacity-0 w-0"
+                )}
+              />
+              <span className="truncate text-sm">{item.title}</span>
+            </div>
+          </Link>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+  };
+
+  const renderGroupContent = (itemsToRender: typeof items) => (
+    <SidebarGroupContent>
+      <div
+        className={cn(
+          "mt-2 transition-all duration-300 ease-in-out",
+          !isCollapsed
+            ? "ml-3 pl-3 border-l "
+            : "ml-0 pl-0 border-none"
+        )}
+      >
+        <SidebarMenu>
+          {itemsToRender.map((item, idx) => renderMenuItem(item, idx))}
+        </SidebarMenu>
+      </div>
+    </SidebarGroupContent>
+  );
+
   return (
     <Sidebar
       collapsible="icon"
-      className="transition-all duration-300 ease-in-out font-lexend"
+      className="transition-all duration-300 ease-in-out font-lexend group/side"
     >
       <SidebarHeader className="py-4">
         <TeamSwitcher />
       </SidebarHeader>
       <SidebarContent className="transition-opacity duration-200">
         <SidebarGroup>
-          <SidebarGroupLabel>Application</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
+          <SidebarGroupLabel className="pl-2">Application</SidebarGroupLabel>
+          {renderGroupContent(items)}
 
-            {/* Role-based panel */}
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton className="cursor-default">
-                  <span className="text-nowrap font-semibold">{panelTitle}</span>
-                </SidebarMenuButton>
-                <SidebarMenuSub>
-                  {panelItems.map((it) => (
-                    <SidebarMenuSubItem className="border-b" key={it.title}>
-                      <SidebarMenuSubButton asChild className="transition-all mb-1 duration-200 hover:translate-x-1">
-                        <Link className="pb-1" href={it.url}>
-                          <it.icon className="transition-transform duration-300 group-data-[state=collapsed]:-translate-x-6 group-data-[state=collapsed]:opacity-0 group-data-[state=expanded]:translate-x-0 group-data-[state=expanded]:opacity-100" />
-                          <span className="transition-opacity duration-200">{it.title}</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  ))}
-                </SidebarMenuSub>
-              </SidebarMenuItem>
-            </SidebarMenu>
+          <div className="mt-6" />
 
-          </SidebarGroupContent>
+          <SidebarGroupLabel className="pl-2">{panelTitle}</SidebarGroupLabel>
+          {renderGroupContent(panelItems)}
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
