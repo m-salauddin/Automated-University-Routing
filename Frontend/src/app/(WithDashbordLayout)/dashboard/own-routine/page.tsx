@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion"; // Import Framer Motion
+import { motion } from "framer-motion"; 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Select,
@@ -80,7 +80,7 @@ import {
 } from "lucide-react";
 import { myRoutine } from "./own-routine-data";
 
-// --- Animation Variants ---
+// --- Page Animations ---
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -98,15 +98,6 @@ const itemVariants = {
     y: 0,
     opacity: 1,
     transition: { type: "spring" as const, stiffness: 100, damping: 10 },
-  },
-};
-
-const tableRowVariants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: {
-    opacity: 1,
-    x: 0,
-    transition: { type: "spring" as const, stiffness: 120 },
   },
 };
 
@@ -134,7 +125,6 @@ export default function OwnRoutinePage() {
 
   // --- State ---
   const [rows, setRows] = useState<RoutineRow[]>(initialRows);
-
   const [day, setDay] = useState<string>("All");
   const [typeFilter, setTypeFilter] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
@@ -154,12 +144,21 @@ export default function OwnRoutinePage() {
   });
 
   const sensors = useSensors(
-    useSensor(MouseSensor, {}),
-    useSensor(TouchSensor, {}),
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 8, 
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
     useSensor(KeyboardSensor, {})
   );
 
-  // --- Extract Unique Options for Dropdowns ---
+  // --- Extract Unique Options ---
   const uniqueRooms = useMemo(() => {
     const rooms = new Set(rows.map((r) => r.room));
     return Array.from(rooms).sort();
@@ -268,18 +267,17 @@ export default function OwnRoutinePage() {
   }) {
     return (
       <button
+        type="button"
         {...attributes}
         {...listeners}
-        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none p-1 rounded hover:bg-muted"
       >
         <IconGripVertical className="size-4" />
       </button>
     );
   }
 
-  // --- Animated Draggable Row ---
-  const MotionTableRow = motion(TableRow);
-
+  // --- Draggable Row ---
   function DraggableRow({ row }: { row: RoutineRow }) {
     const {
       setNodeRef,
@@ -293,6 +291,8 @@ export default function OwnRoutinePage() {
     const style: React.CSSProperties = {
       transform: CSS.Transform.toString(transform),
       transition,
+      position: "relative",
+      zIndex: isDragging ? 50 : "auto",
     };
 
     const setStatus = (status: "on" | "off") => {
@@ -306,16 +306,12 @@ export default function OwnRoutinePage() {
     };
 
     return (
-      <MotionTableRow
+      <TableRow
         ref={setNodeRef}
         style={style}
-        layout
-        initial="hidden"
-        animate="visible"
-        variants={tableRowVariants}
         className={cn(
           "whitespace-nowrap transition-colors",
-          isDragging && "opacity-70 bg-muted/50"
+          isDragging && "opacity-70 bg-muted/50 shadow-lg ring-1 ring-primary/10"
         )}
       >
         <TableCell className="w-8 print:hidden p-3">
@@ -363,11 +359,11 @@ export default function OwnRoutinePage() {
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
-      </MotionTableRow>
+      </TableRow>
     );
   }
 
-  // --- Reusable Filter Controls ---
+  // --- Filter Controls ---
   const DaySelect = () => (
     <div className="space-y-1 w-full">
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
@@ -521,7 +517,7 @@ export default function OwnRoutinePage() {
       animate="visible"
       className="w-full font-lexend max-w-full overflow-x-hidden mx-auto p-5 space-y-4 print:overflow-visible"
     >
-      {/* --- Header Section with Staggered Animation --- */}
+      {/* --- Header Section (Screen Only) --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden mb-8">
         <div className="space-y-2">
           <motion.div variants={itemVariants}>
@@ -607,6 +603,21 @@ export default function OwnRoutinePage() {
             Print View
           </Button>
         </motion.div>
+      </div>
+
+      {/* --- Header Section (Print Only) --- */}
+      <div className="hidden print:flex flex-col items-center justify-center mb-6 pt-2 text-center w-full font-serif text-black">
+        <h1 className="text-2xl font-bold text-black mb-3 font-lexend tracking-tight">
+          Department of Computer Science & Engineering
+        </h1>
+
+        <div className="px-8 py-1">
+          <h2 className="font-lexend text-black tracking-wide">
+            {username}&apos;s Class Routine
+          </h2>
+        </div>
+
+        
       </div>
 
       {/* --- Main Content Card --- */}
