@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion"; // Import Framer Motion
+import { useState, useMemo, useEffect } from "react";
+import { motion, Variants, AnimatePresence } from "framer-motion";
 import {
   Select,
   SelectContent,
@@ -12,7 +12,6 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   Table,
-  TableBody,
   TableCell,
   TableHeader,
   TableRow,
@@ -45,62 +44,64 @@ const timeSlots = [
 const LUNCH_SLOT_INDEX = 5;
 
 // --- Animation Variants ---
-const containerVariants = {
+
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
+      staggerChildren: 0.08,
+      delayChildren: 0.1,
     },
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { y: 20, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { 
-      stiffness: 100, 
-      damping: 10 
-    },
+    transition: { type: "spring" as const, stiffness: 120, damping: 20 },
   },
 };
 
-const tableVariants = {
-  hidden: { opacity: 0, scale: 0.98 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { type: "spring" as const, stiffness: 120, delay: 0.4 },
-  },
-};
 
 export default function DepartmentRoutinePage() {
   const [selectedSemester, setSelectedSemester] = useState<string>("6th");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [inputValue, setInputValue] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
 
-  const currentRoutine = routineData[selectedSemester];
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(inputValue);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [inputValue]);
 
-  const isMatch = (session: ClassSession | null) => {
-    if (!session || !searchQuery) return false;
-    const query = searchQuery.toLowerCase();
-    return (
-      session.course.toLowerCase().includes(query) ||
-      session.teacher.toLowerCase().includes(query) ||
-      session.room.toLowerCase().includes(query)
-    );
-  };
+  const currentRoutine = useMemo(
+    () => routineData[selectedSemester],
+    [selectedSemester]
+  );
+  const semesterOptions = useMemo(() => Object.values(routineData), []);
 
-  const semesterOptions = Object.values(routineData);
+  const isMatch = useMemo(() => {
+    return (session: ClassSession | null) => {
+      if (!session || !debouncedSearch) return false;
+      const query = debouncedSearch.toLowerCase();
+      return (
+        session.course.toLowerCase().includes(query) ||
+        session.teacher.toLowerCase().includes(query) ||
+        session.room.toLowerCase().includes(query)
+      );
+    };
+  }, [debouncedSearch]);
 
   return (
     <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="min-h-screen font-lexend w-full max-w-full bg-background text-foreground p-5 overflow-x-hidden print:p-0 print:bg-white print:overflow-visible"
+      className="min-h-screen font-lexend w-full max-w-[1600px] mx-auto bg-background text-foreground p-5 overflow-x-hidden print:p-0 print:bg-white print:overflow-visible"
     >
       <style jsx global>{`
         @media print {
@@ -113,14 +114,17 @@ export default function DepartmentRoutinePage() {
             print-color-adjust: exact;
             background-color: white !important;
           }
-          /* Hide standard scrollbars and UI elements */
           * {
             box-shadow: none !important;
+            transition: none !important;
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
           }
         }
       `}</style>
 
-      <div className="max-w-[1800px] mx-auto space-y-8 print:space-y-0 print:w-full print:max-w-none">
+      <div className="space-y-8 print:space-y-0 print:w-full print:max-w-none">
         {/* --- Header --- */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden">
           <div className="space-y-2">
@@ -138,12 +142,11 @@ export default function DepartmentRoutinePage() {
             >
               Department of CSE
             </motion.h1>
-            <motion.p
-              variants={itemVariants}
-              className="text-muted-foreground font-medium"
-            >
-              Class Routine
-            </motion.p>
+            <motion.div variants={itemVariants} className="flex items-center gap-3">
+              <p className="text-muted-foreground font-medium text-lg">
+                Class Routine
+              </p>
+            </motion.div>
           </div>
           <motion.div variants={itemVariants}>
             <Button
@@ -202,25 +205,23 @@ export default function DepartmentRoutinePage() {
               <Input
                 placeholder="Find course, teacher, room..."
                 className="border-none font-lexend shadow-none bg-transparent! focus-visible:ring-0 h-10 px-0 text-sm"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
               />
             </div>
           </motion.div>
         </div>
 
-        {/* --- Specific Header (Print Only) --- */}
+        {/* --- Header (Print Only) --- */}
         <div className="hidden print:flex flex-col items-center justify-center mb-6 pt-2 text-center w-full font-serif text-black">
           <h1 className="text-3xl font-bold text-black mb-3 tracking-tight">
             Department of Computer Science & Engineering
           </h1>
-
           <div className="border-[3px] border-double border-black px-8 py-1 mb-5">
             <h2 className="text-lg font-bold uppercase text-black tracking-wide">
               Class Routine – {currentRoutine.session}
             </h2>
           </div>
-
           <div className="w-full flex border border-black font-bold text-sm">
             <div className="bg-gray-300 border-r border-black px-6 py-1.5">
               Semester
@@ -239,15 +240,14 @@ export default function DepartmentRoutinePage() {
 
         {/* --- Main Table Container --- */}
         <motion.div
-          variants={tableVariants}
+          variants={itemVariants}
           className="rounded-xl font-lexend border bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:border-none print:shadow-none print:bg-transparent print:overflow-visible"
         >
           <div className="overflow-x-auto w-full print:overflow-visible">
-            <Table className="w-full min-w-[1000px] print:min-w-0 print:w-full border-collapse text-sm print:border-collapse print:border border-black">
+            <Table className="w-full overflow-hidden min-w-[1000px] print:min-w-0 print:w-full border-collapse text-sm print:border-collapse print:border border-black">
               <TableHeader>
                 <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b">
-                  {/* -- Diagonal Header -- */}
-                  <TableCell className="p-0 w-[100px] min-w-[100px] h-[60px] border-r border-border/60 relative bg-muted/40 print:bg-white print:border-r print:border-black print:w-[100px] print:min-w-0">
+                  <TableCell className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40 print:bg-white print:border-r print:border-black print:w-[100px] print:min-w-0">
                     <svg
                       className="absolute inset-0 w-full h-full pointer-events-none"
                       preserveAspectRatio="none"
@@ -268,8 +268,6 @@ export default function DepartmentRoutinePage() {
                       Day
                     </span>
                   </TableCell>
-
-                  {/* -- Time Slots Header -- */}
                   {timeSlots.map((slot, i) => (
                     <TableCell
                       key={i}
@@ -298,106 +296,113 @@ export default function DepartmentRoutinePage() {
                 </TableRow>
               </TableHeader>
 
-              <TableBody>
-                {currentRoutine.schedule.map((dayRow) => (
-                  <TableRow
-                    key={dayRow.day}
-                    className="border-b border-border/60 hover:bg-muted/5 print:border-black print:border-b print:h-20"
-                  >
-                    <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 print:border-r print:border-black print:bg-white print:text-black print:font-bold">
-                      <div className="flex items-center justify-center h-full w-full py-4">
-                        <span className="writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0 print:rotate-0">
-                          {dayRow.day}
-                        </span>
-                      </div>
-                    </TableCell>
+              <motion.tbody
+                key={selectedSemester}
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+              >
+                <AnimatePresence mode="popLayout">
+                  {currentRoutine.schedule.map((dayRow) => (
+                    <motion.tr
+                      key={dayRow.day}
+                      variants={itemVariants}
+                      className="border-b border-border/60 hover:bg-muted/5 print:border-black print:border-b print:h-20"
+                    >
+                      <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 print:border-r print:border-black print:bg-white print:text-black print:font-bold">
+                        <div className="flex items-center justify-center h-full w-full py-4">
+                          <span className="writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0 print:rotate-0">
+                            {dayRow.day}
+                          </span>
+                        </div>
+                      </TableCell>
 
-                    {dayRow.slots.map((session, index) => {
-                      const highlighted = isMatch(session);
-                      const isLunch = index === LUNCH_SLOT_INDEX;
+                      {dayRow.slots.map((session, index) => {
+                        const highlighted = isMatch(session);
+                        const isLunch = index === LUNCH_SLOT_INDEX;
 
-                      // --- LUNCH COLUMN ---
-                      if (isLunch) {
+                        if (isLunch) {
+                          return (
+                            <TableCell
+                              key={index}
+                              className="p-0 align-middle border-r-0 relative overflow-hidden bg-muted/20 print:bg-gray-200 print:border-r print:border-black"
+                            >
+                              <div
+                                className="absolute inset-0 opacity-10 print:hidden"
+                                style={{
+                                  backgroundImage:
+                                    "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
+                                  backgroundSize: "4px 4px",
+                                }}
+                              />
+                              <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden">
+                                <Utensils className="w-3 h-3 text-foreground/40" />
+                              </div>
+                            </TableCell>
+                          );
+                        }
+
                         return (
                           <TableCell
                             key={index}
-                            className="p-0 align-middle border-r-0 relative overflow-hidden bg-muted/20 print:bg-gray-200 print:border-r print:border-black"
+                            className={cn(
+                              "p-1.5 align-middle border-r border-border/60 transition-colors duration-200 print:border-r print:border-black print:p-1",
+                              highlighted
+                                ? "bg-foreground/5 print:bg-transparent"
+                                : "bg-transparent print:bg-white"
+                            )}
                           >
-                            {/* -- Screen View Pattern -- */}
-                            <div
-                              className="absolute inset-0 opacity-10 print:hidden"
-                              style={{
-                                backgroundImage:
-                                  "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
-                                backgroundSize: "4px 4px",
-                              }}
-                            />
-                            <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden">
-                              <Utensils className="w-3 h-3 text-foreground/40" />
-                            </div>
-                          </TableCell>
-                        );
-                      }
+                            {session ? (
+                              <>
+                                <div
+                                  className={cn(
+                                    "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm cursor-default group print:hidden",
+                                    "transition-colors duration-200",
+                                    highlighted
+                                      ? "bg-background border-foreground shadow-md ring-1 ring-foreground/10"
+                                      : "bg-card border-border/50 hover:border-foreground/20 hover:shadow-md"
+                                  )}
+                                >
+                                  <div className="flex justify-between items-start">
+                                    <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
+                                      {session.course}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col gap-0.5 mt-1">
+                                    <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                                      <User className="w-3 h-3 opacity-70" />
+                                      <span>{session.teacher}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
+                                      <MapPin className="w-3 h-3 opacity-70" />
+                                      <span>{session.room}</span>
+                                    </div>
+                                  </div>
+                                </div>
 
-                      return (
-                        <TableCell
-                          key={index}
-                          className={cn(
-                            "p-1.5 align-middle border-r border-border/60 transition-all duration-200 print:border-r print:border-black print:p-1",
-                            highlighted
-                              ? "bg-foreground/5 print:bg-transparent"
-                              : "bg-transparent print:bg-white"
-                          )}
-                        >
-                          {session ? (
-                            <>
-                              {/* --- Screen View Card --- */}
-                              <div
-                                className={cn(
-                                  "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm transition-all cursor-default group print:hidden",
-                                  highlighted
-                                    ? "bg-background border-foreground shadow-md ring-1 ring-foreground/10"
-                                    : "bg-card border-border/50 hover:border-foreground/20 hover:shadow-md"
-                                )}
-                              >
-                                <div className="flex justify-between items-start">
-                                  <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
-                                    {session.course}
+                                <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-snug">
+                                  <span className="font-bold text-[11px]">
+                                    {session.course}, T-
+                                    {session.teacher},
+                                  </span>
+                                  <span className="font-bold text-[11px]">
+                                    R-{session.room}
                                   </span>
                                 </div>
-                                <div className="flex flex-col gap-0.5 mt-1">
-                                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                                    <User className="w-3 h-3 opacity-70" />
-                                    <span>{session.teacher}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-                                    <MapPin className="w-3 h-3 opacity-70" />
-                                    <span>{session.room}</span>
-                                  </div>
-                                </div>
+                              </>
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center">
+                                <div className="w-1 h-1 rounded-full bg-border print:hidden" />
                               </div>
-
-                              <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-snug">
-                                <span className="font-bold text-[11px]">
-                                  {session.course}, T-
-                                  {session.teacher},
-                                </span>
-                                <span className="font-bold text-[11px]">
-                                  R-{session.room}
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center">
-                              <div className="w-1 h-1 rounded-full bg-border print:hidden" />
-                            </div>
-                          )}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableBody>
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              </motion.tbody>
             </Table>
           </div>
         </motion.div>
