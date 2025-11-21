@@ -29,6 +29,8 @@ class Course(models.Model):
     room_number = models.CharField(max_length=50)
     
     
+    
+    
     credits = models.IntegerField(default=3, help_text="Number of classes per week")
     course_type = models.CharField(max_length=10, choices=COURSE_TYPES, default='Theory')
 
