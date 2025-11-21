@@ -11,6 +11,12 @@ from .permissions import IsAdminUser, IsTeacherUser, IsStudentUser
 from academic.models import Course
 from academic.serializers import CourseSerializer
 
+
+from django.http import HttpResponse
+
+def first_page(request):
+    return HttpResponse("This is home page")
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     permission_classes = (AllowAny,) 
