@@ -747,15 +747,12 @@ export default function OwnRoutinePage() {
       {/* --- Header Section (Screen Only) --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden mb-8">
         <div className="space-y-2">
-          <motion.div variants={itemVariants}>
-            {/* NEW HEADER BADGE DESIGN */}
-            <Badge
-              variant="secondary"
-              className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border rounded-full px-4 py-1 text-[10px] uppercase tracking-widest font-bold shadow-sm transition-all"
-            >
-              Faculty Member
-            </Badge>
-          </motion.div>
+          <Badge
+            variant="outline"
+            className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
+          >
+            Teacher Portal
+          </Badge>
           <motion.h1
             variants={itemVariants}
             className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"

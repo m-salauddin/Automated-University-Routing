@@ -31,38 +31,32 @@ export function NavUser() {
   };
 
   return (
-    <SidebarMenu>
+    <SidebarMenu className="border-t pt-2">
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton
               size="lg"
               className={cn(
-                "group relative dark:bg-[#1e1e1e] overflow-hidden data-[state=open]:bg-sidebar-accent cursor-pointer data-[state=open]:text-sidebar-accent-foreground",
+                "group relative overflow-hidden hover:bg-transparent data-[state=open]:bg-sidebar-accent cursor-pointer data-[state=open]:text-sidebar-accent-foreground",
                 "h-12 w-full p-2"
               )}
             >
-              {state === "expanded" && (
-                <div
-                  className="absolute inset-0 -translate-x-[150%] bg-linear-to-r from-transparent via-white/40 to-transparent 
-                  transition-transform duration-1000 ease-in-out group-hover:translate-x-[150%] 
-                  skew-x-[-20deg] pointer-events-none z-10 dark:via-white/10"
-                />
-              )}
-
-              <div className="relative z-20 flex items-center gap-2 w-full">
+              <div className="relative z-20 flex items-center gap-2 w-full overflow-hidden">
                 <Avatar className="h-8 w-8 rounded-lg shrink-0">
                   <AvatarImage src={user.avatar} alt={user.name} />
                   <AvatarFallback className="rounded-lg">CN</AvatarFallback>
                 </Avatar>
+
                 {state === "expanded" && (
-                  <div className="grid flex-1 text-left text-sm leading-tight animate-in fade-in slide-in-from-left-2 duration-200 overflow-hidden">
+                  <div className="grid flex-1 text-left text-sm leading-tight min-w-0 animate-in fade-in duration-300">
                     <span className="truncate font-medium">{user.name}</span>
                     <span className="truncate text-xs">{user.userId}</span>
                   </div>
                 )}
+
                 {state === "expanded" && (
-                  <ChevronsUpDown className="ml-auto size-4 shrink-0 animate-in fade-in duration-200" />
+                  <ChevronsUpDown className="ml-auto size-4 shrink-0 animate-in fade-in duration-300" />
                 )}
               </div>
             </SidebarMenuButton>

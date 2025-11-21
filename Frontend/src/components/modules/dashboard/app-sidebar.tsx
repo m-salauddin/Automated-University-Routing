@@ -92,7 +92,7 @@ export function AppSidebar() {
             " transition-all duration-200 group/item",
             "hover:translate-x-1",
             active
-              ? "text-primary font-semibold"
+              ? "text-primary"
               : "text-muted-foreground hover:text-foreground"
           )}
         >
@@ -106,8 +106,7 @@ export function AppSidebar() {
             >
               <item.icon
                 className={cn(
-                  "size-4.5 transition-transform duration-300",
-                  active && "scale-110"
+                  "size-4.5 transition-transform duration-300"
                 )}
               />
             </div>
@@ -157,7 +156,7 @@ export function AppSidebar() {
       <SidebarHeader className="py-4">
         <TeamSwitcher />
       </SidebarHeader>
-      <SidebarContent className="transition-opacity duration-200">
+      <SidebarContent className="transition-opacity overflow-hidden duration-200">
         <SidebarGroup>
           <SidebarGroupLabel className="pl-2">Application</SidebarGroupLabel>
           {renderGroupContent(items)}

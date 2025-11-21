@@ -57,7 +57,7 @@ export default function ProfilePage() {
     department: "Computer Science & Engineering",
     role: role || "student",
     batch: "25th Batch",
-    enrollmentYear: "Fall 2023",
+    semester: "6th Semester",
     avatarUrl:
       "https://generated.vusercontent.net/photos/rs:fill:400:400/g:ce/vi:kv:1/cid:v1:7397223c-cf9f-43b9-ab60-90df54559553",
   };
@@ -327,13 +327,13 @@ export default function ProfilePage() {
 
                   <motion.div className="space-y-3" variants={itemVariants}>
                     <Label className="text-xs uppercase text-muted-foreground font-bold tracking-wider flex items-center gap-2">
-                      Enrollment Year
+                      Semester
                     </Label>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         readOnly
-                        value={profileData.enrollmentYear}
+                        value={profileData.semester}
                         className="pl-9 bg-muted/30 border-border/60 focus-visible:ring-0 text-foreground text-base h-11"
                       />
                     </div>

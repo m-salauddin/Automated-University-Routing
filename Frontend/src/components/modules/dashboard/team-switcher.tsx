@@ -8,7 +8,7 @@ import {
   GalleryVerticalEnd,
   Users,
 } from "lucide-react";
-import logo from "@/assets/logo.svg";
+// import logo from "@/assets/logo.svg";
 
 import {
   DropdownMenu,
@@ -23,8 +23,9 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import Image from "next/image";
+// import Image from "next/image";
 import { cn } from "@/lib/utils";
+import Logo from "@/components/ui/logo";
 
 export function TeamSwitcher() {
   const { isMobile, state } = useSidebar();
@@ -64,7 +65,7 @@ export function TeamSwitcher() {
           <DropdownMenuTrigger asChild>
             <div
               className={cn(
-                "group relative overflow-hidden transition-all duration-300 ease-in-out cursor-pointer flex font-pacifico bg-muted/60 hover:bg-sidebar-accent rounded-md items-center gap-2 w-full",
+                "group relative overflow-hidden transition-all duration-300 ease-in-out cursor-pointer flex font-pacifico bg-muted/60 rounded-md items-center gap-2 w-full",
                 showContent ? "p-2" : "justify-center size-8 p-0"
               )}
             >
@@ -78,13 +79,13 @@ export function TeamSwitcher() {
 
               <div className="relative z-20 flex items-center gap-2 w-full">
                 <div className="shrink-0">
-                  <Image src={logo} width={35} height={35} alt="logo" />
+                  <Logo className="w-8 h-8" />
                 </div>
 
                 {showContent && (
                   <>
                     <div className="flex-1 animate-in fade-in slide-in-from-left-2 duration-200 overflow-hidden">
-                      <span className="text-lg font-script truncate block">
+                      <span className="text-lg font-lexend text-nowrap font-bold tracking-tight block">
                         Automated Routine
                       </span>
                     </div>
