@@ -5,7 +5,6 @@ interface LogoProps extends SVGMotionProps<SVGSVGElement> {
 }
 
 const Logo = ({ className, ...props }: LogoProps) => {
-  // Animation variants remain the same
   const itemVariants = {
     hidden: { opacity: 0, x: -10, scaleX: 0.5 },
     visible: (i: number) => ({
@@ -30,7 +29,6 @@ const Logo = ({ className, ...props }: LogoProps) => {
       animate="visible"
       {...props}
     >
-      {/* Main Card Background */}
       <motion.rect
         x="10"
         y="10"
@@ -43,7 +41,6 @@ const Logo = ({ className, ...props }: LogoProps) => {
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      {/* Header Elements */}
       <motion.rect
         x="20"
         y="22"
@@ -59,7 +56,6 @@ const Logo = ({ className, ...props }: LogoProps) => {
         cx="80"
         cy="25"
         r="3"
-        // Changed to a slightly off-white for depth
         className="fill-zinc-100 dark:fill-zinc-800"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -69,14 +65,12 @@ const Logo = ({ className, ...props }: LogoProps) => {
         cx="72"
         cy="25"
         r="3"
-        // Made slightly brighter blue
         className="fill-blue-500"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.35 }}
       />
 
-      {/* Content Bars with Gradients */}
       <motion.rect
         custom={1}
         variants={itemVariants}
@@ -143,27 +137,22 @@ const Logo = ({ className, ...props }: LogoProps) => {
         style={{ filter: "url(#clean-glow)" }}
       />
 
-      {/* Definitions for Gradients and Filters */}
       <defs>
-        {/* Bar 1 Gradient: Sunny Amber to Orange */}
         <linearGradient id="grad-amber" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#FBBF24" /> {/* amber-400 */}
           <stop offset="100%" stopColor="#F97316" /> {/* orange-500 */}
         </linearGradient>
 
-        {/* Bar 2 Gradient: Vibrant Teal to Emerald */}
         <linearGradient id="grad-teal" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#2DD4BF" /> {/* teal-400 */}
           <stop offset="100%" stopColor="#10B981" /> {/* emerald-500 */}
         </linearGradient>
 
-        {/* Bar 3 Gradient: Rich Berry Pink to Purple */}
         <linearGradient id="grad-berry" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#F472B6" /> {/* pink-400 */}
           <stop offset="100%" stopColor="#A855F7" /> {/* purple-500 */}
         </linearGradient>
 
-        {/* Bar 4 Gradient: Deep Indigo to Blue */}
         <linearGradient id="grad-indigo" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#818CF8" /> {/* indigo-400 */}
           <stop offset="100%" stopColor="#3B82F6" /> {/* blue-500 */}

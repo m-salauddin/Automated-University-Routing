@@ -348,7 +348,7 @@ export default function AutomatedRoutineDashboard() {
       <style jsx global>{`
         /* Custom Scrollbar Styling */
         .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
+          width: 0px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
           background: transparent;
@@ -492,7 +492,7 @@ export default function AutomatedRoutineDashboard() {
                         onMouseEnter={() => setActivePieIndex(index)}
                         className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border ${
                           isActive
-                            ? "bg-zinc-800 border-zinc-700 shadow-md"
+                            ? "dark:bg-zinc-800 bg-zinc-100 dark:border-zinc-700"
                             : "bg-transparent border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
                         }`}
                       >
@@ -506,8 +506,8 @@ export default function AutomatedRoutineDashboard() {
                           <span
                             className={`text-sm font-medium truncate ${
                               isActive
-                                ? "text-white"
-                                : "text-zinc-600 dark:text-zinc-400"
+                                ? "dark:text-white text-black"
+                                : "text-black dark:text-zinc-400"
                             }`}
                           >
                             {teacher.name}
@@ -517,7 +517,7 @@ export default function AutomatedRoutineDashboard() {
                           <span
                             className={`text-sm font-bold ${
                               isActive
-                                ? "text-white"
+                                ? "dark:text-white"
                                 : "text-zinc-900 dark:text-zinc-100"
                             }`}
                           >
