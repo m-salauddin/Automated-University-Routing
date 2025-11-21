@@ -28,6 +28,8 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  SheetFooter,
+  SheetClose,
 } from "@/components/ui/sheet";
 import {
   Search,
@@ -51,9 +53,29 @@ import {
 import { cn } from "@/lib/utils";
 import { Course, COURSE_DATA } from "./curriculam-data";
 
-// --- ANIMATION VARIANTS ---
+// --- PAGE LOAD ANIMATION VARIANTS ---
+const pageVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1,
+    },
+  },
+};
 
-const containerVariants: Variants = {
+const pageItemVariants: Variants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { type: "spring" as const, stiffness: 100, damping: 10 },
+  },
+};
+
+// --- TABLE ROW ANIMATION VARIANTS ---
+const tableContainerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -65,7 +87,7 @@ const containerVariants: Variants = {
 
 const rowVariants: Variants = {
   hidden: {
-    x: -100,
+    x: -20,
     opacity: 0,
   },
   visible: {
@@ -106,6 +128,9 @@ interface FilterPanelProps {
   marksFilter: string;
   setMarksFilter: (val: string) => void;
   resetFilters: () => void;
+  handleColumnToggle: (val: string) => void;
+  columns: { key: string; label: string }[];
+  visibleCols: Record<string, boolean>;
 }
 
 const FilterPanel = ({
@@ -118,8 +143,11 @@ const FilterPanel = ({
   marksFilter,
   setMarksFilter,
   resetFilters,
+  handleColumnToggle,
+  columns,
+  visibleCols,
 }: FilterPanelProps) => (
-  <div className="flex flex-col gap-6">
+  <div className="flex flex-col gap-6 py-6 px-4">
     <FilterItem label="Search">
       <div className="relative">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -179,15 +207,57 @@ const FilterPanel = ({
       </Select>
     </FilterItem>
 
-    <div className="pt-2">
-      <Button variant="outline" className="w-full" onClick={resetFilters}>
-        <X className="h-3.5 w-3.5 mr-2" /> Reset All Filters
-      </Button>
-    </div>
+    <div className="my-2 border-t" />
+
+    <FilterItem label="Visible Columns">
+      <Select onValueChange={handleColumnToggle}>
+        <SelectTrigger className="w-full h-9 bg-background text-muted-foreground">
+          <SelectValue placeholder="Toggle Columns" />
+        </SelectTrigger>
+        <SelectContent>
+          {columns.map((col) => (
+            <SelectItem key={col.key} value={col.key}>
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    "flex h-4 w-4 items-center justify-center rounded border",
+                    visibleCols[col.key]
+                      ? "bg-primary border-primary"
+                      : "opacity-40"
+                  )}
+                >
+                  <Check
+                    className={cn(
+                      "h-3 w-3 text-primary-foreground",
+                      !visibleCols[col.key] && "hidden"
+                    )}
+                  />
+                </div>
+                <span className="capitalize">{col.label}</span>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </FilterItem>
+
+    <div className="mt-2"></div>
+
+    <SheetFooter>
+      <SheetClose asChild>
+        <Button variant="outline" onClick={resetFilters} className="w-full">
+          Reset All
+        </Button>
+      </SheetClose>
+      <SheetClose asChild>
+        <Button className="w-full mt-2 sm:mt-0">Done</Button>
+      </SheetClose>
+    </SheetFooter>
   </div>
 );
 
 export default function AutomatedRoutineCourses() {
+  // -- State --
   const [searchQuery, setSearchQuery] = useState("");
   const [semesterFilter, setSemesterFilter] = useState("All");
   const [creditFilter, setCreditFilter] = useState("All");
@@ -209,7 +279,7 @@ export default function AutomatedRoutineCourses() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-
+  // -- Handlers --
   const handleSearchChange = (val: string) => {
     setSearchQuery(val);
     setCurrentPage(1);
@@ -251,7 +321,6 @@ export default function AutomatedRoutineCourses() {
     []
   );
 
-  // Derived Data
   const filteredData = useMemo(() => {
     let data = [...COURSE_DATA];
 
@@ -287,14 +356,13 @@ export default function AutomatedRoutineCourses() {
     return data;
   }, [searchQuery, semesterFilter, creditFilter, marksFilter, sortConfig]);
 
-
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
   const paginatedData = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     return filteredData.slice(startIndex, startIndex + pageSize);
   }, [filteredData, currentPage, pageSize]);
 
-  const animationKey = `${searchQuery}-${semesterFilter}-${creditFilter}-${marksFilter}-${currentPage}-${pageSize}-${sortConfig?.key}-${sortConfig?.direction}`;
+  const tableAnimationKey = `${searchQuery}-${semesterFilter}-${creditFilter}-${marksFilter}-${currentPage}-${pageSize}-${sortConfig?.key}-${sortConfig?.direction}`;
 
   const handleSort = (key: keyof Course) => {
     let direction: "asc" | "desc" = "asc";
@@ -323,24 +391,36 @@ export default function AutomatedRoutineCourses() {
         }
       `}</style>
 
-      <div className="w-full min-w-0 max-w-full mx-auto p-4 md:p-6 space-y-6 font-lexend text-foreground overflow-x-hidden print:p-0 print:max-w-none">
-        {/* Header Section */}
+      {/* -- PAGE LOAD ANIMATION CONTAINER -- */}
+      <motion.div
+        variants={pageVariants}
+        initial="hidden"
+        animate="visible"
+        className="w-full min-w-0 max-w-full mx-auto p-4 md:p-6 space-y-6 font-lexend text-foreground overflow-x-hidden print:p-0 print:max-w-none"
+      >
+        {/* -- Header Section -- */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden mb-8">
           <div className="space-y-2 w-full">
-            <div>
+            <motion.div variants={pageItemVariants}>
               <Badge
                 variant="outline"
                 className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
               >
                 Course Curriculum
               </Badge>
-            </div>
+            </motion.div>
 
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
+            <motion.h1
+              variants={pageItemVariants}
+              className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"
+            >
               Department of CSE
-            </h1>
+            </motion.h1>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <motion.div
+              variants={pageItemVariants}
+              className="flex flex-wrap items-center gap-3"
+            >
               <p className="text-muted-foreground ">All Course Offered</p>
               <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
               <span className="text-foreground font-bold uppercase">
@@ -352,37 +432,46 @@ export default function AutomatedRoutineCourses() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 rounded-full gap-1.5 text-xs font-medium border-dashed ml-2 min-[1300px]:hidden"
+                    className="min-[1300px]:hidden h-6 text-[10px] px-2 gap-1"
                   >
-                    <Filter className="h-3.5 w-3.5" /> Filters
+                    <Filter className="h-3 w-3" /> Filters
                   </Button>
                 </SheetTrigger>
-                <SheetContent className="w-[300px] sm:w-[400px] overflow-y-auto">
+                <SheetContent
+                  side="right"
+                  className="w-[300px] sm:w-[400px] overflow-y-auto"
+                >
                   <SheetHeader>
-                    <SheetTitle>Filter Courses</SheetTitle>
+                    <SheetTitle>Filters & View</SheetTitle>
                     <SheetDescription>
-                      Narrow down the curriculum list.
+                      Customize your course table view.
                     </SheetDescription>
                   </SheetHeader>
-                  <div className="mt-6">
-                    <FilterPanel
-                      searchQuery={searchQuery}
-                      setSearchQuery={handleSearchChange}
-                      semesterFilter={semesterFilter}
-                      setSemesterFilter={handleSemesterChange}
-                      creditFilter={creditFilter}
-                      setCreditFilter={handleCreditChange}
-                      marksFilter={marksFilter}
-                      setMarksFilter={handleMarksChange}
-                      resetFilters={resetFilters}
-                    />
-                  </div>
+
+                  {/* -- Extracted Filter Panel for Mobile -- */}
+                  <FilterPanel
+                    searchQuery={searchQuery}
+                    setSearchQuery={handleSearchChange}
+                    semesterFilter={semesterFilter}
+                    setSemesterFilter={handleSemesterChange}
+                    creditFilter={creditFilter}
+                    setCreditFilter={handleCreditChange}
+                    marksFilter={marksFilter}
+                    setMarksFilter={handleMarksChange}
+                    resetFilters={resetFilters}
+                    handleColumnToggle={handleColumnToggle}
+                    columns={columns}
+                    visibleCols={visibleCols}
+                  />
                 </SheetContent>
               </Sheet>
-            </div>
+            </motion.div>
           </div>
 
-          <div className="flex gap-2 shrink-0">
+          <motion.div
+            variants={pageItemVariants}
+            className="flex gap-2 shrink-0"
+          >
             <Button
               onClick={() => window.print()}
               variant="outline"
@@ -390,7 +479,7 @@ export default function AutomatedRoutineCourses() {
             >
               <Printer className="h-4 w-4" /> Print Catalog
             </Button>
-          </div>
+          </motion.div>
         </div>
 
         {/* -- Print Header -- */}
@@ -401,13 +490,14 @@ export default function AutomatedRoutineCourses() {
           </p>
         </div>
 
-        <div>
+        {/* -- Main Content Card -- */}
+        <motion.div variants={pageItemVariants}>
           <Card className="w-full overflow-hidden dark:bg-[#111113] border shadow-sm print:border-none print:shadow-none print:overflow-visible">
             <CardHeader className="p-4 bg-muted/30 border-b hidden min-[1300px]:block print:hidden">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col xl:flex-row gap-4 justify-between items-end">
                   <div className="grid grid-cols-4 gap-3 w-full xl:w-auto flex-1">
-                   
+                    {/* -- Desktop Filters -- */}
                     <FilterItem label="Search">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -484,7 +574,7 @@ export default function AutomatedRoutineCourses() {
                     </FilterItem>
                   </div>
 
-                  {/* -- Right Side Controls -- */}
+                  {/* -- Desktop Right Controls -- */}
                   <div className="flex gap-3 items-end shrink-0 w-full xl:w-auto justify-end xl:justify-start">
                     <div className="min-w-[150px]">
                       <FilterItem label="Columns">
@@ -617,8 +707,8 @@ export default function AutomatedRoutineCourses() {
                   </TableHeader>
 
                   <motion.tbody
-                    key={animationKey}
-                    variants={containerVariants}
+                    key={tableAnimationKey}
+                    variants={tableContainerVariants}
                     initial="hidden"
                     animate="visible"
                     className="[&_tr:last-child]:border-0"
@@ -804,16 +894,18 @@ export default function AutomatedRoutineCourses() {
               </div>
             )}
           </Card>
-        </div>
+        </motion.div>
 
-        <Button
-          variant="outline"
-          onClick={() => window.print()}
-          className="w-full lg:hidden print:hidden gap-2 mt-4"
-        >
-          <Printer className="h-4 w-4" /> Print Catalog
-        </Button>
-      </div>
+        <motion.div variants={pageItemVariants}>
+          <Button
+            variant="outline"
+            onClick={() => window.print()}
+            className="w-full lg:hidden print:hidden gap-2 mt-4"
+          >
+            <Printer className="h-4 w-4" /> Print Curriculum
+          </Button>
+        </motion.div>
+      </motion.div>
     </>
   );
 }

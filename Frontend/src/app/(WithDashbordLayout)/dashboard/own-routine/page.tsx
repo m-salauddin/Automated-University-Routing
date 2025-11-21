@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { motion} from "framer-motion";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Select,
@@ -157,7 +157,9 @@ export default function OwnRoutinePage() {
   // --- State ---
   const [rows, setRows] = useState<RoutineRow[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [teacherInfo, setTeacherInfo] = useState<APIResponse['teacher_info'] | null>(null);
+  const [teacherInfo, setTeacherInfo] = useState<
+    APIResponse["teacher_info"] | null
+  >(null);
 
   const [day, setDay] = useState<string>("All");
   const [typeFilter, setTypeFilter] = useState<string>("All");
@@ -166,7 +168,7 @@ export default function OwnRoutinePage() {
   const [semesterFilter, setSemesterFilter] = useState<string>("All");
 
   const [visibleCols, setVisibleCols] = useState<
-      Record<keyof Omit<RoutineRow, "id" | "teacherId">, boolean>
+    Record<keyof Omit<RoutineRow, "id" | "teacherId">, boolean>
   >({
     day: true,
     time: true,
@@ -178,9 +180,11 @@ export default function OwnRoutinePage() {
   });
 
   const sensors = useSensors(
-      useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
-      useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
-      useSensor(KeyboardSensor, {})
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 5 },
+    }),
+    useSensor(KeyboardSensor, {})
   );
 
   // --- Data Fetching ---
@@ -189,32 +193,137 @@ export default function OwnRoutinePage() {
       setIsLoading(true);
       try {
         // Simulate API Delay for Demo
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
         const data: APIResponse = {
-          "teacher_info": {
-            "id": "101",
-            "initials": "MKN",
-            "total_sessions": 15,
-            "semesters_involved": ["6th", "7th", "8th"]
+          teacher_info: {
+            id: "101",
+            initials: "MKN",
+            total_sessions: 15,
+            semesters_involved: ["6th", "7th", "8th"],
           },
-          "schedule": [
-            { "day": "Sun", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B317L", "slot_index": 1 },
-            { "day": "Sun", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B317L", "slot_index": 2 },
-            { "day": "Mon", "semester": "6th", "course": "CSE 3603", "type": "Theory", "room": "B316", "slot_index": 2 },
-            { "day": "Mon", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B318L", "slot_index": 6 },
-            { "day": "Mon", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B318L", "slot_index": 7 },
-            { "day": "Tue", "semester": "6th", "course": "CSE 3603", "type": "Theory", "room": "B322", "slot_index": 0 },
-            { "day": "Tue", "semester": "6th", "course": "CSE 3603", "type": "Theory", "room": "B322", "slot_index": 1 },
-            { "day": "Wed", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B317L", "slot_index": 2 },
-            { "day": "Wed", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B317L", "slot_index": 3 },
-            { "day": "Wed", "semester": "7th", "course": "CSE 4700", "type": "Lab", "room": "B318L", "slot_index": 6 },
-            { "day": "Wed", "semester": "7th", "course": "CSE 4700", "type": "Lab", "room": "B318L", "slot_index": 7 },
-            { "day": "Thu", "semester": "7th", "course": "CSE 4700", "type": "Lab", "room": "B318L", "slot_index": 3 },
-            { "day": "Thu", "semester": "7th", "course": "CSE 4700", "type": "Lab", "room": "B318L", "slot_index": 4 },
-            { "day": "Thu", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B318L", "slot_index": 6 },
-            { "day": "Thu", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B318L", "slot_index": 7 }
-          ]
+          schedule: [
+            {
+              day: "Sun",
+              semester: "8th",
+              course: "CSE 4800",
+              type: "Lab",
+              room: "B317L",
+              slot_index: 1,
+            },
+            {
+              day: "Sun",
+              semester: "8th",
+              course: "CSE 4800",
+              type: "Lab",
+              room: "B317L",
+              slot_index: 2,
+            },
+            {
+              day: "Mon",
+              semester: "6th",
+              course: "CSE 3603",
+              type: "Theory",
+              room: "B316",
+              slot_index: 2,
+            },
+            {
+              day: "Mon",
+              semester: "8th",
+              course: "CSE 4800",
+              type: "Lab",
+              room: "B318L",
+              slot_index: 6,
+            },
+            {
+              day: "Mon",
+              semester: "8th",
+              course: "CSE 4800",
+              type: "Lab",
+              room: "B318L",
+              slot_index: 7,
+            },
+            {
+              day: "Tue",
+              semester: "6th",
+              course: "CSE 3603",
+              type: "Theory",
+              room: "B322",
+              slot_index: 0,
+            },
+            {
+              day: "Tue",
+              semester: "6th",
+              course: "CSE 3603",
+              type: "Theory",
+              room: "B322",
+              slot_index: 1,
+            },
+            {
+              day: "Wed",
+              semester: "8th",
+              course: "CSE 4800",
+              type: "Lab",
+              room: "B317L",
+              slot_index: 2,
+            },
+            {
+              day: "Wed",
+              semester: "8th",
+              course: "CSE 4800",
+              type: "Lab",
+              room: "B317L",
+              slot_index: 3,
+            },
+            {
+              day: "Wed",
+              semester: "7th",
+              course: "CSE 4700",
+              type: "Lab",
+              room: "B318L",
+              slot_index: 6,
+            },
+            {
+              day: "Wed",
+              semester: "7th",
+              course: "CSE 4700",
+              type: "Lab",
+              room: "B318L",
+              slot_index: 7,
+            },
+            {
+              day: "Thu",
+              semester: "7th",
+              course: "CSE 4700",
+              type: "Lab",
+              room: "B318L",
+              slot_index: 3,
+            },
+            {
+              day: "Thu",
+              semester: "7th",
+              course: "CSE 4700",
+              type: "Lab",
+              room: "B318L",
+              slot_index: 4,
+            },
+            {
+              day: "Thu",
+              semester: "8th",
+              course: "CSE 4800",
+              type: "Lab",
+              room: "B318L",
+              slot_index: 6,
+            },
+            {
+              day: "Thu",
+              semester: "8th",
+              course: "CSE 4800",
+              type: "Lab",
+              room: "B318L",
+              slot_index: 7,
+            },
+          ],
         };
 
         setTeacherInfo(data.teacher_info);
@@ -260,7 +369,8 @@ export default function OwnRoutinePage() {
       const matchType = typeFilter === "All" || r.type === typeFilter;
       const matchStatus = statusFilter === "All" || r.status === statusFilter;
       const matchRoom = roomFilter === "All" || r.room === roomFilter;
-      const matchSemester = semesterFilter === "All" || r.semester === semesterFilter;
+      const matchSemester =
+        semesterFilter === "All" || r.semester === semesterFilter;
       return matchDay && matchType && matchStatus && matchRoom && matchSemester;
     });
   }, [day, typeFilter, statusFilter, roomFilter, semesterFilter, rows]);
@@ -272,10 +382,10 @@ export default function OwnRoutinePage() {
 
   const totalPages = Math.max(1, Math.ceil(processedRows.length / pageSize));
   const paged = showAllForPrint
-      ? processedRows
-      : processedRows.slice(
-          (page - 1) * pageSize,
-          Math.min((page - 1) * pageSize + pageSize, processedRows.length)
+    ? processedRows
+    : processedRows.slice(
+        (page - 1) * pageSize,
+        Math.min((page - 1) * pageSize + pageSize, processedRows.length)
       );
 
   useEffect(() => {
@@ -339,133 +449,290 @@ export default function OwnRoutinePage() {
     "semester",
   ];
 
-  function DragHandle({ attributes, listeners }: { attributes: React.HTMLAttributes<HTMLElement>; listeners: Record<string, unknown>; }) {
+  function DragHandle({
+    attributes,
+    listeners,
+  }: {
+    attributes: React.HTMLAttributes<HTMLElement>;
+    listeners: Record<string, unknown>;
+  }) {
     return (
-        <button type="button" {...attributes} {...listeners} className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none p-1 rounded hover:bg-muted">
-          <IconGripVertical className="size-4" />
-        </button>
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none p-1 rounded hover:bg-muted"
+      >
+        <IconGripVertical className="size-4" />
+      </button>
     );
   }
 
   function DraggableRow({ row }: { row: RoutineRow }) {
-    const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: row.id });
+    const {
+      setNodeRef,
+      attributes,
+      listeners,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: row.id });
+
     const style: React.CSSProperties = {
       transform: CSS.Transform.toString(transform),
       transition,
       position: "relative",
       zIndex: isDragging ? 50 : "auto",
     };
+
     const setStatus = (status: "on" | "off") => {
-      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status } : r)));
+      setRows((prev) =>
+        prev.map((r) => (r.id === row.id ? { ...r, status } : r))
+      );
       try {
-        dispatch(setTeacherStatus({ teacherId: row.teacherId, isOn: status === "on" }));
+        dispatch(
+          setTeacherStatus({ teacherId: row.teacherId, isOn: status === "on" })
+        );
       } catch (error) {
         console.error("Failed to update teacher status:", error);
       }
       const isOff = status === "off";
-      toast[isOff ? "warning" : "success"](`${row.course} is now ${isOff ? "OFF" : "ON"}`);
+      toast[isOff ? "warning" : "success"](
+        `${row.course} is now ${isOff ? "OFF" : "ON"}`
+      );
     };
 
     return (
-        <TableRow ref={setNodeRef} style={style} className={cn("whitespace-nowrap transition-colors", isDragging && "opacity-70 bg-muted/50 shadow-lg ring-1 ring-primary/10")} data-teacher-id={row.teacherId}>
-          <TableCell className="w-8 print:hidden p-3"><DragHandle attributes={attributes} listeners={listeners ?? {}} /></TableCell>
-          {columnsOrder.map((key) => visibleCols[key] ? (
-              <TableCell key={key} className={cn("p-3", key === "course" && "font-medium")}>
-                {key === "type" ? <Badge variant={row.type === "Lab" ? "secondary" : "default"}>{row.type}</Badge> :
-                    key === "status" ? <Badge variant={row.status === "on" ? "default" : "destructive"}>{row.status === "on" ? "On" : "Off"}</Badge> :
-                        row[key]}
-              </TableCell>
-          ) : null)}
-          <TableCell className="w-8 text-right print:hidden p-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="size-4" /></Button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-400 hover:text-red-400" onClick={() => setStatus(row.status === "on" ? "off" : "on")}>
-                  <PowerOff className="size-4 text-red-400" />{row.status === "on" ? "Mark as Off" : "Mark as On"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TableCell>
-        </TableRow>
+      <TableRow
+        ref={setNodeRef}
+        style={style}
+        className={cn(
+          "whitespace-nowrap transition-colors",
+          isDragging &&
+            "opacity-70 bg-muted/50 shadow-lg ring-1 ring-primary/10"
+        )}
+        data-teacher-id={row.teacherId}
+      >
+        <TableCell className="w-8 print:hidden p-3">
+          <DragHandle attributes={attributes} listeners={listeners ?? {}} />
+        </TableCell>
+        {columnsOrder.map((key) =>
+          visibleCols[key] ? (
+            <TableCell
+              key={key}
+              className={cn("p-3", key === "course" && "font-medium")}
+            >
+              {/* CUSTOM BADGE LOGIC START */}
+              {key === "type" ? (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "rounded-md px-2.5 py-0.5 font-medium border shadow-sm",
+                    row.type === "Lab"
+                      ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20"
+                      : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/20"
+                  )}
+                >
+                  {row.type}
+                </Badge>
+              ) : key === "status" ? (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "rounded-md px-2.5 py-0.5 font-medium border shadow-sm flex w-fit items-center gap-1.5",
+                    row.status === "on"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/20"
+                      : "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/20"
+                  )}
+                >
+                  {/* Status Indicator Dot */}
+                  <span
+                    className={cn(
+                      "size-1.5 rounded-full",
+                      row.status === "on"
+                        ? "bg-emerald-500"
+                        : "bg-rose-500 animate-pulse"
+                    )}
+                  />
+                  {row.status === "on" ? "Active" : "Cancelled"}
+                </Badge>
+              ) : (
+                row[key]
+              )}
+              {/* CUSTOM BADGE LOGIC END */}
+            </TableCell>
+          ) : null
+        )}
+        <TableCell className="w-8 text-right print:hidden p-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-red-400 hover:text-red-400"
+                onClick={() => setStatus(row.status === "on" ? "off" : "on")}
+              >
+                <PowerOff className="size-4 text-red-400 mr-2" />
+                {row.status === "on" ? "Mark as Off" : "Mark as On"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
     );
   }
 
   // --- Filters ---
   const DaySelect = () => (
-      <div className="space-y-1 w-full">
-        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><Calendar className="w-3 h-3" /> Day</span>
-        <Select value={day} onValueChange={setDay}>
-          <SelectTrigger className="w-full h-9 bg-background"><SelectValue /></SelectTrigger>
-          <SelectContent>{days.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <Calendar className="w-3 h-3" /> Day
+      </span>
+      <Select value={day} onValueChange={setDay}>
+        <SelectTrigger className="w-full h-9 bg-background">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {days.map((d) => (
+            <SelectItem key={d} value={d}>
+              {d}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
   const TypeSelect = () => (
-      <div className="space-y-1 w-full">
-        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><BookOpen className="w-3 h-3" /> Type</span>
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-full h-9 bg-background"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="All">All Types</SelectItem><SelectItem value="Theory">Theory</SelectItem><SelectItem value="Lab">Lab</SelectItem></SelectContent>
-        </Select>
-      </div>
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <BookOpen className="w-3 h-3" /> Type
+      </span>
+      <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <SelectTrigger className="w-full h-9 bg-background">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="All">All Types</SelectItem>
+          <SelectItem value="Theory">Theory</SelectItem>
+          <SelectItem value="Lab">Lab</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
   );
   const StatusSelect = () => (
-      <div className="space-y-1 w-full">
-        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><SlidersHorizontal className="w-3 h-3" /> Status</span>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full h-9 bg-background"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="All">All Status</SelectItem><SelectItem value="on">Active (On)</SelectItem><SelectItem value="off">Cancelled (Off)</SelectItem></SelectContent>
-        </Select>
-      </div>
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <SlidersHorizontal className="w-3 h-3" /> Status
+      </span>
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger className="w-full h-9 bg-background">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="All">All Status</SelectItem>
+          <SelectItem value="on">Active (On)</SelectItem>
+          <SelectItem value="off">Cancelled (Off)</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
   );
   const RoomSelect = () => (
-      <div className="space-y-1 w-full">
-        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><MapPin className="w-3 h-3" /> Room</span>
-        <Select value={roomFilter} onValueChange={setRoomFilter}>
-          <SelectTrigger className="w-full h-9 bg-background"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="All">All Rooms</SelectItem>{uniqueRooms.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <MapPin className="w-3 h-3" /> Room
+      </span>
+      <Select value={roomFilter} onValueChange={setRoomFilter}>
+        <SelectTrigger className="w-full h-9 bg-background">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="All">All Rooms</SelectItem>
+          {uniqueRooms.map((r) => (
+            <SelectItem key={r} value={r}>
+              {r}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
   const SemesterSelect = () => (
-      <div className="space-y-1 w-full">
-        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><GraduationCap className="w-3 h-3" /> Semester</span>
-        <Select value={semesterFilter} onValueChange={setSemesterFilter}>
-          <SelectTrigger className="w-full h-9 bg-background"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="All">All Semesters</SelectItem>{uniqueSemesters.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <GraduationCap className="w-3 h-3" /> Semester
+      </span>
+      <Select value={semesterFilter} onValueChange={setSemesterFilter}>
+        <SelectTrigger className="w-full h-9 bg-background">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="All">All Semesters</SelectItem>
+          {uniqueSemesters.map((s) => (
+            <SelectItem key={s} value={s}>
+              {s}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
   const ColumnSelect = () => (
-      <div className="space-y-1 w-full">
-        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><LayoutList className="w-3 h-3" /> Columns</span>
-        <Select value="" onValueChange={handleColumnToggle}>
-          <SelectTrigger className="w-full h-9 bg-background text-muted-foreground"><SelectValue placeholder="Customize View" /></SelectTrigger>
-          <SelectContent align="end">
-            {columnsOrder.map((key) => (
-                <SelectItem key={key} value={key}>
-                  <div className="flex items-center gap-2">
-                    <div className={cn("flex h-4 w-4 items-center justify-center rounded border", visibleCols[key] ? "bg-primary border-primary" : "opacity-40")}>
-                      <Check className={cn("h-3 w-3 text-primary-foreground", !visibleCols[key] && "hidden")} />
-                    </div>
-                    <span className="capitalize">{key}</span>
-                  </div>
-                </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="space-y-1 w-full">
+      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
+        <LayoutList className="w-3 h-3" /> Columns
+      </span>
+      <Select value="" onValueChange={handleColumnToggle}>
+        <SelectTrigger className="w-full h-9 bg-background text-muted-foreground">
+          <SelectValue placeholder="Customize View" />
+        </SelectTrigger>
+        <SelectContent align="end">
+          {columnsOrder.map((key) => (
+            <SelectItem key={key} value={key}>
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    "flex h-4 w-4 items-center justify-center rounded border",
+                    visibleCols[key]
+                      ? "bg-primary border-primary"
+                      : "opacity-40"
+                  )}
+                >
+                  <Check
+                    className={cn(
+                      "h-3 w-3 text-primary-foreground",
+                      !visibleCols[key] && "hidden"
+                    )}
+                  />
+                </div>
+                <span className="capitalize">{key}</span>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 
-  if (role !== "teacher") return <div className="p-6"><Alert><AlertTitle>Access restricted</AlertTitle><AlertDescription>Teacher access only.</AlertDescription></Alert></div>;
+  if (role !== "teacher")
+    return (
+      <div className="p-6">
+        <Alert>
+          <AlertTitle>Access restricted</AlertTitle>
+          <AlertDescription>Teacher access only.</AlertDescription>
+        </Alert>
+      </div>
+    );
 
   if (isLoading) {
     return (
-        <div className="w-full h-[70vh] flex items-center justify-center bg-background">
-          <DataLoader />
-        </div>
+      <div className="w-full h-[70vh] flex items-center justify-center bg-background">
+        <DataLoader />
+      </div>
     );
   }
 
@@ -481,9 +748,10 @@ export default function OwnRoutinePage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden mb-8">
         <div className="space-y-2">
           <motion.div variants={itemVariants}>
+            {/* NEW HEADER BADGE DESIGN */}
             <Badge
-              variant="outline"
-              className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
+              variant="secondary"
+              className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 border rounded-full px-4 py-1 text-[10px] uppercase tracking-widest font-bold shadow-sm transition-all"
             >
               Faculty Member
             </Badge>
