@@ -97,11 +97,13 @@ export default function ProfilePage() {
                 {profileData.department}{" "}
                 <span className="text-foreground/40 mx-1">•</span>{" "}
                 <span className="text-foreground font-semibold">
-                  {profileData.studentId}
+                  {profileData.fullName.split(" ")[0]}
                 </span>
               </p>
             </motion.div>
           </div>
+
+          {/* --- Edit Profile --- */}
 
           {/* <motion.div variants={itemVariants}>
             <Button
@@ -240,7 +242,7 @@ export default function ProfilePage() {
                       Full Name
                     </Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <User className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         readOnly
                         value={profileData.fullName}
@@ -254,7 +256,7 @@ export default function ProfilePage() {
                       Student ID
                     </Label>
                     <div className="relative">
-                      <IdCard className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <IdCard className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         readOnly
                         value={profileData.studentId}
@@ -270,7 +272,7 @@ export default function ProfilePage() {
                       Username
                     </Label>
                     <div className="relative">
-                      <AtSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <AtSign className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         readOnly
                         value={profileData.username}
@@ -284,7 +286,7 @@ export default function ProfilePage() {
                       Email Address
                     </Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Mail className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         readOnly
                         value={profileData.email}
@@ -299,7 +301,7 @@ export default function ProfilePage() {
                     Department
                   </Label>
                   <div className="relative">
-                    <Building2 className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Building2 className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       readOnly
                       value={profileData.department}
@@ -314,7 +316,7 @@ export default function ProfilePage() {
                       Role
                     </Label>
                     <div className="relative">
-                      <Shield className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Shield className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         readOnly
                         value={profileData.role.toUpperCase()}
@@ -328,7 +330,7 @@ export default function ProfilePage() {
                       Enrollment Year
                     </Label>
                     <div className="relative">
-                      <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Calendar className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         readOnly
                         value={profileData.enrollmentYear}

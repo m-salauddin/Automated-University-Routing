@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { motion, Variants, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Select,
   SelectContent,
@@ -28,6 +28,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ClassSession, routineData } from "./students-routine-data";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/store";
 
 const timeSlots = [
   "8.45-9.35",
@@ -45,28 +47,29 @@ const LUNCH_SLOT_INDEX = 5;
 
 // --- Animation Variants ---
 
-const containerVariants: Variants = {
+const containerVariants= {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.1,
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
     },
   },
 };
 
-const itemVariants: Variants = {
+const itemVariants = {
   hidden: { y: 20, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { type: "spring" as const, stiffness: 120, damping: 20 },
+    transition: { type: "spring" as const, stiffness: 100, damping:10 },
   },
 };
 
 
 export default function DepartmentRoutinePage() {
+  const availabilityMap = useSelector((s: RootState) => s.teacherAvailability.map);
   const [selectedSemester, setSelectedSemester] = useState<string>("6th");
   const [inputValue, setInputValue] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
@@ -142,9 +145,15 @@ export default function DepartmentRoutinePage() {
             >
               Department of CSE
             </motion.h1>
-            <motion.div variants={itemVariants} className="flex items-center gap-3">
-              <p className="text-muted-foreground font-medium text-lg">
-                Class Routine
+            <motion.div
+              variants={itemVariants}
+              className="flex items-center gap-3"
+            >
+              <p className="text-muted-foreground font-medium">
+                Class Routine <span className="text-foreground/40 mx-1">•</span>{" "}
+                <span className="text-foreground font-semibold">
+                  {currentRoutine.label}
+                </span>
               </p>
             </motion.div>
           </div>
@@ -319,6 +328,8 @@ export default function DepartmentRoutinePage() {
                       </TableCell>
 
                       {dayRow.slots.map((session, index) => {
+                        const teacherKey = session ? (session.teacherId ?? session.teacher) : undefined;
+                        const isTeacherOff = !!teacherKey && availabilityMap[teacherKey] === false;
                         const highlighted = isMatch(session);
                         const isLunch = index === LUNCH_SLOT_INDEX;
 
@@ -359,7 +370,9 @@ export default function DepartmentRoutinePage() {
                                   className={cn(
                                     "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm cursor-default group print:hidden",
                                     "transition-colors duration-200",
-                                    highlighted
+                                    isTeacherOff
+                                      ? "bg-card border-red-500 ring-2 ring-red-400/40"
+                                      : highlighted
                                       ? "bg-background border-foreground shadow-md ring-1 ring-foreground/10"
                                       : "bg-card border-border/50 hover:border-foreground/20 hover:shadow-md"
                                   )}

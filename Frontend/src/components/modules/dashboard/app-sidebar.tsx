@@ -7,6 +7,7 @@ import {
   User,
   View,
   ChevronRight,
+  ListTodo,
 } from "lucide-react";
 
 import {
@@ -30,6 +31,7 @@ import { cn } from "@/lib/utils";
 
 const items = [
   { title: "Analytics", url: "/dashboard/analytics", icon: ChartColumnBig },
+  { title: "Curriculum", url: "/dashboard/course-curriculum", icon: ListTodo },
 ];
 
 export function AppSidebar() {

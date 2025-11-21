@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion"; 
+import { motion} from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Select,
@@ -78,9 +78,56 @@ import {
   GraduationCap,
   PowerOff,
 } from "lucide-react";
-import { myRoutine } from "./own-routine-data";
+import { useDispatch } from "react-redux";
+import { setTeacherStatus } from "@/store/teacherAvailabilitySlice";
+import DataLoader from "@/components/ui/data-loader";
 
-// --- Page Animations ---
+const SLOT_TIMINGS: Record<number, string> = {
+  0: "08:30 AM - 09:50 AM",
+  1: "10:00 AM - 11:20 AM",
+  2: "11:30 AM - 12:50 PM",
+  3: "01:30 PM - 02:50 PM",
+  4: "03:00 PM - 04:20 PM",
+  5: "04:30 PM - 05:50 PM",
+  6: "06:00 PM - 07:20 PM",
+  7: "07:30 PM - 08:50 PM",
+  8: "09:00 PM - 10:20 PM",
+};
+
+const getSlotTime = (index: number) => SLOT_TIMINGS[index] || "Unknown Time";
+
+type APIRoutineItem = {
+  day: string;
+  semester: string;
+  course: string;
+  type: string;
+  room: string;
+  slot_index: number;
+};
+
+type APIResponse = {
+  teacher_info: {
+    id: string;
+    initials: string;
+    total_sessions: number;
+    semesters_involved: string[];
+  };
+  schedule: APIRoutineItem[];
+};
+
+type RoutineRow = {
+  id: number;
+  day: string;
+  time: string;
+  course: string;
+  type: string;
+  room: string;
+  semester: string;
+  status: "on" | "off";
+  teacherId: string;
+};
+
+// --- Animations Variants ---
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -101,30 +148,17 @@ const itemVariants = {
   },
 };
 
-type RoutineRow = {
-  id: number;
-  day: string;
-  time: string;
-  course: string;
-  type: string;
-  room: string;
-  semester: string;
-  status: "on" | "off";
-};
-
-const initialRows: RoutineRow[] = myRoutine.map((r, i) => ({
-  id: i + 1,
-  status: "on",
-  ...r,
-}));
-
 const days = ["All", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function OwnRoutinePage() {
   const { role, username } = { role: "teacher", username: "John Doe" };
+  const dispatch = useDispatch();
 
   // --- State ---
-  const [rows, setRows] = useState<RoutineRow[]>(initialRows);
+  const [rows, setRows] = useState<RoutineRow[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [teacherInfo, setTeacherInfo] = useState<APIResponse['teacher_info'] | null>(null);
+
   const [day, setDay] = useState<string>("All");
   const [typeFilter, setTypeFilter] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
@@ -132,7 +166,7 @@ export default function OwnRoutinePage() {
   const [semesterFilter, setSemesterFilter] = useState<string>("All");
 
   const [visibleCols, setVisibleCols] = useState<
-    Record<keyof Omit<RoutineRow, "id">, boolean>
+      Record<keyof Omit<RoutineRow, "id" | "teacherId">, boolean>
   >({
     day: true,
     time: true,
@@ -144,21 +178,72 @@ export default function OwnRoutinePage() {
   });
 
   const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 8, 
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250,
-        tolerance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {})
+      useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+      useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+      useSensor(KeyboardSensor, {})
   );
 
-  // --- Extract Unique Options ---
+  // --- Data Fetching ---
+  useEffect(() => {
+    const fetchRoutineData = async () => {
+      setIsLoading(true);
+      try {
+        // Simulate API Delay for Demo
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        const data: APIResponse = {
+          "teacher_info": {
+            "id": "101",
+            "initials": "MKN",
+            "total_sessions": 15,
+            "semesters_involved": ["6th", "7th", "8th"]
+          },
+          "schedule": [
+            { "day": "Sun", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B317L", "slot_index": 1 },
+            { "day": "Sun", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B317L", "slot_index": 2 },
+            { "day": "Mon", "semester": "6th", "course": "CSE 3603", "type": "Theory", "room": "B316", "slot_index": 2 },
+            { "day": "Mon", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B318L", "slot_index": 6 },
+            { "day": "Mon", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B318L", "slot_index": 7 },
+            { "day": "Tue", "semester": "6th", "course": "CSE 3603", "type": "Theory", "room": "B322", "slot_index": 0 },
+            { "day": "Tue", "semester": "6th", "course": "CSE 3603", "type": "Theory", "room": "B322", "slot_index": 1 },
+            { "day": "Wed", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B317L", "slot_index": 2 },
+            { "day": "Wed", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B317L", "slot_index": 3 },
+            { "day": "Wed", "semester": "7th", "course": "CSE 4700", "type": "Lab", "room": "B318L", "slot_index": 6 },
+            { "day": "Wed", "semester": "7th", "course": "CSE 4700", "type": "Lab", "room": "B318L", "slot_index": 7 },
+            { "day": "Thu", "semester": "7th", "course": "CSE 4700", "type": "Lab", "room": "B318L", "slot_index": 3 },
+            { "day": "Thu", "semester": "7th", "course": "CSE 4700", "type": "Lab", "room": "B318L", "slot_index": 4 },
+            { "day": "Thu", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B318L", "slot_index": 6 },
+            { "day": "Thu", "semester": "8th", "course": "CSE 4800", "type": "Lab", "room": "B318L", "slot_index": 7 }
+          ]
+        };
+
+        setTeacherInfo(data.teacher_info);
+
+        const mappedRows: RoutineRow[] = data.schedule.map((item, index) => ({
+          id: index + 1,
+          day: item.day,
+          time: getSlotTime(item.slot_index),
+          course: item.course,
+          type: item.type || "Lecture",
+          room: item.room,
+          semester: item.semester,
+          status: "on",
+          teacherId: data.teacher_info.id,
+        }));
+
+        setRows(mappedRows);
+      } catch (error) {
+        console.error("Failed to fetch routine:", error);
+        toast.error("Failed to load routine data.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRoutineData();
+  }, []);
+
+  // --- Helper Computations ---
   const uniqueRooms = useMemo(() => {
     const rooms = new Set(rows.map((r) => r.room));
     return Array.from(rooms).sort();
@@ -169,21 +254,17 @@ export default function OwnRoutinePage() {
     return Array.from(sems).sort();
   }, [rows]);
 
-  // --- Processing ---
   const processedRows = useMemo(() => {
     return rows.filter((r) => {
       const matchDay = day === "All" || r.day === day;
       const matchType = typeFilter === "All" || r.type === typeFilter;
       const matchStatus = statusFilter === "All" || r.status === statusFilter;
       const matchRoom = roomFilter === "All" || r.room === roomFilter;
-      const matchSemester =
-        semesterFilter === "All" || r.semester === semesterFilter;
-
+      const matchSemester = semesterFilter === "All" || r.semester === semesterFilter;
       return matchDay && matchType && matchStatus && matchRoom && matchSemester;
     });
   }, [day, typeFilter, statusFilter, roomFilter, semesterFilter, rows]);
 
-  // --- Pagination ---
   const pageSizeOptions = [5, 10, 20, 50] as const;
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -191,10 +272,10 @@ export default function OwnRoutinePage() {
 
   const totalPages = Math.max(1, Math.ceil(processedRows.length / pageSize));
   const paged = showAllForPrint
-    ? processedRows
-    : processedRows.slice(
-        (page - 1) * pageSize,
-        Math.min((page - 1) * pageSize + pageSize, processedRows.length)
+      ? processedRows
+      : processedRows.slice(
+          (page - 1) * pageSize,
+          Math.min((page - 1) * pageSize + pageSize, processedRows.length)
       );
 
   useEffect(() => {
@@ -248,7 +329,7 @@ export default function OwnRoutinePage() {
     });
   }
 
-  const columnsOrder: (keyof Omit<RoutineRow, "id">)[] = [
+  const columnsOrder: (keyof Omit<RoutineRow, "id" | "teacherId">)[] = [
     "day",
     "time",
     "course",
@@ -258,258 +339,137 @@ export default function OwnRoutinePage() {
     "semester",
   ];
 
-  function DragHandle({
-    attributes,
-    listeners,
-  }: {
-    attributes: React.HTMLAttributes<HTMLElement>;
-    listeners: Record<string, unknown>;
-  }) {
+  function DragHandle({ attributes, listeners }: { attributes: React.HTMLAttributes<HTMLElement>; listeners: Record<string, unknown>; }) {
     return (
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none p-1 rounded hover:bg-muted"
-      >
-        <IconGripVertical className="size-4" />
-      </button>
+        <button type="button" {...attributes} {...listeners} className="text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none p-1 rounded hover:bg-muted">
+          <IconGripVertical className="size-4" />
+        </button>
     );
   }
 
-  // --- Draggable Row ---
   function DraggableRow({ row }: { row: RoutineRow }) {
-    const {
-      setNodeRef,
-      attributes,
-      listeners,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: row.id });
-
+    const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: row.id });
     const style: React.CSSProperties = {
       transform: CSS.Transform.toString(transform),
       transition,
       position: "relative",
       zIndex: isDragging ? 50 : "auto",
     };
-
     const setStatus = (status: "on" | "off") => {
-      setRows((prev) =>
-        prev.map((r) => (r.id === row.id ? { ...r, status } : r))
-      );
+      setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status } : r)));
+      try {
+        dispatch(setTeacherStatus({ teacherId: row.teacherId, isOn: status === "on" }));
+      } catch (error) {
+        console.error("Failed to update teacher status:", error);
+      }
       const isOff = status === "off";
-      toast[isOff ? "warning" : "success"](
-        `${row.course} is now ${isOff ? "OFF" : "ON"}`
-      );
+      toast[isOff ? "warning" : "success"](`${row.course} is now ${isOff ? "OFF" : "ON"}`);
     };
 
     return (
-      <TableRow
-        ref={setNodeRef}
-        style={style}
-        className={cn(
-          "whitespace-nowrap transition-colors",
-          isDragging && "opacity-70 bg-muted/50 shadow-lg ring-1 ring-primary/10"
-        )}
-      >
-        <TableCell className="w-8 print:hidden p-3">
-          <DragHandle attributes={attributes} listeners={listeners ?? {}} />
-        </TableCell>
-        {columnsOrder.map((key) =>
-          visibleCols[key] ? (
-            <TableCell
-              key={key}
-              className={cn("p-3", key === "course" && "font-medium")}
-            >
-              {key === "type" ? (
-                <Badge variant={row.type === "Lab" ? "secondary" : "default"}>
-                  {row.type}
-                </Badge>
-              ) : key === "status" ? (
-                <Badge
-                  variant={row.status === "on" ? "default" : "destructive"}
-                >
-                  {row.status === "on" ? "On" : "Off"}
-                </Badge>
-              ) : (
-                row[key]
-              )}
-            </TableCell>
-          ) : null
-        )}
-        <TableCell className="w-8 text-right print:hidden p-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreVertical className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-red-400 hover:text-red-400!"
-                onClick={() => setStatus(row.status === "on" ? "off" : "on")}
-              >
-                <PowerOff className="size-4 text-red-400" />
-                {row.status === "on" ? "Mark as Off" : "Mark as On"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </TableCell>
-      </TableRow>
+        <TableRow ref={setNodeRef} style={style} className={cn("whitespace-nowrap transition-colors", isDragging && "opacity-70 bg-muted/50 shadow-lg ring-1 ring-primary/10")} data-teacher-id={row.teacherId}>
+          <TableCell className="w-8 print:hidden p-3"><DragHandle attributes={attributes} listeners={listeners ?? {}} /></TableCell>
+          {columnsOrder.map((key) => visibleCols[key] ? (
+              <TableCell key={key} className={cn("p-3", key === "course" && "font-medium")}>
+                {key === "type" ? <Badge variant={row.type === "Lab" ? "secondary" : "default"}>{row.type}</Badge> :
+                    key === "status" ? <Badge variant={row.status === "on" ? "default" : "destructive"}>{row.status === "on" ? "On" : "Off"}</Badge> :
+                        row[key]}
+              </TableCell>
+          ) : null)}
+          <TableCell className="w-8 text-right print:hidden p-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="size-4" /></Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-red-400 hover:text-red-400" onClick={() => setStatus(row.status === "on" ? "off" : "on")}>
+                  <PowerOff className="size-4 text-red-400" />{row.status === "on" ? "Mark as Off" : "Mark as On"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        </TableRow>
     );
   }
 
-  // --- Filter Controls ---
+  // --- Filters ---
   const DaySelect = () => (
-    <div className="space-y-1 w-full">
-      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
-        <Calendar className="w-3 h-3" /> Day
-      </span>
-      <Select value={day} onValueChange={setDay}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {days.map((d) => (
-            <SelectItem key={d} value={d}>
-              {d}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-
-  const TypeSelect = () => (
-    <div className="space-y-1 w-full">
-      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
-        <BookOpen className="w-3 h-3" /> Type
-      </span>
-      <Select value={typeFilter} onValueChange={setTypeFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Types</SelectItem>
-          <SelectItem value="Lecture">Lecture</SelectItem>
-          <SelectItem value="Lab">Lab</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-  );
-
-  const StatusSelect = () => (
-    <div className="space-y-1 w-full">
-      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
-        <SlidersHorizontal className="w-3 h-3" /> Status
-      </span>
-      <Select value={statusFilter} onValueChange={setStatusFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Status</SelectItem>
-          <SelectItem value="on">Active (On)</SelectItem>
-          <SelectItem value="off">Cancelled (Off)</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-  );
-
-  const RoomSelect = () => (
-    <div className="space-y-1 w-full">
-      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
-        <MapPin className="w-3 h-3" /> Room
-      </span>
-      <Select value={roomFilter} onValueChange={setRoomFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Rooms</SelectItem>
-          {uniqueRooms.map((r) => (
-            <SelectItem key={r} value={r}>
-              {r}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-
-  const SemesterSelect = () => (
-    <div className="space-y-1 w-full">
-      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
-        <GraduationCap className="w-3 h-3" /> Semester
-      </span>
-      <Select value={semesterFilter} onValueChange={setSemesterFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Semesters</SelectItem>
-          {uniqueSemesters.map((s) => (
-            <SelectItem key={s} value={s}>
-              {s}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-
-  const ColumnSelect = () => (
-    <div className="space-y-1 w-full">
-      <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
-        <LayoutList className="w-3 h-3" /> Columns
-      </span>
-      <Select value="" onValueChange={handleColumnToggle}>
-        <SelectTrigger className="w-full h-9 bg-background text-muted-foreground">
-          <SelectValue placeholder="Customize View" />
-        </SelectTrigger>
-        <SelectContent align="end">
-          {columnsOrder.map((key) => (
-            <SelectItem key={key} value={key}>
-              <div className="flex items-center gap-2">
-                <div
-                  className={cn(
-                    "flex h-4 w-4 items-center justify-center rounded border",
-                    visibleCols[key]
-                      ? "bg-primary border-primary"
-                      : "opacity-40"
-                  )}
-                >
-                  <Check
-                    className={cn(
-                      "h-3 w-3 text-primary-foreground",
-                      !visibleCols[key] && "hidden"
-                    )}
-                  />
-                </div>
-                <span className="capitalize">{key}</span>
-              </div>
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-
-  if (role !== "teacher") {
-    return (
-      <div className="p-6">
-        <Alert>
-          <AlertTitle>Access restricted</AlertTitle>
-          <AlertDescription>Teacher access only.</AlertDescription>
-        </Alert>
+      <div className="space-y-1 w-full">
+        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><Calendar className="w-3 h-3" /> Day</span>
+        <Select value={day} onValueChange={setDay}>
+          <SelectTrigger className="w-full h-9 bg-background"><SelectValue /></SelectTrigger>
+          <SelectContent>{days.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+        </Select>
       </div>
+  );
+  const TypeSelect = () => (
+      <div className="space-y-1 w-full">
+        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><BookOpen className="w-3 h-3" /> Type</span>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-full h-9 bg-background"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="All">All Types</SelectItem><SelectItem value="Theory">Theory</SelectItem><SelectItem value="Lab">Lab</SelectItem></SelectContent>
+        </Select>
+      </div>
+  );
+  const StatusSelect = () => (
+      <div className="space-y-1 w-full">
+        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><SlidersHorizontal className="w-3 h-3" /> Status</span>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full h-9 bg-background"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="All">All Status</SelectItem><SelectItem value="on">Active (On)</SelectItem><SelectItem value="off">Cancelled (Off)</SelectItem></SelectContent>
+        </Select>
+      </div>
+  );
+  const RoomSelect = () => (
+      <div className="space-y-1 w-full">
+        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><MapPin className="w-3 h-3" /> Room</span>
+        <Select value={roomFilter} onValueChange={setRoomFilter}>
+          <SelectTrigger className="w-full h-9 bg-background"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="All">All Rooms</SelectItem>{uniqueRooms.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+  );
+  const SemesterSelect = () => (
+      <div className="space-y-1 w-full">
+        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><GraduationCap className="w-3 h-3" /> Semester</span>
+        <Select value={semesterFilter} onValueChange={setSemesterFilter}>
+          <SelectTrigger className="w-full h-9 bg-background"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="All">All Semesters</SelectItem>{uniqueSemesters.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+  );
+  const ColumnSelect = () => (
+      <div className="space-y-1 w-full">
+        <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1"><LayoutList className="w-3 h-3" /> Columns</span>
+        <Select value="" onValueChange={handleColumnToggle}>
+          <SelectTrigger className="w-full h-9 bg-background text-muted-foreground"><SelectValue placeholder="Customize View" /></SelectTrigger>
+          <SelectContent align="end">
+            {columnsOrder.map((key) => (
+                <SelectItem key={key} value={key}>
+                  <div className="flex items-center gap-2">
+                    <div className={cn("flex h-4 w-4 items-center justify-center rounded border", visibleCols[key] ? "bg-primary border-primary" : "opacity-40")}>
+                      <Check className={cn("h-3 w-3 text-primary-foreground", !visibleCols[key] && "hidden")} />
+                    </div>
+                    <span className="capitalize">{key}</span>
+                  </div>
+                </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+  );
+
+  if (role !== "teacher") return <div className="p-6"><Alert><AlertTitle>Access restricted</AlertTitle><AlertDescription>Teacher access only.</AlertDescription></Alert></div>;
+
+  if (isLoading) {
+    return (
+        <div className="w-full h-[70vh] flex items-center justify-center bg-background">
+          <DataLoader />
+        </div>
     );
   }
 
+  // Once loaded, show the full UI
   return (
     <motion.div
       variants={containerVariants}
@@ -528,29 +488,28 @@ export default function OwnRoutinePage() {
               Faculty Member
             </Badge>
           </motion.div>
-
           <motion.h1
             variants={itemVariants}
             className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"
           >
             Department of CSE
           </motion.h1>
-
           <motion.div
             variants={itemVariants}
             className="flex flex-wrap items-center gap-3"
           >
             <p className="text-muted-foreground font-medium ">
               Class Routine <span className="text-foreground/40 mx-1">•</span>{" "}
-              <span className="text-foreground font-semibold">{username}</span>
+              <span className="text-foreground font-semibold">
+                {teacherInfo ? teacherInfo.initials : username}
+              </span>
             </p>
-
             <Sheet>
               <SheetTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="lg:hidden h-6 text-[10px] px-2 gap-1"
+                  className="min-[1300px]:hidden h-6 text-[10px] px-2 gap-1"
                 >
                   <Filter className="h-3 w-3" /> Filters
                 </Button>
@@ -592,7 +551,6 @@ export default function OwnRoutinePage() {
             </Sheet>
           </motion.div>
         </div>
-
         <motion.div variants={itemVariants}>
           <Button
             onClick={() => window.print()}
@@ -610,20 +568,17 @@ export default function OwnRoutinePage() {
         <h1 className="text-2xl font-bold text-black mb-3 font-lexend tracking-tight">
           Department of Computer Science & Engineering
         </h1>
-
         <div className="px-8 py-1">
           <h2 className="font-lexend text-black tracking-wide">
-            {username}&apos;s Class Routine
+            {teacherInfo ? teacherInfo.initials : username}&apos;s Class Routine
           </h2>
         </div>
-
-        
       </div>
 
       {/* --- Main Content Card --- */}
       <motion.div variants={itemVariants}>
         <Card className="w-full overflow-hidden dark:bg-[#111113] border shadow-sm print:border-none print:shadow-none print:overflow-visible">
-          <CardHeader className="p-4 bg-muted/30 border-b hidden lg:block print:hidden">
+          <CardHeader className="p-4 min-[1300px]:block bg-muted/30 border-b hidden print:hidden">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col xl:flex-row gap-4 justify-between items-end">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 w-full xl:w-auto flex-1">
@@ -633,7 +588,6 @@ export default function OwnRoutinePage() {
                   <RoomSelect />
                   <SemesterSelect />
                 </div>
-
                 <div className="flex gap-3 items-end shrink-0 w-full xl:w-auto justify-end xl:justify-start">
                   <div className="min-w-[150px]">
                     <ColumnSelect />
@@ -702,8 +656,8 @@ export default function OwnRoutinePage() {
                             items={paged.map((r) => r.id)}
                             strategy={verticalListSortingStrategy}
                           >
-                            {paged.map((r) => (
-                              <DraggableRow key={r.id} row={r} />
+                            {paged.map((row) => (
+                              <DraggableRow key={row.id} row={row} />
                             ))}
                           </SortableContext>
                         )}
