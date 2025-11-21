@@ -13,19 +13,19 @@ class ScheduleConstraint:
         self.day_loads = {day: 0 for day in days} 
 
     def check_conflict_reason(self, day, slot, course):
-        # ১. শিক্ষক চেক (যদি শিক্ষক অ্যাসাইন করা থাকে)
+    
         if course.teacher and (day, slot.id, course.teacher.id) in self.teacher_occupied:
             return "Teacher Busy"
         
-        # ২. রুম চেক (আপনার মডেলে রুম স্ট্রিং হিসেবে আছে)
+  
         if course.room_number and (day, slot.id, course.room_number) in self.room_occupied:
             return "Room Busy"
             
-        # ৩. ব্যাচ চেক (ডিপার্টমেন্ট এবং সেমিস্টার মিলে ব্যাচ)
+ 
         if (day, slot.id, course.department.id, course.semester.id) in self.batch_occupied:
             return "Batch Busy"
 
-        # ৪. ডেইলি লিমিট চেক (থিওরি ক্লাস দিনে একটার বেশি নয়)
+    
         if course.course_type == 'Theory':
             if (course.id, day) in self.course_daily_tracker:
                 return "Daily Limit Reached"
@@ -52,39 +52,37 @@ def prepare_prioritized_sessions(courses):
         remaining_credits = course.credits
         class_rank = 1 
         
-        # Lab Logic: ল্যাবের জন্য প্রতি ২ ক্রেডিটে ১টি সেশন (২ পিরিয়ড ব্যাপ্তির)
+       
         if course.course_type == 'Lab':
             while remaining_credits >= 2:
                 all_sessions.append({'course': course, 'duration': 2, 'priority': class_rank})
                 remaining_credits -= 2
                 class_rank += 1
-            # যদি ১ ক্রেডিট অবশিষ্ট থাকে
+        
             if remaining_credits > 0:
                 all_sessions.append({'course': course, 'duration': 1, 'priority': class_rank})
         
-        # Theory Logic: প্রতি ক্রেডিটে ১টি করে সেশন
+     
         else:
             for _ in range(remaining_credits):
                 all_sessions.append({'course': course, 'duration': 1, 'priority': class_rank})
                 class_rank += 1
-                
-    # Randomize to avoid pattern, then sort by Priority (asc) and Duration (desc)
+   
     random.shuffle(all_sessions)
     all_sessions.sort(key=lambda x: (x['priority'], -x['duration']))
     return all_sessions
 
 def generate_routine_algorithm():
-    # Transaction Atomic: মাঝপথে এরর হলে ডাটাবেস আগের অবস্থায় ফিরে যাবে
+   
     with transaction.atomic():
-        # ১. আগের সব রুটিন ডিলিট করা
+     
         RoutineEntry.objects.all().delete()
 
         days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']
         
-        # সকালের স্লটগুলো আগে পাওয়ার জন্য সর্টিং
+   
         time_slots = list(TimeSlot.objects.all().order_by('start_time'))
         
-        # সব কোর্স নিয়ে আসা
         courses = list(Course.objects.select_related('teacher', 'department', 'semester').all())
         
         sorted_sessions = prepare_prioritized_sessions(courses)
@@ -101,18 +99,17 @@ def generate_routine_algorithm():
             assigned = False
             failure_reasons = []
             
-            # যে দিনে লোড কম, সেই দিন আগে চেক করা হবে
+            
             sorted_days = sorted(days, key=lambda d: constraints.day_loads[d])
 
             for day in sorted_days:
                 if assigned: break
 
-                # স্লট লুপ
+           
                 for i in range(len(time_slots) - duration + 1):
                     slots_to_check = []
                     conflict_reason = None
                     
-                    # ডিউরেশন চেক (ল্যাবের জন্য পরপর স্লট খালি আছে কি না)
                     for j in range(duration):
                         slot = time_slots[i + j]
                         reason = constraints.check_conflict_reason(day, slot, course)
@@ -122,11 +119,11 @@ def generate_routine_algorithm():
                         slots_to_check.append(slot)
                     
                     if not conflict_reason:
-                        # কনফ্লিক্ট নেই, স্লট অ্যাসাইন করা হচ্ছে
+                    
                         for slot in slots_to_check:
                             constraints.assign(day, slot, course)
                             
-                            # UPDATE: আপনার RoutineEntry মডেলে room_no নেই, তাই শুধু এই ৩টি ফিল্ড যাবে
+                           
                             RoutineEntry.objects.create(
                                 day=day,
                                 time_slot=slot,
@@ -140,7 +137,7 @@ def generate_routine_algorithm():
                         failure_reasons.append(conflict_reason)
             
             if not assigned:
-                # ফেইল করার কারণ খুঁজে বের করা
+                
                 reason_counts = Counter(failure_reasons)
                 dropped_sessions_details.append(f"{course.course_name} (Round {priority}) - Failed. Reasons: {dict(reason_counts)}")
 
