@@ -47,7 +47,7 @@ const Logo = ({ className, ...props }: LogoProps) => {
         width="30"
         height="6"
         rx="3"
-        className="fill-foreground/20"
+        className="fill-zinc-300 dark:fill-zinc-500"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
@@ -56,7 +56,7 @@ const Logo = ({ className, ...props }: LogoProps) => {
         cx="80"
         cy="25"
         r="3"
-        className="fill-zinc-100 dark:fill-zinc-800"
+        className="fill-zinc-300 dark:fill-zinc-500"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
@@ -112,7 +112,6 @@ const Logo = ({ className, ...props }: LogoProps) => {
         fill="url(#grad-indigo)"
       />
 
-      {/* Scanner Line */}
       <motion.rect
         x="10"
         width="80"

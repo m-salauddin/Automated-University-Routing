@@ -82,19 +82,29 @@ export function NavUser() {
             >
               <div className="relative z-20 flex items-center gap-2 w-full overflow-hidden">
                 <Avatar className="h-8 w-8 rounded-lg shrink-0">
-                  <AvatarFallback className="rounded-lg">
+                  <AvatarFallback
+                    className="rounded-lg"
+                    suppressHydrationWarning
+                  >
                     {initials}
                   </AvatarFallback>
                 </Avatar>
 
                 {state === "expanded" && (
                   <div className="grid flex-1 text-left text-sm leading-tight min-w-0 animate-in fade-in duration-300">
-                    <span className="truncate font-medium text-sm">{displayName}</span>
-                    {secondary ? (
-                      <span className="truncate capitalize text-[8px]">
-                        {secondary}
-                      </span>
-                    ) : null}
+                    <span
+                      className="truncate font-medium text-sm"
+                      suppressHydrationWarning
+                    >
+                      {displayName}
+                    </span>
+
+                    <span
+                      className="truncate capitalize text-[8px]"
+                      suppressHydrationWarning
+                    >
+                      {secondary}
+                    </span>
                   </div>
                 )}
 
@@ -113,17 +123,26 @@ export function NavUser() {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarFallback className="rounded-lg">
+                  <AvatarFallback
+                    className="rounded-lg"
+                    suppressHydrationWarning
+                  >
                     {initials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium text-sm">{displayName}</span>
-                  {secondary ? (
-                    <span className="truncate capitalize text-[8px]">
-                      {secondary}
-                    </span>
-                  ) : null}
+                  <span
+                    className="truncate font-medium text-sm"
+                    suppressHydrationWarning
+                  >
+                    {displayName}
+                  </span>
+                  <span
+                    className="truncate capitalize text-[8px]"
+                    suppressHydrationWarning
+                  >
+                    {secondary}
+                  </span>
                 </div>
               </div>
             </DropdownMenuLabel>
