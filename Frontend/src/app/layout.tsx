@@ -3,8 +3,8 @@ import { Fugaz_One, Lexend, Oswald, Pacifico } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { AuthProvider } from "@/context/auth-context";
 import StoreProvider from "@/store/StoreProvider";
+import TokenGuard from "@/components/auth/TokenGuard";
 
 const script = Pacifico({
   subsets: ["latin"],
@@ -48,17 +48,16 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${getOswald.variable} ${lexend.variable} ${script.variable} ${fugaz.variable} antialiased`}>
         <StoreProvider>
-          <AuthProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              {children}
-              <Toaster />
-            </ThemeProvider>
-          </AuthProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <TokenGuard />
+            {children}
+            <Toaster />
+          </ThemeProvider>
         </StoreProvider>
       </body>
     </html>

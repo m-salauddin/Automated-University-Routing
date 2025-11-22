@@ -1,18 +1,23 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
+export const dynamic = "force-dynamic";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion } from "framer-motion";
-import { User, Lock, ShieldAlert} from "lucide-react";
+import { User, Lock, ShieldAlert } from "lucide-react";
 import clsx from "clsx";
 import { toast } from "sonner";
 import { FaRegEye, FaRegEyeSlash } from "react-icons/fa";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useAuth } from "@/context/auth-context";
-import type { UserRole } from "@/context/auth-context";
+import { jwtDecode } from "jwt-decode";
+import { useDispatch } from "react-redux";
+
+import { setAuthenticated, setUserData } from "@/store/authSlice";
+
 import {
   Dialog,
   DialogContent,
@@ -21,22 +26,25 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { loginUser } from "@/services/auth";
 
 const loginSchema = z.object({
   username: z.string().min(3, "Username is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
+
 type LoginFormData = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const dispatch = useDispatch();
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isForgotOpen, setIsForgotOpen] = useState(false);
 
-  const { setAuthenticated, setUsername: setCtxUsername, setRole } = useAuth();
-  const [role] = useState<UserRole>("student");
 
   const {
     register,
@@ -56,23 +64,65 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
 
-    setAuthenticated(true);
-    setCtxUsername(data.username);
-    setRole(role);
+    try {
+      const result = await loginUser(data);
 
-    setIsLoading(false);
-    toast.success("Login successful!", {
-      description: `Welcome back, ${data.username}`,
-      duration: 3000,
-    });
+      if (result.success) {
+        const { accessToken, user } = result.data;
 
-    setTimeout(() => {
-      router.push("/dashboard/analytics");
-    }, 500);
+        let decodedToken: any = {};
+        try {
+          decodedToken = jwtDecode(accessToken);
+        } catch (e) {
+          console.error("Token decode failed", e);
+        }
+
+        dispatch(setAuthenticated(true));
+
+        const finalUsername =
+          user?.username || decodedToken?.username || data.username;
+        const rawRole = user?.role || decodedToken?.role || "student";
+        const finalRole = String(rawRole).toLowerCase();
+
+        dispatch(
+          setUserData({
+            username: finalUsername,
+            role: finalRole as any,
+            email: user?.email || "",
+            department_name:
+              user?.["department name"] || user?.department_name || "",
+            department_id: user?.department_id || null,
+            semester_name: user?.semester_name || null,
+            student_id: user?.student_id || null,
+          })
+        );
+
+        toast.success("Login successful!", {
+          description: `Welcome back, ${finalUsername}`,
+          duration: 3000,
+        });
+
+        setTimeout(() => {
+          const redirectPath = searchParams.get("redirect");
+          router.push(redirectPath || "/dashboard/analytics");
+        }, 1000);
+      } else {
+        toast.error("Login Failed", {
+          description: result.message || "Invalid credentials provided.",
+        });
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error("System Error", {
+        description: "Something went wrong. Please try again later.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  // --- Animation Variants ---
   const cardVariants = {
     hidden: { scale: 0.96, opacity: 0, y: 16 },
     visible: {
@@ -205,10 +255,10 @@ export default function LoginPage() {
             <div className="relative mt-1.5">
               <input
                 id="password"
-                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 autoComplete="current-password"
                 {...register("password")}
+                type={showPassword ? "text" : "password"}
                 className={clsx(
                   "pl-10 pr-10 h-11 rounded-md shadow-sm w-full outline-none transition-all border",
                   "bg-white text-gray-900 placeholder:text-gray-400 border-gray-300 focus:border-black focus:ring-1 focus:ring-black",
@@ -338,5 +388,19 @@ export default function LoginPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-black">
+          <div className="w-10 h-10 border-2 border-black border-t-transparent rounded-full animate-spin dark:border-white dark:border-t-transparent"></div>
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }

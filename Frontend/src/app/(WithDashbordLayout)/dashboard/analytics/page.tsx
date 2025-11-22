@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   BookOpen,
   GraduationCap,
@@ -320,19 +320,19 @@ export default function AutomatedRoutineDashboard() {
     };
   }, [semester]);
 
-  // --- AUTO-SCROLL EFFECT ---
-  useEffect(() => {
-    if (legendRefs.current[activePieIndex]) {
-      legendRefs.current[activePieIndex]?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    }
-  }, [activePieIndex]);
+  // // --- AUTO-SCROLL EFFECT ---
+  // useEffect(() => {
+  //   if (legendRefs.current[activePieIndex]) {
+  //     legendRefs.current[activePieIndex]?.scrollIntoView({
+  //       behavior: "smooth",
+  //       block: "nearest",
+  //     });
+  //   }
+  // }, [activePieIndex]);
 
   // Chart Colors
-  const chartColorPrimary = "#6366f1"; // Indigo 500
-  const chartColorSecondary = "#10b981"; // Emerald 500
+  const chartColorPrimary = "#6366f1"; 
+  const chartColorSecondary = "#10b981"; 
 
   // Logic for the Center Label of the Donut Chart
   const activeItem = computed.teacherCounts[activePieIndex] ||

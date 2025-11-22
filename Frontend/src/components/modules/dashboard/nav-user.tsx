@@ -1,8 +1,10 @@
 "use client";
 
 import { ChevronsUpDown, LogOut, User } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,14 +22,46 @@ import {
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState } from "@/store";
+import { resetAuth } from "@/store/authSlice";
+import { logout } from "@/services/auth";
+
+function getInitials(name: string) {
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "U";
+}
+
 export function NavUser() {
   const { isMobile, state } = useSidebar();
+  const router = useRouter();
+  const dispatch = useDispatch();
 
-  const user = {
-    name: "Shuvo Chandra Debnath",
-    userId: "23151010",
-    avatar:
-      "https://scontent.fdac2-2.fna.fbcdn.net/v/t39.30808-6/580061444_1866883770570104_8552741300415222318_n.jpg?_nc_cat=101&ccb=1-7&_nc_sid=6ee11a&_nc_eui2=AeGDfFgkpK3LthYFeiW-94a3eMdw_XoMQOt4x3D9egxA69DgV5NsqvuiF6yecM5ivGlna5XFMG1wzx1PZs-nkDED&_nc_ohc=749PNjyuJysQ7kNvwGLWaGX&_nc_oc=AdlGjyhCKMn2KBPHQsyCgd4qpKVd4jx5s6nCikR_eUtrm2mg9eKO6jZinRLfuJm8fOsLBowDaaLom7q4vqxjtN9Q&_nc_zt=23&_nc_ht=scontent.fdac2-2.fna&_nc_gid=SGD2WIYLob6T1PFalNxhGw&oh=00_AfhydhtBGgxjLAYzlBraiKTx6lIbMpXkTQPwS8c_fO2O4g&oe=691C2B0B",
+  const username = useSelector((s: RootState) => s.auth.username);
+  const role = useSelector((s: RootState) => s.auth.role);
+
+  const displayName = username || "Guest User";
+  const secondary = role ? String(role) : "";
+  const initials = getInitials(displayName);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      dispatch(resetAuth());
+
+      toast.success("Logged out successfully", {
+        description: "See you next time!",
+        duration: 2500,
+      });
+
+      router.push("/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Logout failed:", error);
+      toast.error("Logout failed", {
+        description: "Please try again.",
+      });
+    }
   };
 
   return (
@@ -44,14 +78,19 @@ export function NavUser() {
             >
               <div className="relative z-20 flex items-center gap-2 w-full overflow-hidden">
                 <Avatar className="h-8 w-8 rounded-lg shrink-0">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">
+                    {initials}
+                  </AvatarFallback>
                 </Avatar>
 
                 {state === "expanded" && (
                   <div className="grid flex-1 text-left text-sm leading-tight min-w-0 animate-in fade-in duration-300">
-                    <span className="truncate font-medium">{user.name}</span>
-                    <span className="truncate text-xs">{user.userId}</span>
+                    <span className="truncate font-medium text-sm">{displayName}</span>
+                    {secondary ? (
+                      <span className="truncate capitalize text-[8px]">
+                        {secondary}
+                      </span>
+                    ) : null}
                   </div>
                 )}
 
@@ -70,12 +109,17 @@ export function NavUser() {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  <AvatarFallback className="rounded-lg">
+                    {initials}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
-                  <span className="truncate text-xs">{user.userId}</span>
+                  <span className="truncate font-medium text-sm">{displayName}</span>
+                  {secondary ? (
+                    <span className="truncate capitalize text-[8px]">
+                      {secondary}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </DropdownMenuLabel>
@@ -90,7 +134,9 @@ export function NavUser() {
               </DropdownMenuItem>
             </Link>
             <DropdownMenuSeparator />
+
             <DropdownMenuItem
+              onClick={handleLogout}
               className="cursor-pointer animate-in hover:text-red-400! text-red-400 fade-in slide-in-from-left-8 duration-500 fill-mode-backwards"
               style={{ animationDelay: "150ms" }}
             >

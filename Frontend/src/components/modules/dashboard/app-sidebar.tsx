@@ -36,7 +36,9 @@ const items = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { state } = useSidebar();
+
+  const { state, isMobile, setOpenMobile } = useSidebar();
+
   const { role } = { role: "teacher" };
 
   const studentPanel = [
@@ -96,7 +98,15 @@ export function AppSidebar() {
               : "text-muted-foreground hover:text-foreground"
           )}
         >
-          <Link href={item.url} className="flex items-center w-full">
+          <Link
+            href={item.url}
+            className="flex items-center w-full"
+            onClick={() => {
+              if (isMobile) {
+                setOpenMobile(false);
+              }
+            }}
+          >
             <div
               className={cn(
                 "relative flex items-center justify-center size-8 rounded-lg transition-all duration-300",
@@ -105,9 +115,7 @@ export function AppSidebar() {
               )}
             >
               <item.icon
-                className={cn(
-                  "size-4.5 transition-transform duration-300"
-                )}
+                className={cn("size-4.5 transition-transform duration-300")}
               />
             </div>
 
@@ -136,9 +144,7 @@ export function AppSidebar() {
       <div
         className={cn(
           "mt-2 transition-all duration-300 ease-in-out",
-          !isCollapsed
-            ? "ml-3 pl-3 border-l "
-            : "ml-0 pl-0 border-none"
+          !isCollapsed ? "ml-3 pl-3 border-l " : "ml-0 pl-0 border-none"
         )}
       >
         <SidebarMenu>
