@@ -46,6 +46,10 @@ export function NavUser() {
 
   const handleLogout = async () => {
     try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("isLoggingOut", "true");
+      }
+
       await logout();
       dispatch(resetAuth());
 

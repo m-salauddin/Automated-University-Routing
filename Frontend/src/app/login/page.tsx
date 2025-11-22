@@ -103,10 +103,8 @@ function LoginContent() {
           duration: 3000,
         });
 
-        setTimeout(() => {
           const redirectPath = searchParams.get("redirect");
           router.push(redirectPath || "/dashboard/analytics");
-        }, 1000);
       } else {
         toast.error("Login Failed", {
           description: result.message || "Invalid credentials provided.",

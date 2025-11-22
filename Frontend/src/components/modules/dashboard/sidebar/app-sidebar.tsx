@@ -25,9 +25,9 @@ import {
 } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { TeamSwitcher } from "./team-switcher";
 import { NavUser } from "./nav-user";
 import { cn } from "@/lib/utils";
+import { TeamSwitcher } from "./team-switcher";
 
 const items = [
   { title: "Analytics", url: "/dashboard/analytics", icon: ChartColumnBig },

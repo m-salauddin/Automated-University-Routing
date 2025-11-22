@@ -9,18 +9,13 @@ import { toast } from "sonner";
 
 function hasAccessTokenCookie() {
   if (typeof document === "undefined") return false;
-  return document.cookie.split(";").some((c) => c.trim().startsWith("accessToken="));
+  return document.cookie
+    .split(";")
+    .some((c) => c.trim().startsWith("accessToken="));
 }
 
 function isProtectedPath(pathname: string) {
   return pathname.startsWith("/dashboard");
-}
-
-function queueToast(type: "error" | "warning" | "message", msg: string) {
-  if (typeof window === "undefined") return;
-  try {
-    sessionStorage.setItem("pendingToast", JSON.stringify({ type, msg }));
-  } catch {}
 }
 
 function flushQueuedToast() {
@@ -46,6 +41,10 @@ export default function TokenGuard() {
   useEffect(() => {
     flushQueuedToast();
 
+    if (pathname === "/login" && typeof window !== "undefined") {
+      sessionStorage.removeItem("isLoggingOut");
+    }
+
     const hasToken = hasAccessTokenCookie();
 
     if (hasToken && !isAuthed) {
@@ -55,20 +54,14 @@ export default function TokenGuard() {
     }
 
     if (isProtectedPath(pathname) && !hasToken) {
-      if (!notifiedRef.current) {
-        const msg = "You must be logged in to visit this page.";
-        queueToast("error", msg);
-        notifiedRef.current = true;
-      }
-      const redirect = encodeURIComponent(pathname);
-      router.replace(`/login?redirect=${redirect}`);
-    }
+      const isLoggingOut =
+        typeof window !== "undefined" &&
+        sessionStorage.getItem("isLoggingOut") === "true";
 
-    if (pathname === "/login" && hasToken) {
-      const msg = "You are already logged in.";
-      queueToast("warning", msg);
-      router.replace("/dashboard/analytics");
-      return;
+      if (!isLoggingOut) {
+        const redirect = encodeURIComponent(pathname);
+        router.replace(`/login?redirect=${redirect}`);
+      }
     }
 
     if (!isProtectedPath(pathname)) {
