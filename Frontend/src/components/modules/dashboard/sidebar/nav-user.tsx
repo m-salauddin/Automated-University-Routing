@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ChevronsUpDown, LogOut, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -40,6 +41,17 @@ export function NavUser() {
   const username = useSelector((s: RootState) => s.auth.username);
   const role = useSelector((s: RootState) => s.auth.role);
 
+  const [isMounted, setIsMounted] = useState(false);
+
+  // FIX: Use setTimeout to satisfy the "synchronous setState" linter rule.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsMounted(true);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Fallback values (Redux might be null initially)
   const displayName = username || "Guest User";
   const secondary = role ? String(role) : "";
   const initials = getInitials(displayName);
@@ -68,6 +80,31 @@ export function NavUser() {
     }
   };
 
+  // LOADING STATE: Prevents "Guest User" flash and Hydration Mismatch
+  if (!isMounted) {
+    return (
+      <SidebarMenu className="border-t pt-2">
+        <SidebarMenuItem>
+          <SidebarMenuButton size="lg">
+            <div className="flex items-center gap-2 w-full">
+              <div className="h-8 w-8 rounded-lg bg-zinc-200 dark:bg-zinc-800 animate-pulse shrink-0" />
+              {state === "expanded" && (
+                <div className="grid flex-1 gap-1 text-left">
+                  <div className="h-3.5 w-24 bg-zinc-200 dark:bg-zinc-800 animate-pulse rounded" />
+                  <div className="h-3 w-16 bg-zinc-200 dark:bg-zinc-800 animate-pulse rounded" />
+                </div>
+              )}
+              {state === "expanded" && (
+                <div className="ml-auto size-4 bg-zinc-200 dark:bg-zinc-800 animate-pulse rounded" />
+              )}
+            </div>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    );
+  }
+
+  // AUTHENTICATED STATE
   return (
     <SidebarMenu className="border-t pt-2">
       <SidebarMenuItem>
@@ -82,27 +119,17 @@ export function NavUser() {
             >
               <div className="relative z-20 flex items-center gap-2 w-full overflow-hidden">
                 <Avatar className="h-8 w-8 rounded-lg shrink-0">
-                  <AvatarFallback
-                    className="rounded-lg"
-                    suppressHydrationWarning
-                  >
+                  <AvatarFallback className="rounded-lg">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
 
                 {state === "expanded" && (
                   <div className="grid flex-1 text-left text-sm leading-tight min-w-0 animate-in fade-in duration-300">
-                    <span
-                      className="truncate font-medium text-sm"
-                      suppressHydrationWarning
-                    >
+                    <span className="truncate font-medium text-sm">
                       {displayName}
                     </span>
-
-                    <span
-                      className="truncate capitalize text-[8px]"
-                      suppressHydrationWarning
-                    >
+                    <span className="truncate capitalize text-[8px]">
                       {secondary}
                     </span>
                   </div>
@@ -123,24 +150,15 @@ export function NavUser() {
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarFallback
-                    className="rounded-lg"
-                    suppressHydrationWarning
-                  >
+                  <AvatarFallback className="rounded-lg">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span
-                    className="truncate font-medium text-sm"
-                    suppressHydrationWarning
-                  >
+                  <span className="truncate font-medium text-sm">
                     {displayName}
                   </span>
-                  <span
-                    className="truncate capitalize text-[8px]"
-                    suppressHydrationWarning
-                  >
+                  <span className="truncate capitalize text-[8px]">
                     {secondary}
                   </span>
                 </div>

@@ -3,8 +3,6 @@
 import {
   CalendarCheck,
   ChartColumnBig,
-  FolderDown,
-  User,
   View,
   ChevronRight,
   ListTodo,
@@ -28,41 +26,31 @@ import { usePathname } from "next/navigation";
 import { NavUser } from "./nav-user";
 import { cn } from "@/lib/utils";
 import { TeamSwitcher } from "./team-switcher";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/store";
 
-const items = [
+const globalItems = [
   { title: "Analytics", url: "/dashboard/analytics", icon: ChartColumnBig },
   { title: "Curriculum", url: "/dashboard/course-curriculum", icon: ListTodo },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
-
   const { state, isMobile, setOpenMobile } = useSidebar();
 
-  const { role } = { role: "teacher" };
+  const { role } = useSelector((s: RootState) => s.auth);
 
   const studentPanel = [
     {
-      title: "Students routine",
+      title: "Class Routine",
       url: "/dashboard/students-routine",
       icon: View,
-    },
-    { title: "Profile", url: "/dashboard/profile", icon: User },
-    {
-      title: "Routine Export in pdf",
-      url: "/dashboard/export-pdf",
-      icon: FolderDown,
     },
   ];
 
   const teacherPanel = [
     {
-      title: "Students routine",
-      url: "/dashboard/students-routine",
-      icon: View,
-    },
-    {
-      title: "Own routine",
+      title: "My Routine",
       url: "/dashboard/own-routine",
       icon: CalendarCheck,
     },
@@ -72,7 +60,6 @@ export function AppSidebar() {
   const panelTitle = role === "teacher" ? "Teacher Panel" : "Student Panel";
 
   const isCollapsed = state === "collapsed";
-
   const isActive = (url: string) => pathname === url;
 
   const renderMenuItem = (
@@ -139,7 +126,7 @@ export function AppSidebar() {
     );
   };
 
-  const renderGroupContent = (itemsToRender: typeof items) => (
+  const renderGroupContent = (itemsToRender: typeof globalItems) => (
     <SidebarGroupContent>
       <div
         className={cn(
@@ -165,7 +152,7 @@ export function AppSidebar() {
       <SidebarContent className="transition-opacity overflow-hidden duration-200">
         <SidebarGroup>
           <SidebarGroupLabel className="pl-2">Application</SidebarGroupLabel>
-          {renderGroupContent(items)}
+          {renderGroupContent(globalItems)}
 
           <div className="mt-6" />
 

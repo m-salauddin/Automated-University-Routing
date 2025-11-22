@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
   GraduationCap,
@@ -38,7 +39,6 @@ interface ComputedMetrics {
   uniqueCourses: number;
   teacherCounts: { name: string; count: number }[];
 }
-
 
 // --- COMPONENT PROPS INTERFACES ---
 
@@ -85,6 +85,27 @@ interface CustomTooltipProps {
   }>;
   label?: string;
 }
+
+// --- ANIMATION VARIANTS ---
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { type: "spring" as const, stiffness: 120, damping: 20 },
+  },
+};
 
 // --- SHADCN-STYLE COMPONENTS ---
 
@@ -320,19 +341,20 @@ export default function AutomatedRoutineDashboard() {
     };
   }, [semester]);
 
-  // // --- AUTO-SCROLL EFFECT ---
-  // useEffect(() => {
-  //   if (legendRefs.current[activePieIndex]) {
-  //     legendRefs.current[activePieIndex]?.scrollIntoView({
-  //       behavior: "smooth",
-  //       block: "nearest",
-  //     });
-  //   }
-  // }, [activePieIndex]);
+  // --- AUTO-SCROLL EFFECT (Uncommented and fixed) ---
+  useEffect(() => {
+    // Only scroll if the index is valid and the ref exists
+    if (legendRefs.current[activePieIndex]) {
+      legendRefs.current[activePieIndex]?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }
+  }, [activePieIndex]);
 
   // Chart Colors
-  const chartColorPrimary = "#6366f1"; 
-  const chartColorSecondary = "#10b981"; 
+  const chartColorPrimary = "#6366f1";
+  const chartColorSecondary = "#10b981";
 
   // Logic for the Center Label of the Donut Chart
   const activeItem = computed.teacherCounts[activePieIndex] ||
@@ -367,9 +389,17 @@ export default function AutomatedRoutineDashboard() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-zinc-50/50 p-6 text-zinc-900 transition-colors dark:bg-zinc-950 dark:text-zinc-50 md:p-8 font-['Lexend']">
+      <motion.div
+        className="min-h-screen bg-zinc-50/50 p-6 text-zinc-900 transition-colors dark:bg-zinc-950 dark:text-zinc-50 md:p-8 font-['Lexend']"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         {/* HEADER */}
-        <header className="flex flex-col gap-4 mb-8 md:flex-row md:items-center justify-between">
+        <motion.header
+          className="flex flex-col gap-4 mb-8 md:flex-row md:items-center justify-between"
+          variants={itemVariants}
+        >
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
               Dashboard
@@ -389,10 +419,13 @@ export default function AutomatedRoutineDashboard() {
               }))}
             />
           </div>
-        </header>
+        </motion.header>
 
         {/* METRICS GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <motion.div
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
+          variants={itemVariants}
+        >
           <MetricCard
             title="Total Classes"
             value={computed.totalClasses}
@@ -425,10 +458,12 @@ export default function AutomatedRoutineDashboard() {
             trendLabel="less free time"
             icon={Clock}
           />
-        </div>
+        </motion.div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-
+        <motion.div
+          className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6"
+          variants={itemVariants}
+        >
           {/* --- FACULTY LOAD --- */}
           <Card className="lg:col-span-1 dark:bg-[#111113]! flex flex-col h-[420px]">
             <CardHeader
@@ -455,7 +490,9 @@ export default function AutomatedRoutineDashboard() {
                           key={`cell-${index}`}
                           fill={COLORS[index % COLORS.length]}
                           stroke="transparent"
-                          className="transition-all duration-300 hover:opacity-80"
+                          // Added: Dim cells that are not active for bidirectional feedback
+                          fillOpacity={activePieIndex === index ? 1 : 0.4}
+                          className="transition-all duration-300 hover:opacity-100"
                         />
                       ))}
                     </Pie>
@@ -472,69 +509,82 @@ export default function AutomatedRoutineDashboard() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto overflow-x-hidden pr-2 custom-scrollbar space-y-2 min-h-0">
-                {computed.teacherCounts.length > 0 ? (
-                  computed.teacherCounts.map((teacher, index) => {
-                    const percent =
-                      computed.totalClasses > 0
-                        ? Math.round(
-                            (teacher.count / computed.totalClasses) * 100
-                          )
-                        : 0;
-                    const isActive = activePieIndex === index;
+              <div className="flex-1 overflow-y-auto overflow-x-hidden pr-2 custom-scrollbar space-y-2 min-h-0 relative">
+                <AnimatePresence>
+                  {computed.teacherCounts.length > 0 ? (
+                    computed.teacherCounts.map((teacher, index) => {
+                      const percent =
+                        computed.totalClasses > 0
+                          ? Math.round(
+                              (teacher.count / computed.totalClasses) * 100
+                            )
+                          : 0;
+                      const isActive = activePieIndex === index;
 
-                    return (
-                      <div
-                        key={teacher.name}
-                        ref={(el) => {
-                          legendRefs.current[index] = el;
-                        }}
-                        onMouseEnter={() => setActivePieIndex(index)}
-                        className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border ${
-                          isActive
-                            ? "dark:bg-zinc-800 bg-zinc-100 dark:border-zinc-700"
-                            : "bg-transparent border-transparent hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div
-                            className="h-3 w-3 rounded-full shrink-0"
-                            style={{
-                              backgroundColor: COLORS[index % COLORS.length],
-                            }}
-                          />
-                          <span
-                            className={`text-sm font-medium truncate ${
-                              isActive
-                                ? "dark:text-white text-black"
-                                : "text-black dark:text-zinc-400"
-                            }`}
-                          >
-                            {teacher.name}
-                          </span>
+                      return (
+                        <div
+                          key={teacher.name}
+                          ref={(el) => {
+                            legendRefs.current[index] = el;
+                          }}
+                          onMouseEnter={() => setActivePieIndex(index)}
+                          className="relative flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all group"
+                        >
+                          {/* Sliding Background Indicator */}
+                          {isActive && (
+                            <motion.div
+                              layoutId="faculty-list-active"
+                              className="absolute inset-0 rounded-lg bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700"
+                              initial={false}
+                              transition={{
+                                type: "spring",
+                                stiffness: 300,
+                                damping: 30,
+                              }}
+                            />
+                          )}
+
+                          {/* Content */}
+                          <div className="relative z-10 flex items-center gap-3 min-w-0">
+                            <div
+                              className="h-3 w-3 rounded-full shrink-0"
+                              style={{
+                                backgroundColor: COLORS[index % COLORS.length],
+                              }}
+                            />
+                            <span
+                              className={`text-sm font-medium truncate transition-colors ${
+                                isActive
+                                  ? "dark:text-white text-black"
+                                  : "text-zinc-600 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-zinc-300"
+                              }`}
+                            >
+                              {teacher.name}
+                            </span>
+                          </div>
+                          <div className="relative z-10 flex items-center gap-3 shrink-0">
+                            <span
+                              className={`text-sm font-bold transition-colors ${
+                                isActive
+                                  ? "dark:text-white"
+                                  : "text-zinc-900 dark:text-zinc-100"
+                              }`}
+                            >
+                              {teacher.count}
+                            </span>
+                            <span className="text-xs font-medium text-emerald-500 w-10 text-right">
+                              +{percent}%
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span
-                            className={`text-sm font-bold ${
-                              isActive
-                                ? "dark:text-white"
-                                : "text-zinc-900 dark:text-zinc-100"
-                            }`}
-                          >
-                            {teacher.count}
-                          </span>
-                          <span className="text-xs font-medium text-emerald-500 w-10 text-right">
-                            +{percent}%
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-zinc-400">
-                    No active classes
-                  </div>
-                )}
+                      );
+                    })
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-zinc-400">
+                      No active classes
+                    </div>
+                  )}
+                </AnimatePresence>
               </div>
             </CardContent>
           </Card>
@@ -604,10 +654,13 @@ export default function AutomatedRoutineDashboard() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
 
         {/* CHARTS SECTION 2 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <motion.div
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          variants={itemVariants}
+        >
           {/* Area Chart */}
           <Card className="h-[350px] dark:bg-[#111113]! flex flex-col">
             <CardHeader
@@ -730,8 +783,8 @@ export default function AutomatedRoutineDashboard() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </>
   );
 }

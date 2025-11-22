@@ -70,7 +70,7 @@ const pageItemVariants: Variants = {
   visible: {
     y: 0,
     opacity: 1,
-    transition: { type: "spring" as const, stiffness: 100, damping: 10 },
+    transition: { type: "spring" as const, stiffness: 120, damping: 20 },
   },
 };
 
