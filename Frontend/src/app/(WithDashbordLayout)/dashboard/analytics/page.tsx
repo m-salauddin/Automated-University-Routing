@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -341,22 +341,10 @@ export default function AutomatedRoutineDashboard() {
     };
   }, [semester]);
 
-  // --- AUTO-SCROLL EFFECT (Uncommented and fixed) ---
-  useEffect(() => {
-    // Only scroll if the index is valid and the ref exists
-    if (legendRefs.current[activePieIndex]) {
-      legendRefs.current[activePieIndex]?.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-    }
-  }, [activePieIndex]);
 
-  // Chart Colors
   const chartColorPrimary = "#6366f1";
   const chartColorSecondary = "#10b981";
 
-  // Logic for the Center Label of the Donut Chart
   const activeItem = computed.teacherCounts[activePieIndex] ||
     computed.teacherCounts[0] || { name: "N/A", count: 0 };
   const activePercent =
@@ -366,7 +354,6 @@ export default function AutomatedRoutineDashboard() {
 
   return (
     <>
-      {/* Inject Font */}
       <style jsx global>{`
         /* Custom Scrollbar Styling */
         .custom-scrollbar::-webkit-scrollbar {

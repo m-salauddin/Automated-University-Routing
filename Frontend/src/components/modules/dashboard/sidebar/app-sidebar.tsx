@@ -7,7 +7,12 @@ import {
   View,
   ChevronRight,
   ListTodo,
-  Shield,
+  BookOpen,
+  Building2,
+  CalendarRange,
+  GraduationCap,
+  Clock,
+  Users,
 } from "lucide-react";
 
 import {
@@ -29,6 +34,7 @@ import { NavUser } from "./nav-user";
 import { cn } from "@/lib/utils";
 import { TeamSwitcher } from "./team-switcher";
 
+// Redux Imports
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "@/store";
 import { initializeAuth } from "@/store/authSlice";
@@ -74,9 +80,34 @@ export function AppSidebar() {
 
   const adminPanel = [
     {
-      title: "Admin Panel",
-      url: "/dashboard/admin",
-      icon: Shield,
+      title: "Courses",
+      url: "/dashboard/admin/courses",
+      icon: BookOpen,
+    },
+    {
+      title: "Departments",
+      url: "/dashboard/admin/departments",
+      icon: Building2,
+    },
+    {
+      title: "Routine Entries",
+      url: "/dashboard/admin/routine-entries",
+      icon: CalendarRange,
+    },
+    {
+      title: "Semesters",
+      url: "/dashboard/admin/semesters",
+      icon: GraduationCap,
+    },
+    {
+      title: "Time Slots",
+      url: "/dashboard/admin/time-slots",
+      icon: Clock,
+    },
+    {
+      title: "Users",
+      url: "/dashboard/admin/users",
+      icon: Users,
     },
   ];
 

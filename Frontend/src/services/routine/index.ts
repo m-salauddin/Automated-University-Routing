@@ -16,7 +16,6 @@ const getRoutine = async () => {
         const res = await fetch(ROUTINE_URL, {
             method: "GET",
             headers: {
-                // 3. FIX: Add 'Bearer ' prefix
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
             },

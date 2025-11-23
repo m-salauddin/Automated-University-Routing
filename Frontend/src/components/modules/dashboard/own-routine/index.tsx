@@ -916,12 +916,14 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden mb-8">
         <div className="space-y-2">
-          <Badge
-            variant="outline"
-            className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
-          >
-            Teacher Portal
-          </Badge>
+          <motion.div variants={itemVariants}>
+            <Badge
+              variant="outline"
+              className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
+            >
+              Teacher Portal
+            </Badge>
+          </motion.div>
           <motion.h1
             variants={itemVariants}
             className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"

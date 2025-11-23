@@ -80,7 +80,7 @@ const tableContainerVariants: Variants = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08,
+      staggerChildren: 0.05,
     },
   },
 };
@@ -484,7 +484,7 @@ export default function AutomatedRoutineCourses() {
 
         {/* -- Print Header -- */}
         <div className="hidden print:block mb-6">
-          <h1 className="text-2xl font-bold mb-2">Academic Course Catalog</h1>
+          <h1 className="text-2xl font-bold mb-2">Academic Course Curriculum</h1>
           <p className="text-sm text-muted-foreground">
             Generated Report • {new Date().toLocaleDateString()}
           </p>
