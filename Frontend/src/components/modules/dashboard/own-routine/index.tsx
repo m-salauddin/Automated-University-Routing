@@ -20,7 +20,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -85,6 +84,7 @@ import {
   PowerOff,
   FolderOpen,
   CheckCheck,
+  ShieldBan,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { markOff, markOn, generateClassKey } from "@/store/classOffSlice";
@@ -332,9 +332,13 @@ function DragHandle({
 
 // --- MAIN PAGE COMPONENT ---
 export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
-  const { role, username } = { role: "teacher", username: "User" };
   const dispatch = useDispatch();
-  const auth = useSelector((s: RootState) => s.auth);
+  const {
+    role,
+    username,
+    department_name,
+    isLoading: isAuthLoading,
+  } = useSelector((s: RootState) => s.auth);
 
   const availabilityMap = useSelector(
     (s: RootState) => s.teacherAvailability?.map || EMPTY_OBJ
@@ -814,7 +818,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
                   {currentStatus === "on" ? "Active" : "Cancelled"}
                 </Badge>
               ) : (
-                row[key]
+                (row)[key]
               )}
             </TableCell>
           ) : null
@@ -839,7 +843,8 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
               >
                 {currentStatus === "on" ? (
                   <>
-                    <PowerOff className="size-4 mr-2 text-red-500" /> Mark as Off
+                    <PowerOff className="size-4 mr-2 text-red-500" /> Mark as
+                    Off
                   </>
                 ) : (
                   <>
@@ -855,21 +860,46 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     );
   }
 
-  if (role !== "teacher")
-    return (
-      <div className="p-6">
-        <Alert>
-          <AlertTitle>Access restricted</AlertTitle>
-          <AlertDescription>Teacher access only.</AlertDescription>
-        </Alert>
-      </div>
-    );
-  if (isLoading)
+  // --- AUTH LOADING STATE ---
+  if (isAuthLoading || isLoading) {
     return (
       <div className="w-full h-[70vh] flex items-center justify-center bg-background">
         <DataLoader />
       </div>
     );
+  }
+
+  // --- ROLE CHECK & BEAUTIFUL ERROR UI ---
+  if (role !== "teacher") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="h-[80vh] w-full flex flex-col font-lexend items-center justify-center gap-6 text-center px-4"
+      >
+        <div className="rounded-full bg-red-100 p-6 dark:bg-red-900/20 ring-1 ring-red-200 dark:ring-red-900/40 shadow-sm">
+          <ShieldBan className="h-12 w-12 text-red-600 dark:text-red-500" />
+        </div>
+        <div className="space-y-3 max-w-[500px]">
+          <h2 className="sm:text-2xl text-xl font-bold tracking-tight text-foreground">
+            Access Restricted
+          </h2>
+          <p className="text-muted-foreground text-xs sm:text-base leading-relaxed">
+            This page is exclusively for faculty members. It seems you do not
+            have the required permissions to view this content.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => window.history.back()}
+        >
+          <ChevronLeft className="h-4 w-4" /> Go Back
+        </Button>
+      </motion.div>
+    );
+  }
+
   if (!teacherInfo && rows.length === 0)
     return (
       <div className="w-full h-[50vh] flex flex-col items-center justify-center text-muted-foreground">
@@ -884,7 +914,6 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       animate="visible"
       className="w-full font-lexend max-w-full overflow-x-hidden mx-auto p-5 space-y-4 print:overflow-visible"
     >
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden mb-8">
         <div className="space-y-2">
           <Badge
@@ -897,7 +926,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
             variants={itemVariants}
             className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"
           >
-            Department of {auth.department_name}
+            Department of {department_name || "N/A"}
           </motion.h1>
           <motion.div
             variants={itemVariants}
