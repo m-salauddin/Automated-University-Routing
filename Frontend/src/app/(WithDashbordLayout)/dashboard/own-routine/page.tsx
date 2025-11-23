@@ -1,5 +1,5 @@
 import OwnRoutinePage from "@/components/modules/dashboard/own-routine";
-import getRoutine from "@/services/routine";
+import { getRoutine } from "@/services/routine";
 
 const StudentRoutine = async () => {
   const routineResponse = await getRoutine();

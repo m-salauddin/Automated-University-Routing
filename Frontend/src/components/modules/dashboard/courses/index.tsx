@@ -288,8 +288,8 @@ export default function AutomatedRoutineCourses({
   courses = [],
 }: AutomatedRoutineCoursesProps) {
   // -- State --
-  const [inputValue, setInputValue] = useState(""); // Local state for immediate input feedback
-  const [searchQuery, setSearchQuery] = useState(""); // Debounced state for heavy filtering
+  const [inputValue, setInputValue] = useState("");
+  const [searchQuery, setSearchQuery] = useState(""); 
   const [semesterFilter, setSemesterFilter] = useState("All");
   const [creditFilter, setCreditFilter] = useState("All");
   const [teacherFilter, setTeacherFilter] = useState("All");
