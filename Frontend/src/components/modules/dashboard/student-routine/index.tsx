@@ -22,14 +22,22 @@ import {
   CalendarX,
   Loader2,
   ShieldAlert,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
-import { getLocalISODate } from "@/store/classOffSlice";
+import { generateClassKey, normalizeTime } from "@/store/classOffSlice";
 import DataLoader from "@/components/ui/data-loader";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export type APIRoutineItem = {
   id: number;
@@ -49,6 +57,7 @@ type ClassSession = {
   teacher: string;
   room: string;
   teacherId?: string;
+  originalTime?: string;
 };
 
 type DayRow = {
@@ -64,61 +73,47 @@ type RoutineData = {
 };
 
 const timeSlots = [
-  "8.45-9.35", // Index 0
-  "9.40-10.30", // Index 1
-  "10.35-11.25", // Index 2
-  "11.30-12.20", // Index 3
-  "12.25-1.15", // Index 4
-  "Break", // Index 5
-  "2.00-2.45", // Index 6
-  "2.45-3.30", // Index 7
-  "3.30-4.15", // Index 8
+  "8.45-9.35",
+  "9.40-10.30",
+  "10.35-11.25",
+  "11.30-12.20",
+  "12.25-1.15",
+  "Break",
+  "2.00-2.45",
+  "2.45-3.30",
+  "3.30-4.15",
 ];
 
 const LUNCH_SLOT_INDEX = 5;
 
 const TIME_TO_SLOT_INDEX: Record<string, number> = {
-  "08:45:00": 0,
-  "09:40:00": 1,
-  "10:35:00": 2,
-  "11:30:00": 3,
-  "12:25:00": 4,
-  "14:00:00": 6,
-  "14:45:00": 7,
-  "15:30:00": 8,
+  [normalizeTime("08:45:00")]: 0,
+  [normalizeTime("09:40:00")]: 1,
+  [normalizeTime("10:35:00")]: 2,
+  [normalizeTime("11:30:00")]: 3,
+  [normalizeTime("12:25:00")]: 4,
+  [normalizeTime("14:00:00")]: 6,
+  [normalizeTime("14:45:00")]: 7,
+  [normalizeTime("15:30:00")]: 8,
 };
-
-const SLOT_INDEX_TO_TIME: Record<number, string> = Object.entries(
-  TIME_TO_SLOT_INDEX
-).reduce((acc, [time, idx]) => {
-  acc[idx as unknown as number] = time as string;
-  return acc;
-}, {} as Record<number, string>);
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 
-// --- Helper Function for Teacher Initials ---
 const getTeacherInitials = (name: string) => {
   if (!name) return "";
   const capitals = name.match(/[A-Z]/g);
-  if (capitals && capitals.length > 0) {
-    return capitals.join("");
-  }
+  if (capitals && capitals.length > 0) return capitals.join("");
   return name
     .split(/[\s-_]+/)
     .map((word) => word.charAt(0).toUpperCase())
     .join("");
 };
 
-// --- Animation Variants ---
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2,
-    },
+    transition: { staggerChildren: 0.1, delayChildren: 0.2 },
   },
 };
 
@@ -131,55 +126,83 @@ const itemVariants = {
   },
 };
 
+// --- NEW ANIMATION VARIANTS FOR DIALOG ---
+const dialogContainerVariants = {
+  hidden: { opacity: 0, scale: 0.95 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      delayChildren: 0.1,
+      staggerChildren: 0.1,
+      duration: 0.2,
+    },
+  },
+};
+
+const dialogItemVariants = {
+  hidden: { y: 10, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { type: "spring" as const, stiffness: 300, damping: 24 },
+  },
+};
+
+const EMPTY_OBJ = {};
+
 interface Props {
   routineList: APIRoutineItem[];
 }
 
 export default function DepartmentRoutinePage({ routineList }: Props) {
   const availabilityMap = useSelector(
-    (s: RootState) => s.teacherAvailability.map
+    (s: RootState) => s.teacherAvailability?.map || EMPTY_OBJ
   );
-  const classOffMap = useSelector((s: RootState) => s.classOff.offMap);
-  const today = getLocalISODate();
+  const classOffMap = useSelector(
+    (s: RootState) => s.classOff.offMap || EMPTY_OBJ
+  );
 
-  // --- NEW: Loading State ---
   const [isLoading, setIsLoading] = useState(true);
-
   const [selectedSemester, setSelectedSemester] = useState<string>("");
   const [inputValue, setInputValue] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const auth = useSelector((s: RootState) => s.auth) as any;
 
+  const [viewReasonModal, setViewReasonModal] = useState<{
+    isOpen: boolean;
+    course: string;
+    teacher: string;
+    reason: string;
+  }>({
+    isOpen: false,
+    course: "",
+    teacher: "",
+    reason: "",
+  });
+
   const isStudent = auth?.role?.toLowerCase() === "student";
   const studentSemester = auth?.semester_name;
 
-  // --- NEW: Simulate Loading Effect ---
   useEffect(() => {
     const delay = 1500;
-
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, delay);
-
+    const timer = setTimeout(() => setIsLoading(false), delay);
     return () => clearTimeout(timer);
   }, []);
 
-  // 1. Transform API Data into UI Structure
   const formattedRoutineData = useMemo(() => {
     const grouped: Record<string, RoutineData> = {};
 
     routineList.forEach((item) => {
       if (!grouped[item.semester_name]) {
-        const emptySchedule = DAYS_ORDER.map((day) => ({
-          day,
-          slots: Array(9).fill(null),
-        }));
-
         grouped[item.semester_name] = {
           label: `${item.semester_name} Semester`,
           session: "Spring 2024",
           credits: 0,
-          schedule: emptySchedule,
+          schedule: DAYS_ORDER.map((day) => ({
+            day,
+            slots: Array(9).fill(null),
+          })),
         };
       }
     });
@@ -187,11 +210,11 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
     routineList.forEach((item) => {
       const semesterGroup = grouped[item.semester_name];
       if (!semesterGroup) return;
-
       const dayRow = semesterGroup.schedule.find((d) => d.day === item.day);
       if (!dayRow) return;
 
-      const slotIndex = TIME_TO_SLOT_INDEX[item.start_time];
+      const normalizedApiTime = normalizeTime(item.start_time);
+      const slotIndex = TIME_TO_SLOT_INDEX[normalizedApiTime];
 
       if (slotIndex !== undefined && slotIndex >= 0 && slotIndex < 9) {
         dayRow.slots[slotIndex] = {
@@ -199,6 +222,7 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
           teacher: item.teacher_name,
           room: item.room_number,
           teacherId: item.teacher_name,
+          originalTime: item.start_time,
         };
       }
     });
@@ -206,25 +230,18 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
     return grouped;
   }, [routineList]);
 
-  // 2. Set semester options
   const semesterOptions = useMemo(() => {
-    const keys = Object.keys(formattedRoutineData);
-    return keys.map((key) => ({
+    return Object.keys(formattedRoutineData).map((key) => ({
       id: key,
       label: formattedRoutineData[key].label,
     }));
   }, [formattedRoutineData]);
 
-  // 3. Calculate activeSemesterId
   const activeSemesterId = useMemo(() => {
-    if (selectedSemester && formattedRoutineData[selectedSemester]) {
+    if (selectedSemester && formattedRoutineData[selectedSemester])
       return selectedSemester;
-    }
-
-    if (isStudent && studentSemester && formattedRoutineData[studentSemester]) {
+    if (isStudent && studentSemester && formattedRoutineData[studentSemester])
       return studentSemester;
-    }
-
     return semesterOptions.length > 0 ? semesterOptions[0].id : "";
   }, [
     selectedSemester,
@@ -234,22 +251,18 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
     studentSemester,
   ]);
 
-  // 4. Get current view
   const currentRoutine = useMemo(
     () => formattedRoutineData[activeSemesterId],
     [activeSemesterId, formattedRoutineData]
   );
 
-  // 5. Access Control Check
   const hasAccess = useMemo(() => {
     if (!isStudent) return true;
     return activeSemesterId === studentSemester;
   }, [isStudent, activeSemesterId, studentSemester]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(inputValue);
-    }, 300);
+    const timer = setTimeout(() => setDebouncedSearch(inputValue), 300);
     return () => clearTimeout(timer);
   }, [inputValue]);
 
@@ -265,13 +278,12 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
     };
   }, [debouncedSearch]);
 
-  if (isLoading) {
+  if (isLoading)
     return (
       <div className="w-full h-[70vh] flex items-center justify-center bg-background">
         <DataLoader />
       </div>
     );
-  }
 
   if (!currentRoutine) {
     const isEmpty = routineList.length === 0;
@@ -279,7 +291,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
         className="min-h-[80vh] flex font-lexend flex-col items-center justify-center text-center p-8"
       >
         <div
@@ -296,17 +307,14 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
             <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
           )}
         </div>
-
         <h2 className="text-2xl font-bold tracking-tight text-foreground mb-2">
           {isEmpty ? "No Routine Found" : "Processing Data"}
         </h2>
-
         <p className="text-muted-foreground max-w-[400px] text-base leading-relaxed">
           {isEmpty
             ? "There is no schedule data available for this semester yet."
             : "Please wait while we finalize the display."}
         </p>
-
         {isEmpty && (
           <Button
             variant="outline"
@@ -320,13 +328,10 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
     );
   }
 
-  // --- STATE 2: Display Data ---
   return (
     <>
-      {/* GLOBAL PRINT STYLES */}
       <style jsx global>{`
         @media print {
-          /* 1. FORCE LIGHT MODE */
           :root,
           .dark,
           body,
@@ -352,31 +357,21 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
             --ring: 0 0% 3.9% !important;
             color-scheme: light !important;
           }
-
           @page {
             size: landscape;
             margin: 5mm;
           }
-
-          /* 2. RESET ALL BACKGROUNDS & COLORS */
           body {
             background-color: white !important;
             background: white !important;
             color: black !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
             width: 100% !important;
-            min-width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
           }
-
-          /* 3. NUCLEAR BORDER RESET */
           * {
             border-color: transparent !important;
           }
-
-          /* 4. TABLE BORDERS: Changed to 1px standard width */
           table,
           th,
           td,
@@ -384,7 +379,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
             border-color: black !important;
             border-style: solid !important;
           }
-          /* CHANGED: 2px -> 1px */
           table {
             border: 1px solid black !important;
             border-collapse: collapse !important;
@@ -393,25 +387,20 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
           th {
             border: 1px solid black !important;
           }
-
-          /* 5. SPECIFIC FIXES */
           #print-container-wrapper {
             border: none !important;
             box-shadow: none !important;
             background-color: transparent !important;
           }
-
           div,
           span,
           p {
             background-color: transparent !important;
             color: black !important;
           }
-
           svg line {
             stroke: black !important;
           }
-
           * {
             box-shadow: none !important;
           }
@@ -425,7 +414,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
         className="min-h-screen font-lexend w-full max-w-[1600px] mx-auto bg-background text-foreground p-5 overflow-x-hidden print:p-0 print:m-0 print:max-w-none print:w-full print:bg-white print:text-black print:overflow-visible"
       >
         <div className="space-y-8 print:space-y-0 print:w-full print:max-w-none">
-          {/* --- Header (Web Only) --- */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden">
             <div className="space-y-2">
               <motion.div variants={itemVariants}>
@@ -461,14 +449,12 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                 variant="outline"
                 className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex"
               >
-                <Printer className="h-4 w-4" />
-                Print View
+                <Printer className="h-4 w-4" /> Print View
               </Button>
             </motion.div>
           </div>
 
           <div className="grid grid-cols-1 mb-5 lg:grid-cols-12 gap-4 print:hidden">
-            {/* -- Filter Group -- */}
             <motion.div
               variants={itemVariants}
               className="lg:col-span-8 flex justify-between flex-col sm:flex-row gap-3 bg-card border rounded-xl p-1.5 shadow-sm"
@@ -491,7 +477,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="flex font-lexend items-center justify-between px-4 py-2 bg-muted/30 rounded-lg min-w-[140px]">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Total Credits
@@ -501,8 +486,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                 </span>
               </div>
             </motion.div>
-
-            {/* -- Search -- */}
             <motion.div
               variants={itemVariants}
               className="lg:col-span-4 bg-card border rounded-xl p-1.5 shadow-sm"
@@ -519,7 +502,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
             </motion.div>
           </div>
 
-          {/* --- STATE 3: Access Restricted for Students --- */}
           {!hasAccess ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -549,9 +531,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
             </motion.div>
           ) : (
             <>
-              {/* --- STATE 4: Authorized Table View --- */}
-
-              {/* --- Header (Print Only) --- */}
               <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-2 pt-0 text-center w-full font-serif text-black">
                 <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
                   Department of Computer Science & Engineering
@@ -577,7 +556,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                 </div>
               </div>
 
-              {/* --- Main Table Container --- */}
               <motion.div
                 id="print-container-wrapper"
                 variants={itemVariants}
@@ -635,7 +613,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                         ))}
                       </TableRow>
                     </TableHeader>
-
                     <motion.tbody
                       key={activeSemesterId}
                       variants={containerVariants}
@@ -652,28 +629,42 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                           >
                             <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 !print:border-r !print:border-black print:bg-white print:text-black print:font-bold">
                               <div className="flex items-center justify-center h-full w-full py-4 print:py-2">
-                                {/* FIX: Use 3-char short day format (e.g. SUN, MON) */}
                                 <span className="writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0 print:rotate-0 print:text-[12px]">
                                   {dayRow.day.slice(0, 3).toUpperCase()}
                                 </span>
                               </div>
                             </TableCell>
-
                             {dayRow.slots.map((session, index) => {
                               const teacherKey = session
                                 ? session.teacherId ?? session.teacher
                                 : undefined;
-                              const startTimeRaw = SLOT_INDEX_TO_TIME[index];
-                              const isClassOffToday = teacherKey && startTimeRaw
-                                ? Boolean(classOffMap[`${today}|${teacherKey}|${startTimeRaw}`])
-                                : false;
+
+                              // KEY GENERATION
+                              const startTimeRaw = session?.originalTime || "";
+                              const key = generateClassKey(
+                                teacherKey || "",
+                                startTimeRaw
+                              );
+
+                              const classOffData =
+                                teacherKey && startTimeRaw
+                                  ? classOffMap[key]
+                                  : undefined;
+                              const isClassOffToday = Boolean(
+                                classOffData?.status
+                              );
+                              const cancellationReason =
+                                classOffData?.reason || "No reason provided.";
+
                               const isTeacherOff =
-                                (!!teacherKey && availabilityMap[teacherKey] === false) ||
+                                (!!teacherKey &&
+                                  availabilityMap[teacherKey] === false) ||
                                 isClassOffToday;
+
                               const highlighted = isMatch(session);
                               const isLunch = index === LUNCH_SLOT_INDEX;
 
-                              if (isLunch) {
+                              if (isLunch)
                                 return (
                                   <TableCell
                                     key={index}
@@ -692,13 +683,25 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                     </div>
                                   </TableCell>
                                 );
-                              }
 
                               return (
                                 <TableCell
                                   key={index}
+                                  onClick={() => {
+                                    if (session && isClassOffToday) {
+                                      setViewReasonModal({
+                                        isOpen: true,
+                                        course: session.course,
+                                        teacher: session.teacher,
+                                        reason: cancellationReason,
+                                      });
+                                    }
+                                  }}
                                   className={cn(
                                     "p-1.5 align-middle border-r border-border/60 transition-colors duration-200 !print:border-r !print:border-black print:p-0.5",
+                                    isClassOffToday
+                                      ? "cursor-pointer"
+                                      : "cursor-default",
                                     highlighted
                                       ? "bg-foreground/5 print:bg-transparent"
                                       : "bg-transparent print:bg-white"
@@ -706,13 +709,12 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                 >
                                   {session ? (
                                     <>
-                                      {/* Web View Card */}
                                       <div
                                         className={cn(
-                                          "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm cursor-default group print:hidden",
+                                          "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden",
                                           "transition-colors duration-200",
                                           isTeacherOff
-                                            ? "bg-card border-red-500 ring-2 ring-red-400/40"
+                                            ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
                                             : highlighted
                                             ? "bg-background border-foreground shadow-md ring-1 ring-foreground/10"
                                             : "bg-card border-border/50 hover:border-foreground/20 hover:shadow-md"
@@ -738,15 +740,13 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                           </div>
                                         </div>
                                       </div>
-
-                                      {/* Print View Content (Full Size) */}
                                       <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
                                         <span className="font-bold text-[11px]">
                                           {session.course}, T-
                                           {getTeacherInitials(session.teacher)}
                                         </span>
                                         <span className="font-bold text-[11px]">
-                                          R-{session.room}
+                                          {session.room}
                                         </span>
                                       </div>
                                     </>
@@ -767,8 +767,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
               </motion.div>
             </>
           )}
-
-          {/* -- Mobile Print Hint -- */}
           <div className="text-center mt-6 print:hidden sm:hidden">
             <Button
               onClick={() => window.print()}
@@ -780,6 +778,57 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
           </div>
         </div>
       </motion.div>
+
+      <Dialog
+        open={viewReasonModal.isOpen}
+        onOpenChange={(open) =>
+          setViewReasonModal((prev) => ({ ...prev, isOpen: open }))
+        }
+      >
+        <DialogContent>
+          <AnimatePresence mode="wait">
+            {viewReasonModal.isOpen && (
+              <motion.div
+                variants={dialogContainerVariants}
+                initial="hidden"
+                animate="visible"
+                className="flex flex-col gap-1"
+              >
+                <motion.div variants={dialogItemVariants}>
+                  <DialogHeader>
+                    <div className="flex items-center gap-2 text-red-500 mb-2">
+                      <Info className="h-5 w-5" />
+                      <DialogTitle>Class Cancelled</DialogTitle>
+                    </div>
+                    <DialogDescription className="text-foreground text-base">
+                      <span className="font-semibold">
+                        {viewReasonModal.course}
+                      </span>{" "}
+                      with{" "}
+                      <span className="font-semibold">
+                        {viewReasonModal.teacher}
+                      </span>{" "}
+                      has been cancelled for today.
+                    </DialogDescription>
+                  </DialogHeader>
+                </motion.div>
+
+                <motion.div variants={dialogItemVariants}>
+                  <div className="bg-muted/50 p-4 rounded-md border mt-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">
+                      Teacher&apos;s Reason
+                    </p>
+                    {/* Added break-all and whitespace-pre-wrap to handle long strings/multiline */}
+                    <p className="text-sm italic text-foreground/90 whitespace-pre-wrap break-all">
+                      &quot;{viewReasonModal.reason}&quot;
+                    </p>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

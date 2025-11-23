@@ -45,6 +45,11 @@ export default function TokenGuard() {
       sessionStorage.removeItem("isLoggingOut");
     }
 
+    if(pathname==="/login" && hasAccessTokenCookie()){
+      router.replace("/dashboard/analytics");
+      return;
+    }
+
     const hasToken = hasAccessTokenCookie();
 
     if (hasToken && !isAuthed) {

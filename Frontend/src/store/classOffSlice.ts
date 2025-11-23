@@ -1,48 +1,68 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
+export type ClassOffRecord = {
+  status: boolean;
+  reason: string;
+};
+
 export type ClassOffState = {
-  offMap: Record<string, true>;
+  offMap: Record<string, ClassOffRecord>;
 };
 
 const STORAGE_KEY = "classOffMap";
 
-function pad(n: number): string {
-  return n < 10 ? `0${n}` : `${n}`;
-}
+// --- HELPER 1: Exported Normalize Time ---
+export const normalizeTime = (timeStr: string) => {
+  if (!timeStr) return "";
+  const [h, m] = timeStr.split(":");
+  // Pad hours with 0 if needed (e.g., "8" -> "08")
+  const normalizedH = h.padStart(2, "0");
+  return `${normalizedH}:${m}`;
+};
 
-export function getLocalISODate(d: Date = new Date()): string {
-  const year = d.getFullYear();
-  const month = pad(d.getMonth() + 1);
-  const day = pad(d.getDate());
-  return `${year}-${month}-${day}`;
-}
+// --- HELPER 2: Exported Date Helper ---
+export const getLocalISODate = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().split("T")[0];
+};
 
-export function buildKey(
-  date: string,
-  teacherId: string,
-  startTime: string
-): string {
-  return `${date}|${teacherId}|${startTime}`;
-}
+// --- HELPER 3: Exported Key Generator ---
+export const generateClassKey = (teacherId: string, startTime: string) => {
+  const today = getLocalISODate();
+  const time = normalizeTime(startTime);
+  const safeId = teacherId.trim();
+  return `${today}|${safeId}|${time}`;
+};
 
 function loadInitialState(): ClassOffState {
   if (typeof window === "undefined") return { offMap: {} };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { offMap: {} };
-    const parsed = JSON.parse(raw) as ClassOffState | undefined;
-    if (!parsed || typeof parsed !== "object" || !parsed.offMap) {
-      return { offMap: {} };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const rawMap = parsed.offMap || parsed;
+      const normalizedMap: Record<string, ClassOffRecord> = {};
+
+      Object.keys(rawMap).forEach((key) => {
+        const val = rawMap[key];
+        if (typeof val === "boolean") {
+          if (val === true) {
+            normalizedMap[key] = { status: true, reason: "No reason provided." };
+          }
+        } else if (typeof val === "object" && val !== null) {
+          normalizedMap[key] = {
+            status: !!val.status,
+            reason: val.reason || "No reason provided.",
+          };
+        }
+      });
+      return { offMap: normalizedMap };
     }
-    const today = getLocalISODate();
-    const cleaned: Record<string, true> = {};
-    for (const key of Object.keys(parsed.offMap)) {
-      if (key.startsWith(`${today}|`)) cleaned[key] = true;
-    }
-    return { offMap: cleaned };
-  } catch {
-    return { offMap: {} };
+  } catch (e) {
+    console.error("Failed to load class off state:", e);
   }
+  return { offMap: {} };
 }
 
 const initialState: ClassOffState = loadInitialState();
@@ -55,67 +75,64 @@ export const classOffSlice = createSlice({
       state,
       action: PayloadAction<{
         teacherId: string;
-        startTime: string; // HH:MM:SS
-        date?: string; // yyyy-mm-dd
+        startTime: string;
+        reason?: string;
       }>
     ) {
-      const { teacherId, startTime } = action.payload;
-      if (!teacherId || !startTime) return;
-      const date = action.payload.date ?? getLocalISODate();
-      const key = buildKey(date, teacherId, startTime);
-      state.offMap[key] = true;
+      const { teacherId, startTime, reason } = action.payload;
+      const key = generateClassKey(teacherId, startTime);
+
+      state.offMap[key] = {
+        status: true,
+        reason: reason || "No reason provided.",
+      };
+
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      } catch {}
+      } catch { }
     },
     markOn(
       state,
-      action: PayloadAction<{
-        teacherId: string;
-        startTime: string;
-        date?: string;
-      }>
+      action: PayloadAction<{ teacherId: string; startTime: string }>
     ) {
       const { teacherId, startTime } = action.payload;
-      if (!teacherId || !startTime) return;
-      const date = action.payload.date ?? getLocalISODate();
-      const key = buildKey(date, teacherId, startTime);
-      if (state.offMap[key]) delete state.offMap[key];
+      const key = generateClassKey(teacherId, startTime);
+
+      if (state.offMap[key]) {
+        delete state.offMap[key];
+      }
+
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      } catch {}
+      } catch { }
     },
+    // --- ADDED MISSING REDUCER HERE ---
     cleanupForToday(state) {
       const today = getLocalISODate();
-      const next: Record<string, true> = {};
-      for (const key of Object.keys(state.offMap)) {
-        if (key.startsWith(`${today}|`)) next[key] = true;
-      }
-      state.offMap = next;
+      const keys = Object.keys(state.offMap);
+
+      keys.forEach((key) => {
+        // Keys are formatted as: DATE|ID|TIME
+        // If the key does not start with today's date, remove it
+        if (!key.startsWith(today)) {
+          delete state.offMap[key];
+        }
+      });
+
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      } catch {}
+      } catch { }
     },
     resetAll(state) {
       state.offMap = {};
       try {
         localStorage.removeItem(STORAGE_KEY);
-      } catch {}
+      } catch { }
     },
   },
 });
 
-export const { markOff, markOn, cleanupForToday, resetAll } = classOffSlice.actions;
+// Export all actions, including cleanupForToday
+export const { markOff, markOn, resetAll, cleanupForToday } = classOffSlice.actions;
 
 export default classOffSlice.reducer;
-
-export const isSlotOff = (
-  state: { classOff: ClassOffState },
-  teacherId: string | undefined,
-  startTime: string | undefined,
-  date: string = getLocalISODate()
-): boolean => {
-  if (!teacherId || !startTime) return false;
-  const key = buildKey(date, teacherId, startTime);
-  return !!state.classOff.offMap[key];
-};

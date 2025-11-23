@@ -1,11 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   CalendarCheck,
   ChartColumnBig,
   View,
   ChevronRight,
   ListTodo,
+  Shield,
 } from "lucide-react";
 
 import {
@@ -26,8 +28,10 @@ import { usePathname } from "next/navigation";
 import { NavUser } from "./nav-user";
 import { cn } from "@/lib/utils";
 import { TeamSwitcher } from "./team-switcher";
-import { useSelector } from "react-redux";
-import type { RootState } from "@/store";
+
+import { useDispatch, useSelector } from "react-redux";
+import type { RootState, AppDispatch } from "@/store";
+import { initializeAuth } from "@/store/authSlice";
 
 const globalItems = [
   { title: "Analytics", url: "/dashboard/analytics", icon: ChartColumnBig },
@@ -38,7 +42,19 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { state, isMobile, setOpenMobile } = useSidebar();
 
-  const { role } = useSelector((s: RootState) => s.auth);
+  const dispatch = useDispatch<AppDispatch>();
+  const { role, isLoading } = useSelector((state: RootState) => state.auth);
+
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      dispatch(initializeAuth());
+      setMounted(true);
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [dispatch]);
 
   const studentPanel = [
     {
@@ -56,11 +72,29 @@ export function AppSidebar() {
     },
   ];
 
-  const panelItems = role === "teacher" ? teacherPanel : studentPanel;
-  const panelTitle = role === "teacher" ? "Teacher Panel" : "Student Panel";
+  const adminPanel = [
+    {
+      title: "Admin Panel",
+      url: "/dashboard/admin",
+      icon: Shield,
+    },
+  ];
+
+  let panelItems = studentPanel;
+  let panelTitle = "Student Panel";
+
+  if (role === "teacher") {
+    panelItems = teacherPanel;
+    panelTitle = "Teacher Panel";
+  } else if (role === "admin") {
+    panelItems = adminPanel;
+    panelTitle = "Admin Panel";
+  }
 
   const isCollapsed = state === "collapsed";
   const isActive = (url: string) => pathname === url;
+
+  const showRolePanel = mounted && !isLoading && role;
 
   const renderMenuItem = (
     item: { title: string; url: string; icon: React.ElementType },
@@ -156,8 +190,14 @@ export function AppSidebar() {
 
           <div className="mt-6" />
 
-          <SidebarGroupLabel className="pl-2">{panelTitle}</SidebarGroupLabel>
-          {renderGroupContent(panelItems)}
+          {showRolePanel && (
+            <>
+              <SidebarGroupLabel className="pl-2">
+                {panelTitle}
+              </SidebarGroupLabel>
+              {renderGroupContent(panelItems)}
+            </>
+          )}
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
