@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   BookOpen,
@@ -28,8 +29,11 @@ import {
   PieChart,
   Pie,
   Cell,
+  Sector,
 } from "recharts";
 import { routineData } from "../students-routine/students-routine-data";
+
+// --- TYPES & INTERFACES ---
 
 interface ComputedMetrics {
   totalClasses: number;
@@ -39,8 +43,6 @@ interface ComputedMetrics {
   uniqueCourses: number;
   teacherCounts: { name: string; count: number }[];
 }
-
-// --- COMPONENT PROPS INTERFACES ---
 
 interface CardProps {
   children: React.ReactNode;
@@ -107,6 +109,33 @@ const itemVariants = {
   },
 };
 
+// --- CUSTOM ACTIVE SHAPE RENDERER WITH ANIMATION ---
+const renderActiveShape = (props: any) => {
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } =
+    props;
+
+  return (
+    <motion.g
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0.8, opacity: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+    >
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 8} 
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+        stroke="var(--background)"
+        strokeWidth={4}
+      />
+    </motion.g>
+  );
+};
+
 // --- SHADCN-STYLE COMPONENTS ---
 
 const Card: React.FC<CardProps> = ({ children, className = "" }) => (
@@ -151,7 +180,7 @@ const ShadcnSelect: React.FC<ShadcnSelectProps> = ({
     <div className="relative min-w-[180px]">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex h-10 w-full items-center justify-between rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-zinc-500 focus:outline-none  disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-[#111113] dark:placeholder:text-zinc-400"
+        className="flex h-10 w-full items-center justify-between rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-zinc-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-[#111113] dark:placeholder:text-zinc-400"
       >
         <span>
           {options.find((o) => o.value === value)?.label || "Select..."}
@@ -244,7 +273,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
   );
 };
 
-// --- CHART & VISUAL HELPERS (Outside render) ---
+// --- CHART & VISUAL HELPERS ---
 
 const COLORS = ["#3b82f6", "#f97316", "#10b981", "#facc15", "#a855f7"];
 
@@ -285,7 +314,6 @@ export default function AutomatedRoutineDashboard() {
   const [semesterId, setSemesterId] = useState<string>("8th");
   const [activePieIndex, setActivePieIndex] = useState<number>(0);
 
-  // REFS FOR SCROLLING LEGEND
   const legendRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const semester = useMemo(() => routineData[semesterId] || null, [semesterId]);
@@ -341,6 +369,15 @@ export default function AutomatedRoutineDashboard() {
     };
   }, [semester]);
 
+  // --- SCROLL EFFECT ---
+  useEffect(() => {
+    if (activePieIndex !== null && legendRefs.current[activePieIndex]) {
+      legendRefs.current[activePieIndex]?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    }
+  }, [activePieIndex]);
 
   const chartColorPrimary = "#6366f1";
   const chartColorSecondary = "#10b981";
@@ -355,7 +392,6 @@ export default function AutomatedRoutineDashboard() {
   return (
     <>
       <style jsx global>{`
-        /* Custom Scrollbar Styling */
         .custom-scrollbar::-webkit-scrollbar {
           width: 0px;
         }
@@ -363,12 +399,7 @@ export default function AutomatedRoutineDashboard() {
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: rgba(
-            113,
-            113,
-            122,
-            0.3
-          ); /* zinc-500 with opacity */
+          background-color: rgba(113, 113, 122, 0.3);
           border-radius: 20px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -447,12 +478,13 @@ export default function AutomatedRoutineDashboard() {
           />
         </motion.div>
 
+        {/* ROW 2: Faculty Load & Session Intensity */}
         <motion.div
-          className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6"
+          className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6"
           variants={itemVariants}
         >
           {/* --- FACULTY LOAD --- */}
-          <Card className="lg:col-span-1 dark:bg-[#111113]! flex flex-col h-[420px]">
+          <Card className="lg:col-span-2 dark:bg-[#111113]! flex flex-col h-[420px]">
             <CardHeader
               title="Faculty Load"
               subtitle="Distribution by instructor"
@@ -471,28 +503,41 @@ export default function AutomatedRoutineDashboard() {
                       paddingAngle={5}
                       dataKey="count"
                       onMouseEnter={(_, index) => setActivePieIndex(index)}
+                      activeIndex={activePieIndex}
+                      activeShape={renderActiveShape}
                     >
                       {computed.teacherCounts.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={COLORS[index % COLORS.length]}
                           stroke="transparent"
-                          // Added: Dim cells that are not active for bidirectional feedback
-                          fillOpacity={activePieIndex === index ? 1 : 0.4}
-                          className="transition-all duration-300 hover:opacity-100"
+                          fillOpacity={1}
+                          className="transition-all duration-300"
                         />
                       ))}
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
 
+                {/* Animated Text in Center */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                    {activePercent}%
-                  </span>
-                  <span className="text-xs text-zinc-500 dark:text-zinc-400 max-w-20 text-center truncate">
-                    {activeItem.name.split(" ")[1] || activeItem.name}
-                  </span>
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeItem.name}
+                      initial={{ opacity: 0, y: 5, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -5, scale: 0.9 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex flex-col items-center justify-center"
+                    >
+                      <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                        {activePercent}%
+                      </span>
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400 max-w-20 text-center truncate">
+                        {activeItem.name.split(" ")[1] || activeItem.name}
+                      </span>
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
               </div>
 
@@ -576,80 +621,8 @@ export default function AutomatedRoutineDashboard() {
             </CardContent>
           </Card>
 
-          {/* --- Line Chart --- */}
-          <Card className="lg:col-span-2 dark:bg-[#111113]! flex flex-col h-[420px]">
-            <CardHeader
-              title="Daily Workload"
-              subtitle="Classes vs Free Time breakdown"
-            />
-            <CardContent className="flex-1 min-h-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={computed.perDay.map((d) => ({
-                    name: d.day,
-                    Classes: d.classes,
-                    Free: d.free,
-                  }))}
-                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    vertical={false}
-                    strokeOpacity={0.15}
-                    stroke="currentColor"
-                  />
-                  <XAxis
-                    dataKey="name"
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#71717a", fontSize: 12 }}
-                    dy={10}
-                  />
-                  <YAxis
-                    axisLine={false}
-                    tickLine={false}
-                    tick={{ fill: "#71717a", fontSize: 12 }}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Line
-                    type="monotone"
-                    dataKey="Classes"
-                    stroke={chartColorPrimary}
-                    strokeWidth={3}
-                    dot={{
-                      r: 4,
-                      fill: chartColorPrimary,
-                      strokeWidth: 2,
-                      stroke: "var(--background)",
-                    }}
-                    activeDot={{ r: 6 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="Free"
-                    stroke={chartColorSecondary}
-                    strokeWidth={3}
-                    dot={{
-                      r: 4,
-                      fill: chartColorSecondary,
-                      strokeWidth: 2,
-                      stroke: "var(--background)",
-                    }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {/* CHARTS SECTION 2 */}
-        <motion.div
-          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-          variants={itemVariants}
-        >
-          {/* Area Chart */}
-          <Card className="h-[350px] dark:bg-[#111113]! flex flex-col">
+          {/* --- Session Intensity (Moved to Row 2) --- */}
+          <Card className="lg:col-span-3 h-[420px] dark:bg-[#111113]! flex flex-col">
             <CardHeader
               title="Session Intensity"
               subtitle="Volume of classes throughout the week"
@@ -714,9 +687,81 @@ export default function AutomatedRoutineDashboard() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </motion.div>
 
-          {/* --- Bar Chart --- */}
-          <Card className="h-[350px] dark:bg-[#111113]! flex flex-col">
+        {/* ROW 3: Daily Workload & Schedule Composition */}
+        <motion.div
+          className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          variants={itemVariants}
+        >
+          {/* --- Daily Workload (Moved to Row 3) --- */}
+          <Card className="dark:bg-[#111113]! flex flex-col h-[400px]">
+            <CardHeader
+              title="Daily Workload"
+              subtitle="Classes vs Free Time breakdown"
+            />
+            <CardContent className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={computed.perDay.map((d) => ({
+                    name: d.day,
+                    Classes: d.classes,
+                    Free: d.free,
+                  }))}
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    vertical={false}
+                    strokeOpacity={0.15}
+                    stroke="currentColor"
+                  />
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#71717a", fontSize: 12 }}
+                    dy={10}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#71717a", fontSize: 12 }}
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line
+                    type="monotone"
+                    dataKey="Classes"
+                    stroke={chartColorPrimary}
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      fill: chartColorPrimary,
+                      strokeWidth: 2,
+                      stroke: "var(--background)",
+                    }}
+                    activeDot={{ r: 6 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="Free"
+                    stroke={chartColorSecondary}
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      fill: chartColorSecondary,
+                      strokeWidth: 2,
+                      stroke: "var(--background)",
+                    }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* --- Schedule Composition --- */}
+          <Card className="h-[400px] dark:bg-[#111113]! flex flex-col">
             <CardHeader
               title="Schedule Composition"
               subtitle="Stacked view of engagement"

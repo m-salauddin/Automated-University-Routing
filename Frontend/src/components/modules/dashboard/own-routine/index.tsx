@@ -123,6 +123,7 @@ type TeacherInfo = {
   semesters_involved: string[];
 };
 
+// UPDATED: Added department to state
 type RoutineRowState = {
   id: number;
   day: string;
@@ -133,6 +134,7 @@ type RoutineRowState = {
   type: string;
   room: string;
   semester: string;
+  department: string; // Added this
   teacherId: string;
 };
 
@@ -361,18 +363,23 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
 
   // Modal State
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
+
+  // UPDATED: Added dept, sem, day to pendingCancellation
   const [pendingCancellation, setPendingCancellation] = useState<{
     id: number;
     teacherId: string;
     startTimeRaw: string;
     courseName: string;
+    department: string;
+    semester: string;
+    day: string;
   } | null>(null);
 
   const [visibleCols, setVisibleCols] = useState<
     Record<
       | keyof Omit<
           RoutineRowState,
-          "id" | "teacherId" | "fullCourseName" | "startTimeRaw"
+          "id" | "teacherId" | "fullCourseName" | "startTimeRaw" | "department"
         >
       | "status",
       boolean
@@ -439,6 +446,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
           type: isLab ? "Lab" : "Theory",
           room: item.room_number,
           semester: item.semester_name,
+          department: item.department_name, // UPDATED: Mapping department
           teacherId: item.teacher_name,
         };
       });
@@ -465,7 +473,14 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
 
   const processedRows = useMemo(() => {
     return rows.filter((r) => {
-      const key = generateClassKey(r.teacherId, r.startTimeRaw);
+      // UPDATED: Using new key generation logic with dept, sem, day
+      const key = generateClassKey(
+        r.department,
+        r.semester,
+        r.day,
+        r.teacherId,
+        r.startTimeRaw
+      );
       const offRecord = classOffMap[key];
       const isOffSlot = Boolean(offRecord?.status);
       const isTeacherOff = availabilityMap[r.teacherId] === false;
@@ -559,7 +574,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
   const columnsOrder: (
     | keyof Omit<
         RoutineRowState,
-        "id" | "teacherId" | "fullCourseName" | "startTimeRaw"
+        "id" | "teacherId" | "fullCourseName" | "startTimeRaw" | "department"
       >
     | "status"
   )[] = ["day", "time", "course", "type", "status", "room", "semester"];
@@ -568,8 +583,12 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
   const submitCancellation = (reason: string) => {
     if (!pendingCancellation) return;
 
+    // UPDATED: Dispatch includes new identifiers
     dispatch(
       markOff({
+        department: pendingCancellation.department,
+        semester: pendingCancellation.semester,
+        day: pendingCancellation.day,
         teacherId: pendingCancellation.teacherId,
         startTime: pendingCancellation.startTimeRaw,
         reason: reason,
@@ -582,6 +601,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
   };
 
   // --- Filter Components ---
+  // ... (Filter components remain exactly the same as previous code, collapsed for brevity)
   const DaySelect = () => (
     <div className="space-y-1 w-full">
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
@@ -729,7 +749,14 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       zIndex: isDragging ? 50 : "auto",
     };
 
-    const key = generateClassKey(row.teacherId, row.startTimeRaw);
+    // UPDATED: Using new identifiers for key generation in row component
+    const key = generateClassKey(
+      row.department,
+      row.semester,
+      row.day,
+      row.teacherId,
+      row.startTimeRaw
+    );
     const offRecord = classOffMap[key];
     const isOffSlot = Boolean(offRecord?.status);
     const isTeacherOff = availabilityMap[row.teacherId] === false;
@@ -737,16 +764,27 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
 
     const handleStatusChange = () => {
       if (currentStatus === "on") {
+        // UPDATED: Set detailed info for pending cancellation
         setPendingCancellation({
           id: row.id,
           teacherId: row.teacherId,
           startTimeRaw: row.startTimeRaw,
           courseName: row.course,
+          department: row.department,
+          semester: row.semester,
+          day: row.day,
         });
         setIsReasonModalOpen(true);
       } else {
+        // UPDATED: Dispatch includes new identifiers
         dispatch(
-          markOn({ teacherId: row.teacherId, startTime: row.startTimeRaw })
+          markOn({
+            department: row.department,
+            semester: row.semester,
+            day: row.day,
+            teacherId: row.teacherId,
+            startTime: row.startTimeRaw,
+          })
         );
         toast.success(`${row.course} is now ON`);
       }
@@ -818,7 +856,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
                   {currentStatus === "on" ? "Active" : "Cancelled"}
                 </Badge>
               ) : (
-                (row)[key]
+                row[key]
               )}
             </TableCell>
           ) : null

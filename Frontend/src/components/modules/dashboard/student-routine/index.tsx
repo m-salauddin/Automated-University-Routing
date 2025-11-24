@@ -52,12 +52,16 @@ export type APIRoutineItem = {
   room_number: string;
 };
 
+// UPDATED: Added fields required for unique key generation
 type ClassSession = {
   course: string;
   teacher: string;
   room: string;
   teacherId?: string;
   originalTime?: string;
+  department: string;
+  semester: string;
+  day: string;
 };
 
 type DayRow = {
@@ -99,6 +103,7 @@ const TIME_TO_SLOT_INDEX: Record<string, number> = {
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 
+// --- HELPERS ---
 const getTeacherInitials = (name: string) => {
   if (!name) return "";
   const capitals = name.match(/[A-Z]/g);
@@ -107,6 +112,11 @@ const getTeacherInitials = (name: string) => {
     .split(/[\s-_]+/)
     .map((word) => word.charAt(0).toUpperCase())
     .join("");
+};
+
+// UPDATED: Helper to match abbreviated day format
+const abbreviateDay = (day: string) => {
+  return day ? day.substring(0, 3) : "";
 };
 
 const containerVariants = {
@@ -217,12 +227,16 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
       const slotIndex = TIME_TO_SLOT_INDEX[normalizedApiTime];
 
       if (slotIndex !== undefined && slotIndex >= 0 && slotIndex < 9) {
+        // UPDATED: Populate new fields
         dayRow.slots[slotIndex] = {
           course: item.course_code,
           teacher: item.teacher_name,
           room: item.room_number,
           teacherId: item.teacher_name,
           originalTime: item.start_time,
+          department: item.department_name,
+          semester: item.semester_name,
+          day: item.day,
         };
       }
     });
@@ -639,26 +653,37 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                 ? session.teacherId ?? session.teacher
                                 : undefined;
 
-                              // KEY GENERATION
-                              const startTimeRaw = session?.originalTime || "";
-                              const key = generateClassKey(
-                                teacherKey || "",
-                                startTimeRaw
-                              );
+                              // UPDATED: Using full context for key generation
+                              const startTimeRaw =
+                                session?.originalTime || "";
+                              
+                              const key =
+                                session && teacherKey
+                                  ? generateClassKey(
+                                      session.department,
+                                      session.semester,
+                                      abbreviateDay(session.day),
+                                      teacherKey,
+                                      startTimeRaw
+                                    )
+                                  : "";
 
                               const classOffData =
-                                teacherKey && startTimeRaw
+                                teacherKey && startTimeRaw && key
                                   ? classOffMap[key]
                                   : undefined;
+
                               const isClassOffToday = Boolean(
                                 classOffData?.status
                               );
                               const cancellationReason =
-                                classOffData?.reason || "No reason provided.";
+                                classOffData?.reason ||
+                                "No reason provided.";
 
                               const isTeacherOff =
                                 (!!teacherKey &&
-                                  availabilityMap[teacherKey] === false) ||
+                                  availabilityMap[teacherKey] ===
+                                    false) ||
                                 isClassOffToday;
 
                               const highlighted = isMatch(session);
@@ -743,7 +768,9 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                       <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
                                         <span className="font-bold text-[11px]">
                                           {session.course}, T-
-                                          {getTeacherInitials(session.teacher)}
+                                          {getTeacherInitials(
+                                            session.teacher
+                                          )}
                                         </span>
                                         <span className="font-bold text-[11px]">
                                           {session.room}
@@ -818,7 +845,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">
                       Teacher&apos;s Reason
                     </p>
-                    {/* Added break-all and whitespace-pre-wrap to handle long strings/multiline */}
                     <p className="text-sm italic text-foreground/90 whitespace-pre-wrap break-all">
                       &quot;{viewReasonModal.reason}&quot;
                     </p>

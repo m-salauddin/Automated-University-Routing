@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useRouter} from "next/navigation";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import {
   Select,
@@ -67,8 +67,10 @@ type ClassSession = {
   room: string;
   teacherId?: string;
   originalTime?: string;
+  department: string;
+  semester: string;
+  day: string;
 };
-
 
 const timeSlots = [
   "8.45-9.35",
@@ -97,6 +99,7 @@ const TIME_TO_SLOT_INDEX: Record<string, number> = {
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 
+// --- HELPERS ---
 const getTeacherInitials = (name: string) => {
   if (!name) return "";
   const capitals = name.match(/[A-Z]/g);
@@ -105,6 +108,11 @@ const getTeacherInitials = (name: string) => {
     .split(/[\s-_]+/)
     .map((word) => word.charAt(0).toUpperCase())
     .join("");
+};
+
+// UPDATED: Added helper to match the abbreviated day format stored by the teacher page
+const abbreviateDay = (day: string) => {
+  return day ? day.substring(0, 3) : "";
 };
 
 const containerVariants: Variants = {
@@ -154,7 +162,7 @@ interface Props {
 
 export default function AdminRoutinePage({ routineList }: Props) {
   const router = useRouter();
-  const dispatch = useDispatch(); // Initialized dispatch
+  const dispatch = useDispatch();
 
   const { role, isLoading: isAuthLoading } = useSelector(
     (s: RootState) => s.auth
@@ -248,7 +256,6 @@ export default function AdminRoutinePage({ routineList }: Props) {
     try {
       const result = await generateRoutine();
       if (result.success) {
-        // Reset class cancellations on successful generation
         dispatch(resetAll());
         toast.success("Routine generated successfully!");
         router.refresh();
@@ -301,6 +308,9 @@ export default function AdminRoutinePage({ routineList }: Props) {
           room: item.room_number,
           teacherId: item.teacher_name,
           originalTime: item.start_time,
+          department: item.department_name,
+          semester: item.semester_name,
+          day: item.day,
         };
       }
     });
@@ -647,14 +657,26 @@ export default function AdminRoutinePage({ routineList }: Props) {
                               : undefined;
 
                             const startTimeRaw = session?.originalTime || "";
-                            const key = generateClassKey(
-                              teacherKey || "",
-                              startTimeRaw
-                            );
+
+                            // UPDATED: Use abbreviateDay() for the day to match the key stored by the Teacher page
+                            // Teacher page stores: "Sun" | "Mon" | etc.
+                            // API here gives: "Sunday" | "Monday" | etc.
+                            const key =
+                              session && teacherKey
+                                ? generateClassKey(
+                                    session.department,
+                                    session.semester,
+                                    abbreviateDay(session.day), // FIXED: Match format
+                                    teacherKey,
+                                    startTimeRaw
+                                  )
+                                : "";
+
                             const classOffData =
-                              teacherKey && startTimeRaw
+                              teacherKey && startTimeRaw && key
                                 ? classOffMap[key]
                                 : undefined;
+
                             const isClassOffToday = Boolean(
                               classOffData?.status
                             );
