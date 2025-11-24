@@ -1,0 +1,582 @@
+"use client";
+
+import * as React from "react";
+import { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Building2,
+  GraduationCap,
+  Clock,
+  Plus,
+  Trash2,
+  Edit2,
+  MoreVertical,
+  CalendarClock,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+
+// --- TYPES ---
+type Department = { id: number; name: string };
+type Semester = { id: number; name: string; order: number };
+type TimeSlot = { id: number; start_time: string; end_time: string };
+
+interface AcademicSettingsPageProps {
+  departments: Department[];
+  semesters: Semester[];
+  timeSlots: TimeSlot[];
+}
+
+// --- ANIMATIONS ---
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1, delayChildren: 0.1 },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { duration: 0.4, stiffness: 120, damping: 20 },
+  },
+};
+
+// --- HELPER: TIME PICKER COMPONENT ---
+interface TimePickerProps {
+  label: string;
+  value: string; // "HH:MM:SS" (24h) or just "HH:MM"
+  onChange: (val: string) => void;
+}
+
+const TimePicker = ({ label, value, onChange }: TimePickerProps) => {
+  // Parse initial value
+  const [hStr, mStr] = (value || "09:00").split(":");
+  let h = parseInt(hStr);
+  const m = mStr || "00";
+  const initialPeriod = h >= 12 ? "PM" : "AM";
+  if (h > 12) h -= 12;
+  if (h === 0) h = 12;
+
+  const [hour, setHour] = useState(h.toString());
+  const [minute, setMinute] = useState(m);
+  const [period, setPeriod] = useState<"AM" | "PM">(initialPeriod);
+
+  // Update parent when any part changes
+  const updateTime = (newH: string, newM: string, newP: string) => {
+    let hourInt = parseInt(newH);
+    if (newP === "PM" && hourInt !== 12) hourInt += 12;
+    if (newP === "AM" && hourInt === 12) hourInt = 0;
+    const formattedH = hourInt.toString().padStart(2, "0");
+    onChange(`${formattedH}:${newM}:00`);
+  };
+
+  const handleHourChange = (val: string) => {
+    setHour(val);
+    updateTime(val, minute, period);
+  };
+  const handleMinuteChange = (val: string) => {
+    setMinute(val);
+    updateTime(hour, val, period);
+  };
+  const handlePeriodChange = (val: "AM" | "PM") => {
+    setPeriod(val);
+    updateTime(hour, minute, val);
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+        {label}
+      </Label>
+      <div className="flex items-center gap-2">
+        <Select value={hour} onValueChange={handleHourChange}>
+          <SelectTrigger className="w-[70px]">
+            <SelectValue placeholder="HH" />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+              <SelectItem key={h} value={h.toString()}>
+                {h.toString().padStart(2, "0")}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <span className="text-muted-foreground font-bold">:</span>
+        <Select value={minute} onValueChange={handleMinuteChange}>
+          <SelectTrigger className="w-[70px]">
+            <SelectValue placeholder="MM" />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => (
+              <SelectItem key={m} value={m.toString().padStart(2, "0")}>
+                {m.toString().padStart(2, "0")}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={period} onValueChange={handlePeriodChange}>
+          <SelectTrigger className="w-20">
+            <SelectValue placeholder="AM/PM" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="AM">AM</SelectItem>
+            <SelectItem value="PM">PM</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+};
+
+// --- MAIN COMPONENT ---
+export default function AcademicSettingsPage({
+  departments,
+  semesters,
+  timeSlots,
+}: AcademicSettingsPageProps) {
+  // Modal States
+  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+  const [isSemModalOpen, setIsSemModalOpen] = useState(false);
+  const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
+
+  // Editing States
+  const [editingDept, setEditingDept] = useState<Department | null>(null);
+  const [editingSem, setEditingSem] = useState<Semester | null>(null);
+  const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
+
+  // Form States
+  const [newDeptName, setNewDeptName] = useState("");
+  const [newSemName, setNewSemName] = useState("");
+  const [newSemOrder, setNewSemOrder] = useState("");
+  const [newSlotStart, setNewSlotStart] = useState("09:00:00");
+  const [newSlotEnd, setNewSlotEnd] = useState("10:00:00");
+
+  // Format Time Helper for Display
+  const formatDisplayTime = (timeStr: string) => {
+    if (!timeStr) return "";
+    const [h, m] = timeStr.split(":");
+    const hour = parseInt(h);
+    const suffix = hour >= 12 ? "PM" : "AM";
+    const formattedHour = hour % 12 || 12;
+    return `${formattedHour}:${m} ${suffix}`;
+  };
+
+  // --- HANDLERS ---
+
+  // Departments
+  const openAddDept = () => {
+    setEditingDept(null);
+    setNewDeptName("");
+    setIsDeptModalOpen(true);
+  };
+  const openEditDept = (dept: Department) => {
+    setEditingDept(dept);
+    setNewDeptName(dept.name);
+    setIsDeptModalOpen(true);
+  };
+  const handleSaveDepartment = () => {
+    if (editingDept) {
+      toast.success(`Department updated to "${newDeptName}" (Mock)`);
+    } else {
+      toast.success(`Department "${newDeptName}" added (Mock)`);
+    }
+    setIsDeptModalOpen(false);
+  };
+
+  // Semesters
+  const openAddSem = () => {
+    setEditingSem(null);
+    setNewSemName("");
+    setNewSemOrder("");
+    setIsSemModalOpen(true);
+  };
+  const openEditSem = (sem: Semester) => {
+    setEditingSem(sem);
+    setNewSemName(sem.name);
+    setNewSemOrder(sem.order.toString());
+    setIsSemModalOpen(true);
+  };
+  const handleSaveSemester = () => {
+    if (editingSem) {
+      toast.success(`Semester updated to "${newSemName}" (Mock)`);
+    } else {
+      toast.success(`Semester "${newSemName}" added (Mock)`);
+    }
+    setIsSemModalOpen(false);
+  };
+
+  // Time Slots
+  const openAddSlot = () => {
+    setEditingSlot(null);
+    setNewSlotStart("09:00:00");
+    setNewSlotEnd("10:00:00");
+    setIsSlotModalOpen(true);
+  };
+  const openEditSlot = (slot: TimeSlot) => {
+    setEditingSlot(slot);
+    setNewSlotStart(slot.start_time);
+    setNewSlotEnd(slot.end_time);
+    setIsSlotModalOpen(true);
+  };
+  const handleSaveTimeSlot = () => {
+    if (editingSlot) {
+      toast.success(`Time Slot updated (Mock)`);
+    } else {
+      toast.success(`Time Slot added (Mock)`);
+    }
+    setIsSlotModalOpen(false);
+  };
+
+  return (
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="w-full max-w-5xl mx-auto p-6 space-y-8 font-lexend text-foreground pb-20"
+    >
+      {/* Header */}
+      <div className="flex flex-col gap-2">
+        <motion.div variants={itemVariants}>
+          <Badge
+            variant="outline"
+            className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
+          >
+            Admin Panel
+          </Badge>
+        </motion.div>
+        <motion.h1
+          variants={itemVariants}
+          className="text-3xl font-bold tracking-tight"
+        >
+          Academic Settings
+        </motion.h1>
+        <motion.p variants={itemVariants} className="text-muted-foreground">
+          Manage departments, semesters, and class time slots for the routine
+          system.
+        </motion.p>
+      </div>
+
+      {/* --- SECTION 1: DEPARTMENTS --- */}
+      <motion.div variants={itemVariants}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-semibold">Departments</h2>
+          </div>
+          <Dialog open={isDeptModalOpen} onOpenChange={setIsDeptModalOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-2" onClick={openAddDept}>
+                <Plus className="w-4 h-4" /> Add Department
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingDept ? "Edit Department" : "Add Department"}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingDept
+                    ? "Update existing department details."
+                    : "Create a new academic department."}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="dept-name">Department Name</Label>
+                  <Input
+                    id="dept-name"
+                    placeholder="e.g. Computer Science & Engineering"
+                    value={newDeptName}
+                    onChange={(e) => setNewDeptName(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleSaveDepartment}>
+                  {editingDept ? "Update Changes" : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {departments.map((dept) => (
+            <Card
+              key={dept.id}
+              className="group hover:shadow-md transition-all"
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  ID: {dept.id}
+                </CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="h-8 w-8 p-0 hover:bg-muted"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openEditDept(dept)}>
+                      <Edit2 className="mr-2 h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-red-600">
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </CardHeader>
+              <CardContent>
+                <div className="text-lg font-bold leading-snug">
+                  {dept.name}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </motion.div>
+
+      <div className="w-full h-px bg-border/50" />
+
+      {/* --- SECTION 2: SEMESTERS --- */}
+      <motion.div variants={itemVariants}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
+              <GraduationCap className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-semibold">Semesters</h2>
+          </div>
+          <Dialog open={isSemModalOpen} onOpenChange={setIsSemModalOpen}>
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 border-primary/20"
+                onClick={openAddSem}
+              >
+                <Plus className="w-4 h-4" /> Add Semester
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingSem ? "Edit Semester" : "Add Semester"}
+                </DialogTitle>
+                <DialogDescription>
+                  Define a new semester level.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="sem-name">Semester Name</Label>
+                  <Input
+                    id="sem-name"
+                    placeholder="e.g. 1st"
+                    value={newSemName}
+                    onChange={(e) => setNewSemName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sem-order">Order Sequence</Label>
+                  <Input
+                    id="sem-order"
+                    type="number"
+                    placeholder="e.g. 1"
+                    value={newSemOrder}
+                    onChange={(e) => setNewSemOrder(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleSaveSemester}>
+                  {editingSem ? "Update Changes" : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {semesters.map((sem) => (
+            <Card
+              key={sem.id}
+              className="flex flex-col items-center justify-center p-4 hover:bg-muted/50 transition-colors relative group"
+            >
+              <div className="absolute top-2 right-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                    >
+                      <MoreVertical className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openEditSem(sem)}>
+                      <Edit2 className="mr-2 h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-red-600">
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-2 text-xs font-bold text-primary">
+                {sem.order}
+              </div>
+              <span className="font-bold text-lg">{sem.name}</span>
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">
+                Semester
+              </span>
+            </Card>
+          ))}
+        </div>
+      </motion.div>
+
+      <div className="w-full h-px bg-border/50" />
+
+      {/* --- SECTION 3: TIME SLOTS --- */}
+      <motion.div variants={itemVariants}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600 dark:text-emerald-400">
+              <CalendarClock className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-semibold">Time Slots</h2>
+          </div>
+          <Dialog open={isSlotModalOpen} onOpenChange={setIsSlotModalOpen}>
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 border-primary/20"
+                onClick={openAddSlot}
+              >
+                <Plus className="w-4 h-4" /> Add Time Slot
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingSlot ? "Edit Time Slot" : "Add Time Slot"}
+                </DialogTitle>
+                <DialogDescription>
+                  Configure the start and end time for a class period.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-1 gap-6 py-4">
+                <TimePicker
+                  label="Start Time"
+                  value={newSlotStart}
+                  onChange={setNewSlotStart}
+                />
+                <TimePicker
+                  label="End Time"
+                  value={newSlotEnd}
+                  onChange={setNewSlotEnd}
+                />
+              </div>
+              <div className="bg-muted/50 p-3 rounded-md text-center text-sm">
+                <span className="text-muted-foreground">Preview: </span>
+                <span className="font-bold text-foreground">
+                  {formatDisplayTime(newSlotStart)} -{" "}
+                  {formatDisplayTime(newSlotEnd)}
+                </span>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleSaveTimeSlot}>
+                  {editingSlot ? "Update Changes" : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <div className="space-y-2">
+          {timeSlots.map((slot) => (
+            <div
+              key={slot.id}
+              className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors group"
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                  <Badge variant="outline" className="font-mono w-fit">
+                    Slot {slot.id}
+                  </Badge>
+                  <span className="font-medium text-base">
+                    {formatDisplayTime(slot.start_time)}{" "}
+                    <span className="text-muted-foreground mx-1">-</span>{" "}
+                    {formatDisplayTime(slot.end_time)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openEditSlot(slot)}>
+                      <Edit2 className="mr-2 h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-red-600">
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}

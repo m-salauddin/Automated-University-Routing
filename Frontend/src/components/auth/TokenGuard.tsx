@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -6,12 +7,26 @@ import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { resetAuth, setAuthenticated } from "@/store/authSlice";
 import { toast } from "sonner";
+import { jwtDecode } from "jwt-decode";
+import { logout } from "@/services/auth";
 
-function hasAccessTokenCookie() {
-  if (typeof document === "undefined") return false;
-  return document.cookie
+function getAccessTokenFromCookie() {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie
     .split(";")
-    .some((c) => c.trim().startsWith("accessToken="));
+    .find((c) => c.trim().startsWith("accessToken="));
+  if (!match) return null;
+  return match.split("=")[1];
+}
+
+function isTokenExpired(token: string) {
+  try {
+    const decoded = jwtDecode<{ exp?: number }>(token);
+    if (!decoded.exp) return false;
+    return decoded.exp * 1000 < Date.now();
+  } catch (error) {
+    return true; 
+  }
 }
 
 function isProtectedPath(pathname: string) {
@@ -39,39 +54,58 @@ export default function TokenGuard() {
   const notifiedRef = useRef(false);
 
   useEffect(() => {
-    flushQueuedToast();
+    const checkAuth = async () => {
+      flushQueuedToast();
 
-    if (pathname === "/login" && typeof window !== "undefined") {
-      sessionStorage.removeItem("isLoggingOut");
-    }
-
-    if(pathname==="/login" && hasAccessTokenCookie()){
-      router.replace("/dashboard/analytics");
-      return;
-    }
-
-    const hasToken = hasAccessTokenCookie();
-
-    if (hasToken && !isAuthed) {
-      dispatch(setAuthenticated(true));
-    } else if (!hasToken && isAuthed) {
-      dispatch(resetAuth());
-    }
-
-    if (isProtectedPath(pathname) && !hasToken) {
-      const isLoggingOut =
-        typeof window !== "undefined" &&
-        sessionStorage.getItem("isLoggingOut") === "true";
-
-      if (!isLoggingOut) {
-        const redirect = encodeURIComponent(pathname);
-        router.replace(`/login?redirect=${redirect}`);
+      if (pathname === "/login" && typeof window !== "undefined") {
+        sessionStorage.removeItem("isLoggingOut");
       }
-    }
 
-    if (!isProtectedPath(pathname)) {
-      notifiedRef.current = false;
-    }
+      const token = getAccessTokenFromCookie();
+      const hasToken = !!token;
+
+      if (pathname === "/login" && hasToken) {
+        if (!isTokenExpired(token)) {
+          router.replace("/dashboard/analytics");
+          return;
+        }
+      }
+
+      if (hasToken && isTokenExpired(token)) {
+        await logout(); 
+        dispatch(resetAuth()); 
+
+        if (isProtectedPath(pathname)) {
+          const redirect = encodeURIComponent(pathname);
+          router.replace(`/login?redirect=${redirect}`);
+          toast.error("Session expired. Please login again.");
+        }
+        return;
+      }
+
+      if (hasToken && !isAuthed) {
+        dispatch(setAuthenticated(true));
+      } else if (!hasToken && isAuthed) {
+        dispatch(resetAuth());
+      }
+
+      if (isProtectedPath(pathname) && !hasToken) {
+        const isLoggingOut =
+          typeof window !== "undefined" &&
+          sessionStorage.getItem("isLoggingOut") === "true";
+
+        if (!isLoggingOut) {
+          const redirect = encodeURIComponent(pathname);
+          router.replace(`/login?redirect=${redirect}`);
+        }
+      }
+
+      if (!isProtectedPath(pathname)) {
+        notifiedRef.current = false;
+      }
+    };
+
+    checkAuth();
   }, [dispatch, isAuthed, pathname, router]);
 
   return null;

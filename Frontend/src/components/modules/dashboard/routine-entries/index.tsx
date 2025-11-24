@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter} from "next/navigation";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import {
@@ -30,9 +30,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "@/store";
-import { generateClassKey, normalizeTime } from "@/store/classOffSlice";
+import {
+  generateClassKey,
+  normalizeTime,
+  resetAll,
+} from "@/store/classOffSlice";
 import DataLoader from "@/components/ui/data-loader";
 import {
   Dialog,
@@ -41,8 +45,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { toast } from "sonner";
 import { generateRoutine } from "@/services/routine";
+import { toast } from "sonner";
 
 export type APIRoutineItem = {
   id: number;
@@ -103,7 +107,6 @@ const getTeacherInitials = (name: string) => {
     .join("");
 };
 
-// --- ANIMATION VARIANTS (Fixed Types) ---
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
@@ -151,6 +154,8 @@ interface Props {
 
 export default function AdminRoutinePage({ routineList }: Props) {
   const router = useRouter();
+  const dispatch = useDispatch(); // Initialized dispatch
+
   const { role, isLoading: isAuthLoading } = useSelector(
     (s: RootState) => s.auth
   );
@@ -165,6 +170,9 @@ export default function AdminRoutinePage({ routineList }: Props) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [inputValue, setInputValue] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+
+  const [generationVersion, setGenerationVersion] = useState(0);
+  const isFirstRender = useRef(true);
 
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [selectedSemester, setSelectedSemester] = useState<string>("");
@@ -191,6 +199,14 @@ export default function AdminRoutinePage({ routineList }: Props) {
     const timer = setTimeout(() => setDebouncedSearch(inputValue), 300);
     return () => clearTimeout(timer);
   }, [inputValue]);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setGenerationVersion((prev) => prev + 1);
+  }, [routineList]);
 
   const departments = useMemo(() => {
     const depts = Array.from(
@@ -232,13 +248,14 @@ export default function AdminRoutinePage({ routineList }: Props) {
     try {
       const result = await generateRoutine();
       if (result.success) {
+        // Reset class cancellations on successful generation
+        dispatch(resetAll());
         toast.success("Routine generated successfully!");
         router.refresh();
       } else {
         toast.error(result.message || "Failed to generate routine");
       }
     } catch {
-      // Fixed: Removed unused 'error' variable
       toast.error("An unexpected error occurred");
     } finally {
       setIsGenerating(false);
@@ -428,7 +445,7 @@ export default function AdminRoutinePage({ routineList }: Props) {
                 className="gap-2 bg-primary/90 hover:bg-primary"
               >
                 {isGenerating ? (
-                  <Loader2 className="animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <motion.div
                     animate={{
@@ -444,7 +461,7 @@ export default function AdminRoutinePage({ routineList }: Props) {
                     <Sparkles className="h-4 w-4" />
                   </motion.div>
                 )}
-                {isGenerating ? "Generating" : "Generate "}
+                {isGenerating ? "Generating..." : "Generate Routine"}
               </Button>
 
               <Button
@@ -552,6 +569,7 @@ export default function AdminRoutinePage({ routineList }: Props) {
                 <Table className="w-full overflow-hidden min-w-[1000px] print:min-w-0 print:w-full border-collapse text-sm print:border-collapse !print:border-black">
                   <TableHeader>
                     <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b">
+                      {/* Fixed Day/Time Header */}
                       <TableCell className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40 print:bg-white !print:border-r !print:border-black print:w-20 print:min-w-0">
                         <svg
                           className="absolute inset-0 w-full h-full pointer-events-none"
@@ -601,7 +619,7 @@ export default function AdminRoutinePage({ routineList }: Props) {
                     </TableRow>
                   </TableHeader>
                   <motion.tbody
-                    key={`${selectedDept}-${selectedSemester}`}
+                    key={`${selectedDept}-${selectedSemester}-${generationVersion}`}
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
@@ -614,6 +632,7 @@ export default function AdminRoutinePage({ routineList }: Props) {
                           variants={itemVariants}
                           className="border-b border-border/60 hover:bg-muted/5 !print:border-black print:border-b print:h-auto"
                         >
+                          {/* Day Column */}
                           <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 !print:border-r !print:border-black print:bg-white print:text-black print:font-bold">
                             <div className="flex items-center justify-center h-full w-full py-4 print:py-2">
                               <span className="writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0 print:rotate-0 print:text-[12px]">

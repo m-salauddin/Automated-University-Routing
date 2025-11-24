@@ -10,8 +10,6 @@ import {
   BookOpen,
   Building2,
   CalendarRange,
-  GraduationCap,
-  Clock,
   Users,
 } from "lucide-react";
 
@@ -85,24 +83,14 @@ export function AppSidebar() {
       icon: BookOpen,
     },
     {
-      title: "Departments",
-      url: "/dashboard/admin/departments",
+      title: "Academic Config",
+      url: "/dashboard/admin/academic-config",
       icon: Building2,
     },
     {
       title: "Routine Entries",
       url: "/dashboard/admin/routine-entries",
       icon: CalendarRange,
-    },
-    {
-      title: "Semesters",
-      url: "/dashboard/admin/semesters",
-      icon: GraduationCap,
-    },
-    {
-      title: "Time Slots",
-      url: "/dashboard/admin/time-slots",
-      icon: Clock,
     },
     {
       title: "Users",
@@ -143,7 +131,7 @@ export function AppSidebar() {
           asChild
           tooltip={item.title}
           className={cn(
-            " transition-all duration-200 group/item",
+          " transition-all duration-200 group/item",
             "hover:translate-x-1",
             active
               ? "text-primary"

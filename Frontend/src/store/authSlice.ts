@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction, Dispatch } from "@reduxjs/toolkit";
+import { getCurrentUser } from "@/services/auth";
 
 export type UserRole = "student" | "teacher" | "admin" | null;
 
@@ -42,38 +43,6 @@ function safeLocalStorageSet(key: string, value: string | null) {
     else window.localStorage.setItem(key, value);
   } catch { }
 }
-
-const getCookie = (name: string): string | null => {
-  if (typeof document === "undefined") return null;
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop()?.split(";").shift() || null;
-  return null;
-};
-
-const decodeRoleFromToken = (token: string): UserRole => {
-  try {
-    const base64Url = token.split(".")[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
-    );
-    const rawRole = JSON.parse(jsonPayload).role;
-
-    const role = rawRole ? rawRole.toLowerCase() : null;
-
-    if (role === "teacher" || role === "student" || role === "admin") {
-      return role;
-    }
-    return "student";
-  } catch (error) {
-    console.error("Failed to decode token", error);
-    return null;
-  }
-};
 
 const preloaded: Partial<AuthState> = {};
 if (typeof window !== "undefined") {
@@ -148,19 +117,28 @@ const authSlice = createSlice({
 export const { setAuthenticated, setUserData, resetAuth, setLoading } =
   authSlice.actions;
 
-export const initializeAuth = () => (dispatch: Dispatch) => {
+export const initializeAuth = () => async (dispatch: Dispatch) => {
   try {
     dispatch(setLoading(true));
-    const token = getCookie("accessToken");
 
-    if (token) {
-      const role = decodeRoleFromToken(token);
-      if (role) {
-        dispatch(setUserData({ role }));
-        dispatch(setAuthenticated(true));
-      } else {
-        dispatch(setAuthenticated(false));
+    const user = await getCurrentUser();
+
+    if (user) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawRole = (user as any).role;
+      const normalizedRole = rawRole ? rawRole.toLowerCase() : null;
+
+      let finalRole: UserRole = "student";
+      if (normalizedRole === "teacher" || normalizedRole === "student" || normalizedRole === "admin") {
+        finalRole = normalizedRole;
       }
+
+      dispatch(setUserData({
+        ...user,
+        role: finalRole
+      }));
+
+      dispatch(setAuthenticated(true));
     } else {
       dispatch(setAuthenticated(false));
     }

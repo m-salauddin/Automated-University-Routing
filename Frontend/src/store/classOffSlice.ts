@@ -15,7 +15,6 @@ const STORAGE_KEY = "classOffMap";
 export const normalizeTime = (timeStr: string) => {
   if (!timeStr) return "";
   const [h, m] = timeStr.split(":");
-  // Pad hours with 0 if needed (e.g., "8" -> "08")
   const normalizedH = h.padStart(2, "0");
   return `${normalizedH}:${m}`;
 };
@@ -112,8 +111,6 @@ export const classOffSlice = createSlice({
       const keys = Object.keys(state.offMap);
 
       keys.forEach((key) => {
-        // Keys are formatted as: DATE|ID|TIME
-        // If the key does not start with today's date, remove it
         if (!key.startsWith(today)) {
           delete state.offMap[key];
         }
@@ -132,7 +129,6 @@ export const classOffSlice = createSlice({
   },
 });
 
-// Export all actions, including cleanupForToday
 export const { markOff, markOn, resetAll, cleanupForToday } = classOffSlice.actions;
 
 export default classOffSlice.reducer;

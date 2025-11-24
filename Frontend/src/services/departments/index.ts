@@ -30,7 +30,6 @@ const getAllDepartments = async () => {
         }
 
         const rawResult = await res.json();
-        console.log('[Auth] API Response:', JSON.stringify(rawResult, null, 2));
         return { success: true, data: rawResult };
     } catch (error) {
         console.error('[Auth] Error:', error);
