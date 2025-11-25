@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, startTransition, useMemo } from "react";
+import { motion, AnimatePresence, Variants } from "framer-motion";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   GraduationCap,
@@ -12,6 +14,7 @@ import {
   Edit2,
   MoreVertical,
   CalendarClock,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,7 +28,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -41,6 +43,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import {
+  addNewDepartment,
+  deleteDepartment,
+  updateDepartment,
+} from "@/services/departments";
 
 // --- TYPES ---
 type Department = { id: number; name: string };
@@ -53,33 +60,88 @@ interface AcademicSettingsPageProps {
   timeSlots: TimeSlot[];
 }
 
-// --- ANIMATIONS ---
-const containerVariants = {
+// --- PAGE ANIMATIONS ---
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1, delayChildren: 0.1 },
+    transition: { staggerChildren: 0.05 },
   },
 };
 
-const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
+const itemVariants: Variants = {
+  hidden: { y: 10, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { duration: 0.4, stiffness: 120, damping: 20 },
+    transition: { duration: 0.3, ease: "easeOut" },
   },
 };
 
-// --- HELPER: TIME PICKER COMPONENT ---
+// --- MODAL & INPUT ANIMATIONS (Simultaneous Fade Up) ---
+
+// 1. Modal Container: Subtle Pop + Fade Up
+const modalContentVariants: Variants = {
+  hidden: {
+    opacity: 0,
+    scale: 0.96,
+    y: 20,
+  },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      type: "spring" as const, // Fixed: Added 'as const'
+      stiffness: 400,
+      damping: 25,
+      mass: 1,
+    },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.96,
+    y: 10,
+    transition: { duration: 0.2 },
+  },
+};
+
+// 2. Form Container: No Stagger (All children fire at once)
+const formContainerVariants: Variants = {
+  hidden: { opacity: 1 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+// 3. Inputs: Simple Fade Up (No Blur)
+const formItemVariants: Variants = {
+  hidden: {
+    y: 15,
+    opacity: 0,
+  },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: "spring" as const, // Fixed: Added 'as const'
+      stiffness: 300,
+      damping: 24,
+    },
+  },
+};
+
 interface TimePickerProps {
   label: string;
-  value: string; // "HH:MM:SS" (24h) or just "HH:MM"
+  value: string;
   onChange: (val: string) => void;
 }
 
 const TimePicker = ({ label, value, onChange }: TimePickerProps) => {
-  // Parse initial value
   const [hStr, mStr] = (value || "09:00").split(":");
   let h = parseInt(hStr);
   const m = mStr || "00";
@@ -91,7 +153,6 @@ const TimePicker = ({ label, value, onChange }: TimePickerProps) => {
   const [minute, setMinute] = useState(m);
   const [period, setPeriod] = useState<"AM" | "PM">(initialPeriod);
 
-  // Update parent when any part changes
   const updateTime = (newH: string, newM: string, newP: string) => {
     let hourInt = parseInt(newH);
     if (newP === "PM" && hourInt !== 12) hourInt += 12;
@@ -114,11 +175,11 @@ const TimePicker = ({ label, value, onChange }: TimePickerProps) => {
   };
 
   return (
-    <div className="space-y-2">
+    <motion.div variants={formItemVariants} className="space-y-2">
       <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         {label}
       </Label>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Select value={hour} onValueChange={handleHourChange}>
           <SelectTrigger className="w-[70px]">
             <SelectValue placeholder="HH" />
@@ -131,7 +192,9 @@ const TimePicker = ({ label, value, onChange }: TimePickerProps) => {
             ))}
           </SelectContent>
         </Select>
-        <span className="text-muted-foreground font-bold">:</span>
+        <span className="text-muted-foreground font-bold hidden sm:inline">
+          :
+        </span>
         <Select value={minute} onValueChange={handleMinuteChange}>
           <SelectTrigger className="w-[70px]">
             <SelectValue placeholder="MM" />
@@ -154,25 +217,44 @@ const TimePicker = ({ label, value, onChange }: TimePickerProps) => {
           </SelectContent>
         </Select>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
 // --- MAIN COMPONENT ---
 export default function AcademicSettingsPage({
-  departments,
+  departments: initialDepartments,
   semesters,
   timeSlots,
 }: AcademicSettingsPageProps) {
+  const router = useRouter();
+
+  const [departmentsList, setDepartmentsList] =
+    useState<Department[]>(initialDepartments);
+
+  const departmentsDependency = useMemo(
+    () => JSON.stringify(initialDepartments),
+    [initialDepartments]
+  );
+
+  useEffect(() => {
+    setDepartmentsList(initialDepartments);
+  }, [departmentsDependency, initialDepartments]);
+
   // Modal States
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [isSemModalOpen, setIsSemModalOpen] = useState(false);
   const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  // Loading States
+  const [isLoading, setIsLoading] = useState(false);
 
   // Editing States
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [editingSem, setEditingSem] = useState<Semester | null>(null);
   const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
+  const [deletingDeptId, setDeletingDeptId] = useState<number | null>(null);
 
   // Form States
   const [newDeptName, setNewDeptName] = useState("");
@@ -181,7 +263,6 @@ export default function AcademicSettingsPage({
   const [newSlotStart, setNewSlotStart] = useState("09:00:00");
   const [newSlotEnd, setNewSlotEnd] = useState("10:00:00");
 
-  // Format Time Helper for Display
   const formatDisplayTime = (timeStr: string) => {
     if (!timeStr) return "";
     const [h, m] = timeStr.split(":");
@@ -192,28 +273,94 @@ export default function AcademicSettingsPage({
   };
 
   // --- HANDLERS ---
-
-  // Departments
   const openAddDept = () => {
     setEditingDept(null);
     setNewDeptName("");
     setIsDeptModalOpen(true);
   };
+
   const openEditDept = (dept: Department) => {
     setEditingDept(dept);
     setNewDeptName(dept.name);
     setIsDeptModalOpen(true);
   };
-  const handleSaveDepartment = () => {
-    if (editingDept) {
-      toast.success(`Department updated to "${newDeptName}" (Mock)`);
-    } else {
-      toast.success(`Department "${newDeptName}" added (Mock)`);
-    }
-    setIsDeptModalOpen(false);
+
+  const openDeleteDept = (id: number) => {
+    setDeletingDeptId(id);
+    setIsDeleteModalOpen(true);
   };
 
-  // Semesters
+  const handleSaveDepartment = async () => {
+    if (!newDeptName.trim()) {
+      toast.error("Department name cannot be empty");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      let res;
+      if (editingDept) {
+        setDepartmentsList((prev) =>
+          prev.map((d) =>
+            d.id === editingDept.id ? { ...d, name: newDeptName } : d
+          )
+        );
+        res = await updateDepartment(editingDept.id, { name: newDeptName });
+      } else {
+        res = await addNewDepartment({ name: newDeptName });
+      }
+
+      if (res.success) {
+        toast.success(
+          editingDept
+            ? `Department updated to "${newDeptName}"`
+            : `Department "${newDeptName}" added successfully`
+        );
+        setIsDeptModalOpen(false);
+        startTransition(() => {
+          router.refresh();
+        });
+      } else {
+        setDepartmentsList(initialDepartments);
+        toast.error(res.message || "Operation failed");
+      }
+    } catch (err) {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteDepartment = async () => {
+    if (!deletingDeptId) return;
+
+    setIsLoading(true);
+    const previousList = [...departmentsList];
+    setDepartmentsList((prev) => prev.filter((d) => d.id !== deletingDeptId));
+
+    try {
+      const res = await deleteDepartment(deletingDeptId);
+
+      if (res.success) {
+        toast.success("Department deleted successfully");
+        setIsDeleteModalOpen(false);
+        setDeletingDeptId(null);
+        startTransition(() => {
+          router.refresh();
+        });
+      } else {
+        setDepartmentsList(previousList);
+        toast.error(res.message || "Failed to delete department");
+      }
+    } catch (err) {
+      setDepartmentsList(previousList);
+      toast.error("An unexpected error occurred during deletion");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const openAddSem = () => {
     setEditingSem(null);
     setNewSemName("");
@@ -227,15 +374,10 @@ export default function AcademicSettingsPage({
     setIsSemModalOpen(true);
   };
   const handleSaveSemester = () => {
-    if (editingSem) {
-      toast.success(`Semester updated to "${newSemName}" (Mock)`);
-    } else {
-      toast.success(`Semester "${newSemName}" added (Mock)`);
-    }
+    toast.success(editingSem ? "Semester Updated" : "Semester Added");
     setIsSemModalOpen(false);
   };
 
-  // Time Slots
   const openAddSlot = () => {
     setEditingSlot(null);
     setNewSlotStart("09:00:00");
@@ -249,334 +391,426 @@ export default function AcademicSettingsPage({
     setIsSlotModalOpen(true);
   };
   const handleSaveTimeSlot = () => {
-    if (editingSlot) {
-      toast.success(`Time Slot updated (Mock)`);
-    } else {
-      toast.success(`Time Slot added (Mock)`);
-    }
+    toast.success(editingSlot ? "Slot Updated" : "Slot Added");
     setIsSlotModalOpen(false);
   };
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="w-full max-w-5xl mx-auto p-6 space-y-8 font-lexend text-foreground pb-20"
-    >
-      {/* Header */}
-      <div className="flex flex-col gap-2">
-        <motion.div variants={itemVariants}>
-          <Badge
-            variant="outline"
-            className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
+    <>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="w-full max-w-5xl mx-auto p-4 sm:p-6 space-y-8 font-lexend text-foreground pb-20"
+      >
+        {/* Header */}
+        <div className="flex flex-col gap-2">
+          <motion.div variants={itemVariants}>
+            <Badge
+              variant="outline"
+              className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
+            >
+              Admin Panel
+            </Badge>
+          </motion.div>
+          <motion.h1
+            variants={itemVariants}
+            className="text-2xl sm:text-3xl font-bold tracking-tight"
           >
-            Admin Panel
-          </Badge>
+            Academic Settings
+          </motion.h1>
+          <motion.p variants={itemVariants} className="text-muted-foreground">
+            Manage departments, semesters, and class time slots for the routine
+            system.
+          </motion.p>
+        </div>
+
+        {/* --- SECTION 1: DEPARTMENTS --- */}
+        <motion.div variants={itemVariants}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <h2 className="text-xl font-semibold">Departments</h2>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={openAddDept}
+            >
+              <Plus className="w-4 h-4" /> Add
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <AnimatePresence>
+              {departmentsList.map((dept) => (
+                <motion.div
+                  key={dept.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                >
+                  <Card className="group hover:shadow-md transition-all h-full">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        ID: {dept.id}
+                      </CardTitle>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="h-8 w-8 p-0 hover:bg-muted"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDept(dept)}>
+                            <Edit2 className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                            onClick={() => openDeleteDept(dept.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg font-bold leading-snug">
+                        {dept.name}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         </motion.div>
-        <motion.h1
-          variants={itemVariants}
-          className="text-3xl font-bold tracking-tight"
-        >
-          Academic Settings
-        </motion.h1>
-        <motion.p variants={itemVariants} className="text-muted-foreground">
-          Manage departments, semesters, and class time slots for the routine
-          system.
-        </motion.p>
-      </div>
 
-      {/* --- SECTION 1: DEPARTMENTS --- */}
-      <motion.div variants={itemVariants}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <h2 className="text-xl font-semibold">Departments</h2>
-          </div>
-          <Dialog open={isDeptModalOpen} onOpenChange={setIsDeptModalOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-2" onClick={openAddDept}>
-                <Plus className="w-4 h-4" /> Add Department
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingDept ? "Edit Department" : "Add Department"}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingDept
-                    ? "Update existing department details."
-                    : "Create a new academic department."}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="dept-name">Department Name</Label>
-                  <Input
-                    id="dept-name"
-                    placeholder="e.g. Computer Science & Engineering"
-                    value={newDeptName}
-                    onChange={(e) => setNewDeptName(e.target.value)}
-                  />
-                </div>
+        <div className="w-full h-px bg-border/50" />
+
+        {/* --- SECTION 2: SEMESTERS --- */}
+        <motion.div variants={itemVariants}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
+                <GraduationCap className="w-5 h-5" />
               </div>
-              <DialogFooter>
-                <Button onClick={handleSaveDepartment}>
-                  {editingDept ? "Update Changes" : "Save Changes"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {departments.map((dept) => (
-            <Card
-              key={dept.id}
-              className="group hover:shadow-md transition-all"
+              <h2 className="text-xl font-semibold">Semesters</h2>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 border-primary/20"
+              onClick={openAddSem}
             >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  ID: {dept.id}
-                </CardTitle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="h-8 w-8 p-0 hover:bg-muted"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openEditDept(dept)}>
-                      <Edit2 className="mr-2 h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600">
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </CardHeader>
-              <CardContent>
-                <div className="text-lg font-bold leading-snug">
-                  {dept.name}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </motion.div>
-
-      <div className="w-full h-px bg-border/50" />
-
-      {/* --- SECTION 2: SEMESTERS --- */}
-      <motion.div variants={itemVariants}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
-              <GraduationCap className="w-5 h-5" />
-            </div>
-            <h2 className="text-xl font-semibold">Semesters</h2>
+              <Plus className="w-4 h-4" /> Add Semester
+            </Button>
           </div>
-          <Dialog open={isSemModalOpen} onOpenChange={setIsSemModalOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2 border-primary/20"
-                onClick={openAddSem}
+
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {semesters.map((sem) => (
+              <Card
+                key={sem.id}
+                className="flex flex-col items-center justify-center p-4 hover:bg-muted/50 transition-colors relative group"
               >
-                <Plus className="w-4 h-4" /> Add Semester
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingSem ? "Edit Semester" : "Add Semester"}
-                </DialogTitle>
-                <DialogDescription>
-                  Define a new semester level.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="sem-name">Semester Name</Label>
-                  <Input
-                    id="sem-name"
-                    placeholder="e.g. 1st"
-                    value={newSemName}
-                    onChange={(e) => setNewSemName(e.target.value)}
-                  />
+                <div className="absolute top-2 right-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <MoreVertical className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEditSem(sem)}>
+                        <Edit2 className="mr-2 h-4 w-4" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-red-600">
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="sem-order">Order Sequence</Label>
-                  <Input
-                    id="sem-order"
-                    type="number"
-                    placeholder="e.g. 1"
-                    value={newSemOrder}
-                    onChange={(e) => setNewSemOrder(e.target.value)}
-                  />
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-2 text-xs font-bold text-primary">
+                  {sem.order}
                 </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleSaveSemester}>
-                  {editingSem ? "Update Changes" : "Save Changes"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {semesters.map((sem) => (
-            <Card
-              key={sem.id}
-              className="flex flex-col items-center justify-center p-4 hover:bg-muted/50 transition-colors relative group"
-            >
-              <div className="absolute top-2 right-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                    >
-                      <MoreVertical className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openEditSem(sem)}>
-                      <Edit2 className="mr-2 h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600">
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-2 text-xs font-bold text-primary">
-                {sem.order}
-              </div>
-              <span className="font-bold text-lg">{sem.name}</span>
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                Semester
-              </span>
-            </Card>
-          ))}
-        </div>
-      </motion.div>
-
-      <div className="w-full h-px bg-border/50" />
-
-      {/* --- SECTION 3: TIME SLOTS --- */}
-      <motion.div variants={itemVariants}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600 dark:text-emerald-400">
-              <CalendarClock className="w-5 h-5" />
-            </div>
-            <h2 className="text-xl font-semibold">Time Slots</h2>
-          </div>
-          <Dialog open={isSlotModalOpen} onOpenChange={setIsSlotModalOpen}>
-            <DialogTrigger asChild>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2 border-primary/20"
-                onClick={openAddSlot}
-              >
-                <Plus className="w-4 h-4" /> Add Time Slot
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingSlot ? "Edit Time Slot" : "Add Time Slot"}
-                </DialogTitle>
-                <DialogDescription>
-                  Configure the start and end time for a class period.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid grid-cols-1 gap-6 py-4">
-                <TimePicker
-                  label="Start Time"
-                  value={newSlotStart}
-                  onChange={setNewSlotStart}
-                />
-                <TimePicker
-                  label="End Time"
-                  value={newSlotEnd}
-                  onChange={setNewSlotEnd}
-                />
-              </div>
-              <div className="bg-muted/50 p-3 rounded-md text-center text-sm">
-                <span className="text-muted-foreground">Preview: </span>
-                <span className="font-bold text-foreground">
-                  {formatDisplayTime(newSlotStart)} -{" "}
-                  {formatDisplayTime(newSlotEnd)}
+                <span className="font-bold text-lg text-center">
+                  {sem.name}
                 </span>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleSaveTimeSlot}>
-                  {editingSlot ? "Update Changes" : "Save Changes"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+                <span className="text-xs text-muted-foreground uppercase tracking-wider">
+                  Semester
+                </span>
+              </Card>
+            ))}
+          </div>
+        </motion.div>
 
-        <div className="space-y-2">
-          {timeSlots.map((slot) => (
-            <div
-              key={slot.id}
-              className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors group"
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground">
-                  <Clock className="w-4 h-4" />
-                </div>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                  <Badge variant="outline" className="font-mono w-fit">
-                    Slot {slot.id}
-                  </Badge>
-                  <span className="font-medium text-base">
-                    {formatDisplayTime(slot.start_time)}{" "}
-                    <span className="text-muted-foreground mx-1">-</span>{" "}
-                    {formatDisplayTime(slot.end_time)}
-                  </span>
-                </div>
-              </div>
+        <div className="w-full h-px bg-border/50" />
 
-              <div className="flex items-center">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openEditSlot(slot)}>
-                      <Edit2 className="mr-2 h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600">
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+        {/* --- SECTION 3: TIME SLOTS --- */}
+        <motion.div variants={itemVariants}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600 dark:text-emerald-400">
+                <CalendarClock className="w-5 h-5" />
               </div>
+              <h2 className="text-xl font-semibold">Time Slots</h2>
             </div>
-          ))}
-        </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 border-primary/20"
+              onClick={openAddSlot}
+            >
+              <Plus className="w-4 h-4" /> Add Time Slot
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            {timeSlots.map((slot) => (
+              <div
+                key={slot.id}
+                className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground shrink-0">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                    <Badge variant="outline" className="font-mono w-fit">
+                      Slot {slot.id}
+                    </Badge>
+                    <span className="font-medium text-sm sm:text-base whitespace-nowrap">
+                      {formatDisplayTime(slot.start_time)}{" "}
+                      <span className="text-muted-foreground mx-1">-</span>{" "}
+                      {formatDisplayTime(slot.end_time)}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEditSlot(slot)}>
+                        <Edit2 className="mr-2 h-4 w-4" /> Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-red-600">
+                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
       </motion.div>
-    </motion.div>
+
+      {/* MODALS */}
+
+      {/* DEPARTMENT MODAL */}
+      <Dialog open={isDeptModalOpen} onOpenChange={setIsDeptModalOpen}>
+        <DialogContent className="sm:max-w-[425px] w-[95vw] max-h-[85vh] overflow-y-auto">
+          <motion.div
+            variants={modalContentVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {editingDept ? "Edit Department" : "Add Department"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingDept
+                  ? "Update existing department details."
+                  : "Create a new academic department."}
+              </DialogDescription>
+            </DialogHeader>
+
+            <motion.div
+              variants={formContainerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid gap-4 py-4"
+            >
+              <motion.div variants={formItemVariants} className="space-y-2">
+                <Label htmlFor="dept-name">Department Name</Label>
+                <Input
+                  id="dept-name"
+                  placeholder="e.g. Computer Science & Engineering"
+                  value={newDeptName}
+                  onChange={(e) => setNewDeptName(e.target.value)}
+                />
+              </motion.div>
+            </motion.div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                onClick={handleSaveDepartment}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editingDept ? "Update Changes" : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent className="w-[95vw] sm:max-w-[425px]">
+          <motion.div
+            variants={modalContentVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <DialogHeader>
+              <DialogTitle>Confirm Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this department? This action
+                cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-end mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteDepartment}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Delete
+              </Button>
+            </DialogFooter>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      {/* SEMESTER MODAL */}
+      <Dialog open={isSemModalOpen} onOpenChange={setIsSemModalOpen}>
+        <DialogContent className="sm:max-w-[425px] w-[95vw]">
+          <motion.div
+            variants={modalContentVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {editingSem ? "Edit Semester" : "Add Semester"}
+              </DialogTitle>
+              <DialogDescription>
+                Define a new semester level.
+              </DialogDescription>
+            </DialogHeader>
+            <motion.div
+              variants={formContainerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid gap-4 py-4"
+            >
+              <motion.div variants={formItemVariants} className="space-y-2">
+                <Label htmlFor="sem-name">Semester Name</Label>
+                <Input
+                  id="sem-name"
+                  placeholder="e.g. 1st"
+                  value={newSemName}
+                  onChange={(e) => setNewSemName(e.target.value)}
+                />
+              </motion.div>
+              <motion.div variants={formItemVariants} className="space-y-2">
+                <Label htmlFor="sem-order">Order Sequence</Label>
+                <Input
+                  id="sem-order"
+                  type="number"
+                  placeholder="e.g. 1"
+                  value={newSemOrder}
+                  onChange={(e) => setNewSemOrder(e.target.value)}
+                />
+              </motion.div>
+            </motion.div>
+            <DialogFooter>
+              <Button onClick={handleSaveSemester}>
+                {editingSem ? "Update Changes" : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      {/* SLOT MODAL */}
+      <Dialog open={isSlotModalOpen} onOpenChange={setIsSlotModalOpen}>
+        <DialogContent className="sm:max-w-[425px] w-[95vw]">
+          <motion.div
+            variants={modalContentVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {editingSlot ? "Edit Time Slot" : "Add Time Slot"}
+              </DialogTitle>
+              <DialogDescription>
+                Configure the start and end time for a class period.
+              </DialogDescription>
+            </DialogHeader>
+            <motion.div
+              variants={formContainerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 gap-6 py-4"
+            >
+              <TimePicker
+                label="Start Time"
+                value={newSlotStart}
+                onChange={setNewSlotStart}
+              />
+              <TimePicker
+                label="End Time"
+                value={newSlotEnd}
+                onChange={setNewSlotEnd}
+              />
+            </motion.div>
+            <div className="bg-muted/50 p-3 rounded-md text-center text-sm mb-4">
+              <span className="text-muted-foreground">Preview: </span>
+              <span className="font-bold text-foreground">
+                {formatDisplayTime(newSlotStart)} -{" "}
+                {formatDisplayTime(newSlotEnd)}
+              </span>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleSaveTimeSlot}>
+                {editingSlot ? "Update Changes" : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

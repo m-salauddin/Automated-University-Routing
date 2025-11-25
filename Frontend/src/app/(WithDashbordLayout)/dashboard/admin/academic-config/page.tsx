@@ -1,5 +1,5 @@
 import AcademicSettingsPage from "@/components/modules/dashboard/academic-config";
-import getAllDepartments from "@/services/departments";
+import { getAllDepartments } from "@/services/departments";
 import getAllSemesters from "@/services/semesters";
 import getAllTimeSlots from "@/services/time-slots";
 
