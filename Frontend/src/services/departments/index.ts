@@ -2,8 +2,6 @@
 
 import { cookies } from 'next/headers';
 
-// --- SERVER ACTIONS ---
-
 export const getAllDepartments = async () => {
     try {
         const DEPARTMENTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/departments/`;
@@ -52,7 +50,7 @@ export const updateDepartment = async (departmentId: number | string, updateData
             return { success: false, message: 'No access token found' };
         }
         const res = await fetch(DEPARTMENTS_URL, {
-            method: 'PUT', // Or 'PATCH' depending on your backend
+            method: 'PUT', 
             headers: {
                 Authorization: `Bearer ${token}`,
                 'Content-Type': 'application/json',
@@ -73,7 +71,6 @@ export const updateDepartment = async (departmentId: number | string, updateData
             return { success: false, message: errorMessage };
         }
 
-        // Handle 204 No Content or regular JSON
         const rawResult = res.status === 204 ? {} : await res.json();
         return { success: true, data: rawResult };
     } catch (error) {
@@ -151,7 +148,6 @@ export const deleteDepartment = async (departmentId: number | string) => {
             return { success: false, message: errorMessage };
         }
 
-        // DELETE often returns 204 No Content, which causes json() to crash
         const rawResult = res.status === 204 ? { success: true } : await res.json();
         return { success: true, data: rawResult };
     } catch (error) {

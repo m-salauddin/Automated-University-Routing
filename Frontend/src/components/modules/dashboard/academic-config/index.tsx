@@ -48,6 +48,11 @@ import {
   deleteDepartment,
   updateDepartment,
 } from "@/services/departments";
+import {
+  addSemester,
+  deleteSemester,
+  updateSemester,
+} from "@/services/semesters";
 
 // --- TYPES ---
 type Department = { id: number; name: string };
@@ -78,9 +83,7 @@ const itemVariants: Variants = {
   },
 };
 
-// --- MODAL & INPUT ANIMATIONS (Simultaneous Fade Up) ---
-
-// 1. Modal Container: Subtle Pop + Fade Up
+// --- MODAL & INPUT ANIMATIONS ---
 const modalContentVariants: Variants = {
   hidden: {
     opacity: 0,
@@ -92,7 +95,7 @@ const modalContentVariants: Variants = {
     scale: 1,
     y: 0,
     transition: {
-      type: "spring" as const, // Fixed: Added 'as const'
+      type: "spring" as const,
       stiffness: 400,
       damping: 25,
       mass: 1,
@@ -106,7 +109,6 @@ const modalContentVariants: Variants = {
   },
 };
 
-// 2. Form Container: No Stagger (All children fire at once)
 const formContainerVariants: Variants = {
   hidden: { opacity: 1 },
   visible: {
@@ -118,7 +120,6 @@ const formContainerVariants: Variants = {
   },
 };
 
-// 3. Inputs: Simple Fade Up (No Blur)
 const formItemVariants: Variants = {
   hidden: {
     y: 15,
@@ -128,7 +129,7 @@ const formItemVariants: Variants = {
     y: 0,
     opacity: 1,
     transition: {
-      type: "spring" as const, // Fixed: Added 'as const'
+      type: "spring" as const,
       stiffness: 300,
       damping: 24,
     },
@@ -224,11 +225,12 @@ const TimePicker = ({ label, value, onChange }: TimePickerProps) => {
 // --- MAIN COMPONENT ---
 export default function AcademicSettingsPage({
   departments: initialDepartments,
-  semesters,
+  semesters: initialSemesters,
   timeSlots,
 }: AcademicSettingsPageProps) {
   const router = useRouter();
 
+  // --- DEPARTMENT STATE ---
   const [departmentsList, setDepartmentsList] =
     useState<Department[]>(initialDepartments);
 
@@ -241,11 +243,25 @@ export default function AcademicSettingsPage({
     setDepartmentsList(initialDepartments);
   }, [departmentsDependency, initialDepartments]);
 
+  // --- SEMESTER STATE ---
+  const [semestersList, setSemestersList] =
+    useState<Semester[]>(initialSemesters);
+
+  const semestersDependency = useMemo(
+    () => JSON.stringify(initialSemesters),
+    [initialSemesters]
+  );
+
+  useEffect(() => {
+    setSemestersList(initialSemesters);
+  }, [semestersDependency, initialSemesters]);
+
   // Modal States
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [isSemModalOpen, setIsSemModalOpen] = useState(false);
   const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleteSemModalOpen, setIsDeleteSemModalOpen] = useState(false);
 
   // Loading States
   const [isLoading, setIsLoading] = useState(false);
@@ -255,6 +271,7 @@ export default function AcademicSettingsPage({
   const [editingSem, setEditingSem] = useState<Semester | null>(null);
   const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
   const [deletingDeptId, setDeletingDeptId] = useState<number | null>(null);
+  const [deletingSemId, setDeletingSemId] = useState<number | null>(null);
 
   // Form States
   const [newDeptName, setNewDeptName] = useState("");
@@ -272,7 +289,7 @@ export default function AcademicSettingsPage({
     return `${formattedHour}:${m} ${suffix}`;
   };
 
-  // --- HANDLERS ---
+  // --- DEPARTMENT HANDLERS ---
   const openAddDept = () => {
     setEditingDept(null);
     setNewDeptName("");
@@ -361,23 +378,115 @@ export default function AcademicSettingsPage({
     }
   };
 
+  // --- SEMESTER HANDLERS ---
   const openAddSem = () => {
     setEditingSem(null);
     setNewSemName("");
     setNewSemOrder("");
     setIsSemModalOpen(true);
   };
+
   const openEditSem = (sem: Semester) => {
     setEditingSem(sem);
     setNewSemName(sem.name);
     setNewSemOrder(sem.order.toString());
     setIsSemModalOpen(true);
   };
-  const handleSaveSemester = () => {
-    toast.success(editingSem ? "Semester Updated" : "Semester Added");
-    setIsSemModalOpen(false);
+
+  const openDeleteSem = (id: number) => {
+    setDeletingSemId(id);
+    setIsDeleteSemModalOpen(true);
   };
 
+  const handleSaveSemester = async () => {
+    if (!newSemName.trim() || !newSemOrder.trim()) {
+      toast.error("Name and Order are required");
+      return;
+    }
+
+    const orderInt = parseInt(newSemOrder);
+    if (isNaN(orderInt)) {
+      toast.error("Order must be a number");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      let res;
+      if (editingSem) {
+        // Optimistic Update
+        setSemestersList((prev) =>
+          prev.map((s) =>
+            s.id === editingSem.id
+              ? { ...s, name: newSemName, order: orderInt }
+              : s
+          )
+        );
+        // FIXED: passed orderInt (number) instead of String(orderInt)
+        res = await updateSemester(editingSem.id, {
+          name: newSemName,
+          order: orderInt,
+        });
+      } else {
+        // FIXED: passed orderInt (number) instead of String(orderInt)
+        res = await addSemester({
+          name: newSemName,
+          order: orderInt,
+        });
+      }
+
+      if (res.success) {
+        toast.success(
+          editingSem
+            ? `Semester updated to "${newSemName}"`
+            : `Semester "${newSemName}" added successfully`
+        );
+        setIsSemModalOpen(false);
+        startTransition(() => {
+          router.refresh();
+        });
+      } else {
+        setSemestersList(initialSemesters); // Revert
+        toast.error(res.message || "Operation failed");
+      }
+    } catch (err) {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteSemester = async () => {
+    if (!deletingSemId) return;
+
+    setIsLoading(true);
+    const previousList = [...semestersList];
+    setSemestersList((prev) => prev.filter((s) => s.id !== deletingSemId));
+
+    try {
+      const res = await deleteSemester(deletingSemId);
+
+      if (res.success) {
+        toast.success("Semester deleted successfully");
+        setIsDeleteSemModalOpen(false);
+        setDeletingSemId(null);
+        startTransition(() => {
+          router.refresh();
+        });
+      } else {
+        setSemestersList(previousList);
+        toast.error(res.message || "Failed to delete semester");
+      }
+    } catch (err) {
+      setSemestersList(previousList);
+      toast.error("An unexpected error occurred during deletion");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // --- TIME SLOT HANDLERS (Mock) ---
   const openAddSlot = () => {
     setEditingSlot(null);
     setNewSlotStart("09:00:00");
@@ -440,7 +549,7 @@ export default function AcademicSettingsPage({
               className="gap-2"
               onClick={openAddDept}
             >
-              <Plus className="w-4 h-4" /> Add
+              <Plus className="w-4 h-4" /> Add Dept
             </Button>
           </div>
 
@@ -515,42 +624,52 @@ export default function AcademicSettingsPage({
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {semesters.map((sem) => (
-              <Card
-                key={sem.id}
-                className="flex flex-col items-center justify-center p-4 hover:bg-muted/50 transition-colors relative group"
-              >
-                <div className="absolute top-2 right-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
-                      >
-                        <MoreVertical className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEditSem(sem)}>
-                        <Edit2 className="mr-2 h-4 w-4" /> Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-2 text-xs font-bold text-primary">
-                  {sem.order}
-                </div>
-                <span className="font-bold text-lg text-center">
-                  {sem.name}
-                </span>
-                <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                  Semester
-                </span>
-              </Card>
-            ))}
+            <AnimatePresence>
+              {semestersList.map((sem) => (
+                <motion.div
+                  key={sem.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                >
+                  <Card className="flex flex-col items-center justify-center p-4 hover:bg-muted/50 transition-colors relative group h-full">
+                    <div className="absolute top-2 right-2">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                          >
+                            <MoreVertical className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditSem(sem)}>
+                            <Edit2 className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => openDeleteSem(sem.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-2 text-xs font-bold text-primary">
+                      {sem.order}
+                    </div>
+                    <span className="font-bold text-lg text-center">
+                      {sem.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground uppercase tracking-wider">
+                      Semester
+                    </span>
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         </motion.div>
 
@@ -623,7 +742,7 @@ export default function AcademicSettingsPage({
         </motion.div>
       </motion.div>
 
-      {/* MODALS */}
+      {/* --- MODALS --- */}
 
       {/* DEPARTMENT MODAL */}
       <Dialog open={isDeptModalOpen} onOpenChange={setIsDeptModalOpen}>
@@ -644,7 +763,6 @@ export default function AcademicSettingsPage({
                   : "Create a new academic department."}
               </DialogDescription>
             </DialogHeader>
-
             <motion.div
               variants={formContainerVariants}
               initial="hidden"
@@ -661,7 +779,6 @@ export default function AcademicSettingsPage({
                 />
               </motion.div>
             </motion.div>
-
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
                 onClick={handleSaveDepartment}
@@ -712,7 +829,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {/* SEMESTER MODAL */}
+      {/* SEMESTER ADD/EDIT MODAL */}
       <Dialog open={isSemModalOpen} onOpenChange={setIsSemModalOpen}>
         <DialogContent className="sm:max-w-[425px] w-[95vw]">
           <motion.div
@@ -755,8 +872,49 @@ export default function AcademicSettingsPage({
               </motion.div>
             </motion.div>
             <DialogFooter>
-              <Button onClick={handleSaveSemester}>
+              <Button onClick={handleSaveSemester} disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingSem ? "Update Changes" : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE SEMESTER MODAL */}
+      <Dialog
+        open={isDeleteSemModalOpen}
+        onOpenChange={setIsDeleteSemModalOpen}
+      >
+        <DialogContent className="w-[95vw] sm:max-w-[425px]">
+          <motion.div
+            variants={modalContentVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <DialogHeader>
+              <DialogTitle>Confirm Semester Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this semester? This action
+                cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-end mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteSemModalOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteSemester}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Delete
               </Button>
             </DialogFooter>
           </motion.div>

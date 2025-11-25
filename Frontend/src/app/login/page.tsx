@@ -42,7 +42,7 @@ function LoginContent() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [isForgotOpen, setIsForgotOpen] = useState(false);
 
 
