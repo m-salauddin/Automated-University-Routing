@@ -148,7 +148,6 @@ interface FilterPanelProps {
   availableTypes: string[];
 }
 
-// Wrapped in React.memo to prevent re-renders on parent updates unless props change
 const FilterPanel = React.memo(
   ({
     inputValue,

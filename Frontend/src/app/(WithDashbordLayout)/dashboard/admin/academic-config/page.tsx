@@ -1,7 +1,7 @@
 import AcademicSettingsPage from "@/components/modules/dashboard/academic-config";
 import { getAllDepartments } from "@/services/departments";
 import { getAllSemesters } from "@/services/semesters";
-import getAllTimeSlots from "@/services/time-slots";
+import { getAllTimeSlots } from "@/services/time-slots";
 
 const page = async () => {
   const [departmentsData, semestersData, timeSlotsData] = await Promise.all([

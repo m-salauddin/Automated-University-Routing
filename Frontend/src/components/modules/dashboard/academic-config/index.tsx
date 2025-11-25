@@ -53,8 +53,12 @@ import {
   deleteSemester,
   updateSemester,
 } from "@/services/semesters";
+import {
+  createTimeSlot,
+  deleteTimeSlot,
+  updateTimeSlot,
+} from "@/services/time-slots"; // Assuming you saved the services here
 
-// --- TYPES ---
 type Department = { id: number; name: string };
 type Semester = { id: number; name: string; order: number };
 type TimeSlot = { id: number; start_time: string; end_time: string };
@@ -65,25 +69,23 @@ interface AcademicSettingsPageProps {
   timeSlots: TimeSlot[];
 }
 
-// --- PAGE ANIMATIONS ---
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.05 },
+    transition: { staggerChildren: 0.1, delayChildren: 0.1 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { y: 10, opacity: 0 },
+  hidden: { y: 20, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { duration: 0.3, ease: "easeOut" },
+    transition: { type: "spring", stiffness: 120, damping: 20 },
   },
 };
 
-// --- MODAL & INPUT ANIMATIONS ---
 const modalContentVariants: Variants = {
   hidden: {
     opacity: 0,
@@ -226,7 +228,7 @@ const TimePicker = ({ label, value, onChange }: TimePickerProps) => {
 export default function AcademicSettingsPage({
   departments: initialDepartments,
   semesters: initialSemesters,
-  timeSlots,
+  timeSlots: initialTimeSlots,
 }: AcademicSettingsPageProps) {
   const router = useRouter();
 
@@ -256,12 +258,26 @@ export default function AcademicSettingsPage({
     setSemestersList(initialSemesters);
   }, [semestersDependency, initialSemesters]);
 
+  // --- TIME SLOT STATE ---
+  const [timeSlotsList, setTimeSlotsList] =
+    useState<TimeSlot[]>(initialTimeSlots);
+
+  const timeSlotsDependency = useMemo(
+    () => JSON.stringify(initialTimeSlots),
+    [initialTimeSlots]
+  );
+
+  useEffect(() => {
+    setTimeSlotsList(initialTimeSlots);
+  }, [timeSlotsDependency, initialTimeSlots]);
+
   // Modal States
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [isSemModalOpen, setIsSemModalOpen] = useState(false);
   const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleteSemModalOpen, setIsDeleteSemModalOpen] = useState(false);
+  const [isDeleteSlotModalOpen, setIsDeleteSlotModalOpen] = useState(false); // New
 
   // Loading States
   const [isLoading, setIsLoading] = useState(false);
@@ -272,6 +288,7 @@ export default function AcademicSettingsPage({
   const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
   const [deletingDeptId, setDeletingDeptId] = useState<number | null>(null);
   const [deletingSemId, setDeletingSemId] = useState<number | null>(null);
+  const [deletingSlotId, setDeletingSlotId] = useState<number | null>(null); // New
 
   // Form States
   const [newDeptName, setNewDeptName] = useState("");
@@ -415,7 +432,6 @@ export default function AcademicSettingsPage({
     try {
       let res;
       if (editingSem) {
-        // Optimistic Update
         setSemestersList((prev) =>
           prev.map((s) =>
             s.id === editingSem.id
@@ -423,13 +439,11 @@ export default function AcademicSettingsPage({
               : s
           )
         );
-        // FIXED: passed orderInt (number) instead of String(orderInt)
         res = await updateSemester(editingSem.id, {
           name: newSemName,
           order: orderInt,
         });
       } else {
-        // FIXED: passed orderInt (number) instead of String(orderInt)
         res = await addSemester({
           name: newSemName,
           order: orderInt,
@@ -447,7 +461,7 @@ export default function AcademicSettingsPage({
           router.refresh();
         });
       } else {
-        setSemestersList(initialSemesters); // Revert
+        setSemestersList(initialSemesters);
         toast.error(res.message || "Operation failed");
       }
     } catch (err) {
@@ -486,22 +500,104 @@ export default function AcademicSettingsPage({
     }
   };
 
-  // --- TIME SLOT HANDLERS (Mock) ---
+  // --- TIME SLOT HANDLERS ---
   const openAddSlot = () => {
     setEditingSlot(null);
     setNewSlotStart("09:00:00");
     setNewSlotEnd("10:00:00");
     setIsSlotModalOpen(true);
   };
+
   const openEditSlot = (slot: TimeSlot) => {
     setEditingSlot(slot);
     setNewSlotStart(slot.start_time);
     setNewSlotEnd(slot.end_time);
     setIsSlotModalOpen(true);
   };
-  const handleSaveTimeSlot = () => {
-    toast.success(editingSlot ? "Slot Updated" : "Slot Added");
-    setIsSlotModalOpen(false);
+
+  const openDeleteSlot = (id: number) => {
+    setDeletingSlotId(id);
+    setIsDeleteSlotModalOpen(true);
+  };
+
+  const handleSaveTimeSlot = async () => {
+    if (!newSlotStart || !newSlotEnd) {
+      toast.error("Start and End times are required");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      let res;
+      if (editingSlot) {
+        // Optimistic Update
+        setTimeSlotsList((prev) =>
+          prev.map((slot) =>
+            slot.id === editingSlot.id
+              ? { ...slot, start_time: newSlotStart, end_time: newSlotEnd }
+              : slot
+          )
+        );
+        res = await updateTimeSlot(editingSlot.id.toString(), {
+          start_time: newSlotStart,
+          end_time: newSlotEnd,
+        });
+      } else {
+        res = await createTimeSlot({
+          start_time: newSlotStart,
+          end_time: newSlotEnd,
+        });
+      }
+
+      if (res.success) {
+        toast.success(
+          editingSlot
+            ? `Time slot updated successfully`
+            : `Time slot added successfully`
+        );
+        setIsSlotModalOpen(false);
+        startTransition(() => {
+          router.refresh();
+        });
+      } else {
+        setTimeSlotsList(initialTimeSlots); // Revert
+        toast.error(res.message || "Operation failed");
+      }
+    } catch (err) {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteTimeSlot = async () => {
+    if (!deletingSlotId) return;
+
+    setIsLoading(true);
+    const previousList = [...timeSlotsList];
+    setTimeSlotsList((prev) => prev.filter((s) => s.id !== deletingSlotId));
+
+    try {
+      const res = await deleteTimeSlot(deletingSlotId.toString());
+
+      if (res.success) {
+        toast.success("Time slot deleted successfully");
+        setIsDeleteSlotModalOpen(false);
+        setDeletingSlotId(null);
+        startTransition(() => {
+          router.refresh();
+        });
+      } else {
+        setTimeSlotsList(previousList);
+        toast.error(res.message || "Failed to delete time slot");
+      }
+    } catch (err) {
+      setTimeSlotsList(previousList);
+      toast.error("An unexpected error occurred during deletion");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -619,7 +715,7 @@ export default function AcademicSettingsPage({
               className="gap-2 border-primary/20"
               onClick={openAddSem}
             >
-              <Plus className="w-4 h-4" /> Add Semester
+              <Plus className="w-4 h-4" /> Add Sem
             </Button>
           </div>
 
@@ -690,54 +786,64 @@ export default function AcademicSettingsPage({
               className="gap-2 border-primary/20"
               onClick={openAddSlot}
             >
-              <Plus className="w-4 h-4" /> Add Time Slot
+              <Plus className="w-4 h-4" /> Add Slot
             </Button>
           </div>
 
           <div className="space-y-2">
-            {timeSlots.map((slot) => (
-              <div
-                key={slot.id}
-                className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground shrink-0">
-                    <Clock className="w-4 h-4" />
+            <AnimatePresence>
+              {timeSlotsList.map((slot) => (
+                <motion.div
+                  key={slot.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                >
+                  <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors group">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground shrink-0">
+                        <Clock className="w-4 h-4" />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1 sm:gap-3">
+                        <Badge variant="outline" className="font-mono w-fit">
+                          Slot {slot.id}
+                        </Badge>
+                        <span className="font-medium text-sm sm:text-base whitespace-nowrap">
+                          {formatDisplayTime(slot.start_time)}{" "}
+                          <span className="text-muted-foreground mx-1">-</span>{" "}
+                          {formatDisplayTime(slot.end_time)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditSlot(slot)}>
+                            <Edit2 className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600"
+                            onClick={() => openDeleteSlot(slot.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
-                    <Badge variant="outline" className="font-mono w-fit">
-                      Slot {slot.id}
-                    </Badge>
-                    <span className="font-medium text-sm sm:text-base whitespace-nowrap">
-                      {formatDisplayTime(slot.start_time)}{" "}
-                      <span className="text-muted-foreground mx-1">-</span>{" "}
-                      {formatDisplayTime(slot.end_time)}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEditSlot(slot)}>
-                        <Edit2 className="mr-2 h-4 w-4" /> Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">
-                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))}
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         </motion.div>
       </motion.div>
@@ -793,6 +899,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
+      {/* DELETE DEPARTMENT MODAL */}
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent className="w-[95vw] sm:max-w-[425px]">
           <motion.div
@@ -921,7 +1028,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {/* SLOT MODAL */}
+      {/* SLOT ADD/EDIT MODAL */}
       <Dialog open={isSlotModalOpen} onOpenChange={setIsSlotModalOpen}>
         <DialogContent className="sm:max-w-[425px] w-[95vw]">
           <motion.div
@@ -962,8 +1069,49 @@ export default function AcademicSettingsPage({
               </span>
             </div>
             <DialogFooter>
-              <Button onClick={handleSaveTimeSlot}>
+              <Button onClick={handleSaveTimeSlot} disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingSlot ? "Update Changes" : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DELETE SLOT MODAL */}
+      <Dialog
+        open={isDeleteSlotModalOpen}
+        onOpenChange={setIsDeleteSlotModalOpen}
+      >
+        <DialogContent className="w-[95vw] sm:max-w-[425px]">
+          <motion.div
+            variants={modalContentVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <DialogHeader>
+              <DialogTitle>Confirm Time Slot Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this time slot? This action
+                cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-end mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteSlotModalOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteTimeSlot}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Delete
               </Button>
             </DialogFooter>
           </motion.div>
