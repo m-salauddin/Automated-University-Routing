@@ -800,7 +800,7 @@ export default function AcademicSettingsPage({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                 >
-                  <div className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors group">
+                  <div className="flex items-center justify-between p-3 dark:bg-[#111113] rounded-lg border hover:bg-muted/30 transition-colors group">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-muted-foreground shrink-0">
                         <Clock className="w-4 h-4" />
