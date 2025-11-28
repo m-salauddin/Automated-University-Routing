@@ -1,16 +1,22 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import * as React from "react";
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { motion, Variants } from "framer-motion";
+import { useState, useMemo, useEffect, startTransition } from "react";
+import { motion, AnimatePresence, Variants } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import {
   Table,
+  TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -18,19 +24,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  SheetFooter,
-  SheetClose,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 import {
   Search,
   GraduationCap,
@@ -38,10 +53,8 @@ import {
   BookOpen,
   Calendar,
   Tag,
-  X,
   Printer,
   FolderOpen,
-  Filter,
   Hash,
   ChevronLeft,
   ChevronRight,
@@ -50,10 +63,19 @@ import {
   MapPin,
   User,
   Building2,
+  Plus,
+  MoreVertical,
+  Edit,
+  Trash2,
+  Loader2,
+  RotateCcw,
+  ShieldBan,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// --- DATA TYPE ---
+import { createCourse, updateCourse, deleteCourse } from "@/services/courses";
+
+// --- TYPES ---
 export interface Course {
   id: number;
   course_code: string;
@@ -69,11 +91,36 @@ export interface Course {
   semester_name: string;
 }
 
-// --- HELPERS ---
-const getInitials = (name: string) => {
-  if (!name) return "";
-  return name.match(/[A-Z]/g)?.join("") || name.substring(0, 3).toUpperCase();
-};
+export interface Department {
+  id: number;
+  name: string;
+}
+
+export interface Semester {
+  id: number;
+  name: string;
+}
+
+export interface User {
+  id: number;
+  name: string;
+  role: string;
+  username: string;
+}
+
+// --- ZOD SCHEMA ---
+const courseSchema = z.object({
+  course_code: z.string().min(1, "Course code is required"),
+  course_name: z.string().min(1, "Course name is required"),
+  room_number: z.string().min(1, "Room number is required"),
+  credits: z.coerce.number().min(0.5, "Minimum 0.5 credits"),
+  course_type: z.string().min(1, "Course type is required"),
+  teacher: z.string().min(1, "Teacher is required"),
+  department: z.string().min(1, "Department is required"),
+  semester: z.string().min(1, "Semester is required"),
+});
+
+type FormValues = z.infer<typeof courseSchema>;
 
 // --- ANIMATION VARIANTS ---
 const pageVariants: Variants = {
@@ -83,7 +130,6 @@ const pageVariants: Variants = {
     transition: { staggerChildren: 0.1, delayChildren: 0.1 },
   },
 };
-
 const pageItemVariants: Variants = {
   hidden: { y: 20, opacity: 0 },
   visible: {
@@ -93,303 +139,315 @@ const pageItemVariants: Variants = {
   },
 };
 
-const tableContainerVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.05 },
-  },
+// --- HELPERS ---
+const getInitials = (name: string) => {
+  if (!name) return "";
+  return name.match(/[A-Z]/g)?.join("") || name.substring(0, 3).toUpperCase();
 };
-
-const rowVariants: Variants = {
-  hidden: { x: -20, opacity: 0 },
-  visible: {
-    x: 0,
-    opacity: 1,
-    transition: { type: "spring", stiffness: 120, damping: 15 },
-  },
-};
-
-// --- EXTRACTED COMPONENTS ---
-
-const FilterItem = ({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) => (
-  <div className="flex flex-col gap-1.5 w-full">
-    <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider pl-0.5 flex items-center gap-1">
-      {label}
-    </span>
-    {children}
-  </div>
-);
-
-interface FilterPanelProps {
-  inputValue: string;
-  setInputValue: (val: string) => void;
-  semesterFilter: string;
-  setSemesterFilter: (val: string) => void;
-  creditFilter: string;
-  setCreditFilter: (val: string) => void;
-  teacherFilter: string;
-  setTeacherFilter: (val: string) => void;
-  deptFilter: string;
-  setDeptFilter: (val: string) => void;
-  typeFilter: string;
-  setTypeFilter: (val: string) => void;
-  resetFilters: () => void;
-  availableSemesters: string[];
-  availableCredits: number[];
-  availableTeachers: string[];
-  availableDepts: string[];
-  availableTypes: string[];
-}
-
-const FilterPanel = React.memo(
-  ({
-    inputValue,
-    setInputValue,
-    semesterFilter,
-    setSemesterFilter,
-    creditFilter,
-    setCreditFilter,
-    teacherFilter,
-    setTeacherFilter,
-    deptFilter,
-    setDeptFilter,
-    typeFilter,
-    setTypeFilter,
-    resetFilters,
-    availableSemesters,
-    availableCredits,
-    availableTeachers,
-    availableDepts,
-    availableTypes,
-  }: FilterPanelProps) => (
-    <div className="flex flex-col gap-6 py-6 px-4">
-      <FilterItem label="Search">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Search by Code or Name..."
-            className="pl-8 h-9 bg-background"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-          />
-        </div>
-      </FilterItem>
-
-      <FilterItem label="Semester">
-        <Select value={semesterFilter} onValueChange={setSemesterFilter}>
-          <SelectTrigger className="w-full h-9 bg-background">
-            <SelectValue placeholder="All Semesters" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Semesters</SelectItem>
-            {availableSemesters.map((sem) => (
-              <SelectItem key={sem} value={sem}>
-                {sem} Semester
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FilterItem>
-
-      <FilterItem label="Credits">
-        <Select value={creditFilter} onValueChange={setCreditFilter}>
-          <SelectTrigger className="w-full h-9 bg-background">
-            <SelectValue placeholder="All Credits" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Credits</SelectItem>
-            {availableCredits.map((c) => (
-              <SelectItem key={c} value={c.toString()}>
-                {c} Credit{c > 1 && "s"}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FilterItem>
-
-      <FilterItem label="Teacher">
-        <Select value={teacherFilter} onValueChange={setTeacherFilter}>
-          <SelectTrigger className="w-full h-9 bg-background">
-            <SelectValue placeholder="All Teachers" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Teachers</SelectItem>
-            {availableTeachers.map((t) => (
-              <SelectItem key={t} value={t}>
-                {getInitials(t)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FilterItem>
-
-      <FilterItem label="Department">
-        <Select value={deptFilter} onValueChange={setDeptFilter}>
-          <SelectTrigger className="w-full h-9 bg-background">
-            <SelectValue placeholder="All Departments" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Departments</SelectItem>
-            {availableDepts.map((d) => (
-              <SelectItem key={d} value={d}>
-                {getInitials(d)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FilterItem>
-
-      <FilterItem label="Course Type">
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
-          <SelectTrigger className="w-full h-9 bg-background">
-            <SelectValue placeholder="All Types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Types</SelectItem>
-            {availableTypes.map((t) => (
-              <SelectItem key={t} value={t}>
-                {t}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FilterItem>
-
-      <div className="mt-2"></div>
-
-      <SheetFooter>
-        <SheetClose asChild>
-          <Button variant="outline" onClick={resetFilters} className="w-full">
-            Reset All
-          </Button>
-        </SheetClose>
-        <SheetClose asChild>
-          <Button className="w-full mt-2 sm:mt-0">Done</Button>
-        </SheetClose>
-      </SheetFooter>
-    </div>
-  )
-);
-FilterPanel.displayName = "FilterPanel";
 
 interface AutomatedRoutineCoursesProps {
   courses: Course[];
+  departments: Department[];
+  semesters: Semester[];
+  teachers: User[];
 }
 
+// --- MAIN COMPONENT ---
 export default function AutomatedRoutineCourses({
   courses = [],
+  departments = [],
+  semesters = [],
+  teachers = [],
 }: AutomatedRoutineCoursesProps) {
-  // -- State --
-  const [inputValue, setInputValue] = useState("");
-  const [searchQuery, setSearchQuery] = useState(""); 
+  const router = useRouter();
+
+  // --- LOCAL STATE ---
+  const [coursesList, setCoursesList] = useState<Course[]>(courses);
+
+  // Sync prop changes
+  useEffect(() => {
+    setCoursesList(courses);
+  }, [courses]);
+
+  // Filters
+  const [searchQuery, setSearchQuery] = useState("");
   const [semesterFilter, setSemesterFilter] = useState("All");
   const [creditFilter, setCreditFilter] = useState("All");
   const [teacherFilter, setTeacherFilter] = useState("All");
   const [deptFilter, setDeptFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
 
+  // Pagination & Sorting
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Course;
     direction: "asc" | "desc";
   } | null>(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  // Modals & Action States
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // -- Debounce Effect for Search --
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setSearchQuery(inputValue);
-      setCurrentPage(1);
-    }, 300);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+  const [deletingCourse, setDeletingCourse] = useState<Course | null>(null);
 
-    return () => clearTimeout(handler);
-  }, [inputValue]);
+  // --- DERIVED LISTS FOR FILTER DROPDOWNS ---
+  const { uniqueTeachers, uniqueDepts, uniqueSemesters, availableCredits } =
+    useMemo(() => {
+      const teachersMap = new Map();
+      const deptsMap = new Map();
+      const semsMap = new Map();
+      const creditsSet = new Set<number>();
 
-  // -- Dynamic Filters Data --
-  const {
-    availableSemesters,
-    availableCredits,
-    availableTeachers,
-    availableDepts,
-    availableTypes,
-  } = useMemo(() => {
-    if (!Array.isArray(courses))
+      courses.forEach((c) => {
+        teachersMap.set(c.teacher, c.teacher_name);
+        deptsMap.set(c.department, c.department_name);
+        semsMap.set(c.semester, c.semester_name);
+        creditsSet.add(c.credits);
+      });
+
       return {
-        availableSemesters: [],
-        availableCredits: [],
-        availableTeachers: [],
-        availableDepts: [],
-        availableTypes: [],
+        uniqueTeachers: Array.from(teachersMap.entries())
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        uniqueDepts: Array.from(deptsMap.entries())
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+        uniqueSemesters: Array.from(semsMap.entries())
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.id - b.id),
+        availableCredits: Array.from(creditsSet).sort((a, b) => a - b),
       };
+    }, [courses]);
 
-    return {
-      availableSemesters: Array.from(
-        new Set(courses.map((c) => c.semester_name))
-      ).sort(),
-      availableCredits: Array.from(new Set(courses.map((c) => c.credits))).sort(
-        (a, b) => a - b
-      ),
-      availableTeachers: Array.from(
-        new Set(courses.map((c) => c.teacher_name))
-      ).sort(),
-      availableDepts: Array.from(
-        new Set(courses.map((c) => c.department_name))
-      ).sort(),
-      availableTypes: Array.from(
-        new Set(courses.map((c) => c.course_type))
-      ).sort(),
-    };
-  }, [courses]);
+  // --- FORM HOOKS ---
+  const form = useForm<FormValues>({
+    resolver: zodResolver(courseSchema) as any,
+    defaultValues: {
+      course_code: "",
+      course_name: "",
+      room_number: "",
+      credits: 3,
+      course_type: "",
+      teacher: "",
+      department: "",
+      semester: "",
+    },
+  });
 
-  // -- Handlers (Memoized for React.memo compatibility) --
-  const handleSearchChange = useCallback((val: string) => {
-    setInputValue(val);
-  }, []);
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = form;
 
-  const handleSemesterChange = useCallback((val: string) => {
-    setSemesterFilter(val);
-    setCurrentPage(1);
-  }, []);
+  // --- MODAL HANDLERS ---
+  const openAddCourse = () => {
+    setEditingCourse(null);
+    setIsSaving(false);
+    reset({
+      course_code: "",
+      course_name: "",
+      room_number: "",
+      credits: 3,
+      course_type: "",
+      teacher: "",
+      department: "",
+      semester: "",
+    });
+    setIsEditModalOpen(true);
+  };
 
-  const handleCreditChange = useCallback((val: string) => {
-    setCreditFilter(val);
-    setCurrentPage(1);
-  }, []);
+  const openEditCourse = (course: Course) => {
+    setEditingCourse(course);
+    setIsSaving(false);
+    reset({
+      course_code: course.course_code,
+      course_name: course.course_name,
+      room_number: course.room_number,
+      credits: course.credits,
+      course_type: course.course_type,
+      teacher: String(course.teacher),
+      department: String(course.department),
+      semester: String(course.semester),
+    });
+    setIsEditModalOpen(true);
+  };
 
-  const handleTeacherChange = useCallback((val: string) => {
-    setTeacherFilter(val);
-    setCurrentPage(1);
-  }, []);
+  const openDeleteCourse = (course: Course) => {
+    setDeletingCourse(course);
+    setIsDeleting(false);
+    setIsDeleteModalOpen(true);
+  };
 
-  const handleDeptChange = useCallback((val: string) => {
-    setDeptFilter(val);
-    setCurrentPage(1);
-  }, []);
-
-  const handleTypeChange = useCallback((val: string) => {
-    setTypeFilter(val);
-    setCurrentPage(1);
-  }, []);
-
-  const resetFilters = useCallback(() => {
-    setInputValue("");
+  const resetFilters = () => {
     setSearchQuery("");
     setSemesterFilter("All");
     setCreditFilter("All");
     setTeacherFilter("All");
     setDeptFilter("All");
     setTypeFilter("All");
-    setSortConfig(null);
-    setCurrentPage(1);
-  }, []);
+    setPage(1);
+  };
+
+  // --- SUBMIT HANDLERS ---
+  const onSubmit = async (data: FormValues) => {
+    setIsSaving(true);
+
+    const teacherObj = teachers.find((t) => String(t.id) === data.teacher);
+    const deptObj = departments.find((d) => String(d.id) === data.department);
+    const semObj = semesters.find((s) => String(s.id) === data.semester);
+
+    try {
+      if (editingCourse) {
+        // --- UPDATE ---
+        const payload = {
+          course_type: data.course_type,
+          course_code: data.course_code,
+          course_name: data.course_name,
+          room_number: data.room_number,
+          department: Number(data.department),
+          semester: Number(data.semester),
+          credits: Number(data.credits),
+          teacher: Number(data.teacher),
+        };
+
+        const result = await updateCourse(editingCourse.id, payload);
+
+        if (result.success) {
+          setCoursesList((prev) =>
+            prev.map((c) =>
+              c.id === editingCourse.id
+                ? ({
+                    ...c,
+                    ...payload,
+                    teacher_name: teacherObj?.name || c.teacher_name,
+                    department_name: deptObj?.name || c.department_name,
+                    semester_name: semObj?.name || c.semester_name,
+                  } as Course)
+                : c
+            )
+          );
+
+          setIsEditModalOpen(false);
+          toast.success("Course updated successfully");
+          startTransition(() => router.refresh());
+        } else {
+          toast.error(result.message);
+        }
+      } else {
+        // --- CREATE ---
+        const payload = {
+          course_code: data.course_code,
+          course_name: data.course_name,
+          room_number: data.room_number,
+          credits: Number(data.credits),
+          course_type: data.course_type,
+          teacher: Number(data.teacher),
+          teacher_name: teacherObj?.name || "",
+          department: Number(data.department),
+          department_name: deptObj?.name || "",
+          semester: Number(data.semester),
+          semester_name: semObj?.name || "",
+        };
+
+        const result = await createCourse(payload);
+
+        if (result.success) {
+          const newCourse = result.data
+            ? ({ ...payload, ...result.data } as Course)
+            : null;
+          if (newCourse) setCoursesList((prev) => [newCourse, ...prev]);
+
+          setIsEditModalOpen(false);
+          toast.success("Course created successfully");
+          startTransition(() => router.refresh());
+        } else {
+          toast.error(result.message);
+        }
+      }
+    } catch (err) {
+      toast.error("An unexpected error occurred");
+      console.error(err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingCourse) return;
+    setIsDeleting(true);
+    try {
+      const result = await deleteCourse(deletingCourse.id);
+      if (result.success) {
+        setCoursesList((prev) =>
+          prev.filter((c) => c.id !== deletingCourse.id)
+        );
+        setIsDeleteModalOpen(false);
+        toast.success("Course deleted successfully");
+        startTransition(() => router.refresh());
+      } else {
+        toast.error(result.message);
+      }
+    } catch (err) {
+      toast.error("Failed to delete");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const filteredData = useMemo(() => {
+    let data = [...coursesList];
+
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase();
+      data = data.filter(
+        (c) =>
+          c.course_name.toLowerCase().includes(lowerQuery) ||
+          c.course_code.toLowerCase().includes(lowerQuery)
+      );
+    }
+    if (semesterFilter !== "All")
+      data = data.filter((c) => c.semester_name === semesterFilter);
+    if (creditFilter !== "All")
+      data = data.filter((c) => c.credits === Number(creditFilter));
+    if (teacherFilter !== "All")
+      data = data.filter((c) => c.teacher_name === teacherFilter);
+    if (deptFilter !== "All")
+      data = data.filter((c) => c.department_name === deptFilter);
+    if (typeFilter !== "All")
+      data = data.filter((c) => c.course_type === typeFilter);
+
+    if (sortConfig) {
+      data.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key])
+          return sortConfig.direction === "asc" ? -1 : 1;
+        if (a[sortConfig.key] > b[sortConfig.key])
+          return sortConfig.direction === "asc" ? 1 : -1;
+        return 0;
+      });
+    }
+    return data;
+  }, [
+    coursesList,
+    searchQuery,
+    semesterFilter,
+    creditFilter,
+    teacherFilter,
+    deptFilter,
+    typeFilter,
+    sortConfig,
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const paginatedData = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return filteredData.slice(startIndex, startIndex + pageSize);
+  }, [filteredData, page, pageSize]);
 
   const handleSort = (key: keyof Course) => {
     let direction: "asc" | "desc" = "asc";
@@ -403,92 +461,46 @@ export default function AutomatedRoutineCourses({
     setSortConfig({ key, direction });
   };
 
-  // -- Table Key Generation --
-  const tableAnimationKey = JSON.stringify({
-    searchQuery,
-    semesterFilter,
-    creditFilter,
-    teacherFilter,
-    deptFilter,
-    typeFilter,
-    page: currentPage,
-    size: pageSize,
-    sort: sortConfig?.key,
-    sortDir: sortConfig?.direction,
-  });
-
-  const filteredData = useMemo(() => {
-    if (!Array.isArray(courses)) {
-      return [];
-    }
-
-    let data = [...courses];
-
-    if (searchQuery) {
-      const lowerQuery = searchQuery.toLowerCase();
-      data = data.filter(
-        (c) =>
-          c.course_name?.toLowerCase().includes(lowerQuery) ||
-          c.course_code?.toLowerCase().includes(lowerQuery)
-      );
-    }
-
-    if (semesterFilter !== "All") {
-      data = data.filter((c) => c.semester_name === semesterFilter);
-    }
-    if (creditFilter !== "All") {
-      data = data.filter((c) => c.credits === Number(creditFilter));
-    }
-    if (teacherFilter !== "All") {
-      data = data.filter((c) => c.teacher_name === teacherFilter);
-    }
-    if (deptFilter !== "All") {
-      data = data.filter((c) => c.department_name === deptFilter);
-    }
-    if (typeFilter !== "All") {
-      data = data.filter((c) => c.course_type === typeFilter);
-    }
-
-    if (sortConfig) {
-      data.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key])
-          return sortConfig.direction === "asc" ? -1 : 1;
-        if (a[sortConfig.key] > b[sortConfig.key])
-          return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
-      });
-    }
-
-    return data;
+  const isFiltered = useMemo(() => {
+    return (
+      searchQuery !== "" ||
+      deptFilter !== "All" ||
+      semesterFilter !== "All" ||
+      creditFilter !== "All" ||
+      teacherFilter !== "All" ||
+      typeFilter !== "All"
+    );
   }, [
-    courses,
     searchQuery,
+    deptFilter,
     semesterFilter,
     creditFilter,
     teacherFilter,
-    deptFilter,
     typeFilter,
-    sortConfig,
   ]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
-  const paginatedData = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredData.slice(startIndex, startIndex + pageSize);
-  }, [filteredData, currentPage, pageSize]);
-
 
   return (
     <>
+      <style jsx global>{`
+        @media print {
+          @page {
+            margin: 0.5cm;
+          }
+          body {
+            -webkit-print-color-adjust: exact;
+          }
+        }
+      `}</style>
+
       <motion.div
         variants={pageVariants}
         initial="hidden"
         animate="visible"
-        className="w-full min-w-0 max-w-full mx-auto p-4 md:p-6 space-y-6 font-lexend text-foreground overflow-x-hidden print:p-0 print:max-w-none"
+        className="w-full font-lexend min-w-0 max-w-full mx-auto p-4 md:p-6 space-y-6 overflow-x-hidden print:p-0 print:max-w-none print:w-full"
       >
         {/* -- Header Section -- */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden mb-8">
-          <div className="space-y-2 w-full">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 print:hidden mb-6">
+          <div className="space-y-2 w-full lg:w-auto">
             <motion.div variants={pageItemVariants}>
               <Badge
                 variant="outline"
@@ -497,226 +509,163 @@ export default function AutomatedRoutineCourses({
                 Admin Panel
               </Badge>
             </motion.div>
-
             <motion.h1
               variants={pageItemVariants}
               className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"
             >
               Course Curriculum
             </motion.h1>
-
-            <motion.div
+            <motion.p
               variants={pageItemVariants}
-              className="flex flex-wrap items-center gap-3"
+              className="text-muted-foreground"
             >
-              <p className="text-muted-foreground ">Manage All Courses</p>
-              <span className="h-1 w-1 rounded-full bg-muted-foreground/40" />
-              <span className="text-foreground font-bold uppercase">
-                Total: {Array.isArray(courses) ? courses.length : 0}
-              </span>
-
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-[1300px]:hidden h-6 text-[10px] px-2 gap-1"
-                  >
-                    <Filter className="h-3 w-3" /> Filters
-                  </Button>
-                </SheetTrigger>
-                <SheetContent
-                  side="right"
-                  className="w-[300px] sm:w-[400px] overflow-y-auto"
-                >
-                  <SheetHeader>
-                    <SheetTitle>Filters & View</SheetTitle>
-                    <SheetDescription>
-                      Customize your course table view.
-                    </SheetDescription>
-                  </SheetHeader>
-
-                  <FilterPanel
-                    inputValue={inputValue}
-                    setInputValue={handleSearchChange}
-                    semesterFilter={semesterFilter}
-                    setSemesterFilter={handleSemesterChange}
-                    creditFilter={creditFilter}
-                    setCreditFilter={handleCreditChange}
-                    teacherFilter={teacherFilter}
-                    setTeacherFilter={handleTeacherChange}
-                    deptFilter={deptFilter}
-                    setDeptFilter={handleDeptChange}
-                    typeFilter={typeFilter}
-                    setTypeFilter={handleTypeChange}
-                    resetFilters={resetFilters}
-                    availableSemesters={availableSemesters}
-                    availableCredits={availableCredits}
-                    availableTeachers={availableTeachers}
-                    availableDepts={availableDepts}
-                    availableTypes={availableTypes}
-                  />
-                </SheetContent>
-              </Sheet>
-            </motion.div>
+              Manage university courses, assign teachers, and organize schedule.
+            </motion.p>
           </div>
 
           <motion.div
             variants={pageItemVariants}
-            className="flex gap-2 shrink-0"
+            className="flex flex-wrap gap-2 w-full lg:w-auto"
           >
-            <Button
-              onClick={() => window.print()}
-              variant="outline"
-              className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex"
+            <Badge
+              variant="secondary"
+              className="h-10 px-4 flex items-center justify-center gap-2 text-sm font-normal bg-background border whitespace-nowrap"
             >
-              <Printer className="h-4 w-4" /> Print List
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+              <span>{filteredData.length} Courses</span>
+            </Badge>
+            <Button
+              onClick={openAddCourse}
+              className="gap-2 grow sm:grow-0"
+            >
+              <Plus className="h-4 w-4" /> Add Course
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => window.print()}
+              className="gap-2 h-10 border-primary/20 hover:bg-primary/5 hover:text-primary grow sm:grow-0"
+            >
+              <Printer className="h-4 w-4" /> Print
             </Button>
           </motion.div>
         </div>
 
-        {/* -- Print Header -- */}
-        <div className="hidden print:block mb-6">
-          <h1 className="text-2xl font-bold mb-2">Course Curriculum Report</h1>
+        {/* -- Print Only Header -- */}
+        <div className="hidden print:block mb-4 text-center">
+          <h1 className="text-2xl font-bold">Course Curriculum</h1>
           <p className="text-sm text-muted-foreground">
-            Generated Report • {new Date().toLocaleDateString()}
+            Generated Report - Total Courses: {filteredData.length}
           </p>
         </div>
 
         {/* -- Main Content Card -- */}
         <motion.div variants={pageItemVariants}>
           <Card className="w-full overflow-hidden dark:bg-[#111113] border shadow-sm print:border-none print:shadow-none print:overflow-visible">
+            {/* -- Filters Header -- */}
             <CardHeader className="p-4 bg-muted/30 border-b hidden min-[1300px]:block print:hidden">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col xl:flex-row gap-4 justify-between items-end">
-                  {/* -- Desktop Filters Grid -- */}
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 w-full">
-                    <FilterItem label="Search">
+                    {/* Search */}
+                    <div className="flex flex-col gap-1.5 w-full">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider pl-0.5">
+                        Search
+                      </span>
                       <div className="relative">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                         <Input
-                          placeholder="Search code/name..."
+                          placeholder="Search..."
                           className="pl-8 h-9 bg-background text-xs"
-                          value={inputValue}
-                          onChange={(e) => handleSearchChange(e.target.value)}
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
                         />
                       </div>
-                    </FilterItem>
+                    </div>
 
-                    <FilterItem label="Semester">
-                      <Select
-                        value={semesterFilter}
-                        onValueChange={handleSemesterChange}
-                      >
-                        <SelectTrigger className="w-full h-9 bg-background text-xs">
-                          <SelectValue placeholder="All" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="All">All Semesters</SelectItem>
-                          {availableSemesters.map((sem) => (
-                            <SelectItem key={sem} value={sem}>
-                              {sem} Semester
+                    {/* Filters */}
+                    {[
+                      {
+                        label: "Semester",
+                        value: semesterFilter,
+                        set: setSemesterFilter,
+                        options: uniqueSemesters.map((s) => s.name),
+                      },
+                      {
+                        label: "Credits",
+                        value: creditFilter,
+                        set: setCreditFilter,
+                        options: availableCredits.map(String),
+                      },
+                      {
+                        label: "Teacher",
+                        value: teacherFilter,
+                        set: setTeacherFilter,
+                        options: uniqueTeachers.map((t) => t.name),
+                      },
+                      {
+                        label: "Dept",
+                        value: deptFilter,
+                        set: setDeptFilter,
+                        options: uniqueDepts.map((d) => d.name),
+                      },
+                      {
+                        label: "Type",
+                        value: typeFilter,
+                        set: setTypeFilter,
+                        options: ["Theory", "Lab", "Project"],
+                      },
+                    ].map((filter, idx) => (
+                      <div key={idx} className="flex flex-col gap-1.5 w-full">
+                        <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider pl-0.5">
+                          {filter.label}
+                        </span>
+                        <Select
+                          value={filter.value}
+                          onValueChange={(val) => {
+                            filter.set(val);
+                            setPage(1);
+                          }}
+                        >
+                          <SelectTrigger className="w-full h-9 bg-background text-xs">
+                            <SelectValue placeholder="All" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="All">
+                              All {filter.label}
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FilterItem>
-
-                    <FilterItem label="Credits">
-                      <Select
-                        value={creditFilter}
-                        onValueChange={handleCreditChange}
-                      >
-                        <SelectTrigger className="w-full h-9 bg-background text-xs">
-                          <SelectValue placeholder="All" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="All">All Credits</SelectItem>
-                          {availableCredits.map((c) => (
-                            <SelectItem key={c} value={c.toString()}>
-                              {c} Credit{c > 1 && "s"}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FilterItem>
-
-                    <FilterItem label="Teacher">
-                      <Select
-                        value={teacherFilter}
-                        onValueChange={handleTeacherChange}
-                      >
-                        <SelectTrigger className="w-full h-9 bg-background text-xs">
-                          <SelectValue placeholder="All" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="All">All Teachers</SelectItem>
-                          {availableTeachers.map((t) => (
-                            <SelectItem key={t} value={t}>
-                              {getInitials(t)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FilterItem>
-
-                    <FilterItem label="Department">
-                      <Select
-                        value={deptFilter}
-                        onValueChange={handleDeptChange}
-                      >
-                        <SelectTrigger className="w-full h-9 bg-background text-xs">
-                          <SelectValue placeholder="All" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="All">All Depts</SelectItem>
-                          {availableDepts.map((d) => (
-                            <SelectItem key={d} value={d}>
-                              {getInitials(d)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FilterItem>
-
-                    <FilterItem label="Type">
-                      <Select
-                        value={typeFilter}
-                        onValueChange={handleTypeChange}
-                      >
-                        <SelectTrigger className="w-full h-9 bg-background text-xs">
-                          <SelectValue placeholder="All" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="All">All Types</SelectItem>
-                          {availableTypes.map((t) => (
-                            <SelectItem key={t} value={t}>
-                              {t}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FilterItem>
+                            {filter.options.map((opt) => (
+                              <SelectItem key={opt} value={opt}>
+                                {filter.label === "Teacher" ||
+                                filter.label === "Dept"
+                                  ? getInitials(opt)
+                                  : opt}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ))}
                   </div>
 
-                  {/* -- Desktop Reset Button -- */}
-                  <div className="flex gap-3 items-end shrink-0 justify-end">
-                    {(inputValue ||
-                      semesterFilter !== "All" ||
-                      creditFilter !== "All" ||
-                      teacherFilter !== "All" ||
-                      deptFilter !== "All" ||
-                      typeFilter !== "All") && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9 gap-2 mb-0.5"
-                        onClick={resetFilters}
+                  <AnimatePresence>
+                    {isFiltered && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="flex-none"
                       >
-                        <X className="h-3.5 w-3.5" /> Reset
-                      </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={resetFilters}
+                          className="h-9 gap-2 mb-0.5 border-dashed text-muted-foreground hover:text-foreground"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" /> Reset
+                        </Button>
+                      </motion.div>
                     )}
-                  </div>
+                  </AnimatePresence>
                 </div>
               </div>
             </CardHeader>
@@ -724,105 +673,101 @@ export default function AutomatedRoutineCourses({
             {/* -- Table Content -- */}
             <CardContent className="p-0 grid grid-cols-1">
               <div className="w-full overflow-x-auto print:overflow-visible">
-                <Table className="min-w-[1000px] overflow-hidden">
+                <Table className="min-w-[1000px] overflow-hidden print:min-w-0 print:w-full">
                   <TableHeader className="bg-muted/40">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-[110px] h-10">
+                    <TableRow className="hover:bg-transparent print:border-b-black/70 print:h-auto">
+                      <TableHead className="w-[110px] h-10 print:h-auto print:py-1 print:text-xs">
                         <div className="flex items-center gap-2">
-                          <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                          <Hash className="w-3.5 h-3.5 text-muted-foreground print:hidden" />
                           Code
                         </div>
                       </TableHead>
 
-                      <TableHead className="min-w-[250px] h-10">
+                      <TableHead className="min-w-[350px] h-10 print:h-auto print:py-1 print:text-xs print:min-w-0">
                         <div className="flex items-center gap-2">
-                          <BookOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                          <BookOpen className="w-3.5 h-3.5 text-muted-foreground print:hidden" />
                           Course Name
                         </div>
                       </TableHead>
 
-                      <TableHead className="w-20 h-10">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                      <TableHead className="w-20 h-10 print:h-auto print:py-1 print:text-xs">
+                        <div className="flex items-center justify-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-muted-foreground print:hidden" />
                           Room
                         </div>
                       </TableHead>
 
-                      <TableHead className="w-[100px] h-10">
+                      <TableHead className="w-[100px] h-10 print:h-auto print:py-1 print:text-xs">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="-ml-3 h-8 font-medium text-muted-foreground hover:text-foreground"
+                          className="-ml-3 h-8 w-full justify-center font-medium text-muted-foreground hover:text-foreground print:h-auto print:p-0"
                           onClick={() => handleSort("credits")}
                         >
-                          <GraduationCap className="w-3.5 h-3.5 mr-2" />
+                          <GraduationCap className="w-3.5 h-3.5 mr-2 print:hidden" />
                           Credits
-                          <ArrowUpDown className="ml-1 h-3 w-3 opacity-50" />
+                          <ArrowUpDown className="ml-1 h-3 w-3 opacity-50 print:hidden" />
                         </Button>
                       </TableHead>
 
-                      <TableHead className="w-[100px] h-10">
+                      <TableHead className="w-[100px] h-10 print:h-auto print:py-1 print:text-xs">
                         <div className="flex items-center gap-2">
-                          <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+                          <Tag className="w-3.5 h-3.5 text-muted-foreground print:hidden" />
                           Type
                         </div>
                       </TableHead>
 
-                      <TableHead className="w-[100px] h-10">
-                        <div className="flex items-center gap-2">
-                          <User className="w-3.5 h-3.5 text-muted-foreground" />
+                      <TableHead className="w-[100px] h-10 print:h-auto print:py-1 print:text-xs">
+                        <div className="flex items-center justify-center gap-2">
+                          <User className="w-3.5 h-3.5 text-muted-foreground print:hidden" />
                           Teacher
                         </div>
                       </TableHead>
 
-                      <TableHead className="w-20 h-10">
-                        <div className="flex items-center gap-2">
-                          <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                      <TableHead className="w-20 h-10 print:h-auto print:py-1 print:text-xs">
+                        <div className="flex items-center justify-center gap-2">
+                          <Building2 className="w-3.5 h-3.5 text-muted-foreground print:hidden" />
                           Dept
                         </div>
                       </TableHead>
 
-                      <TableHead className="w-[100px] h-10">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+                      <TableHead className="w-[100px] h-10 print:h-auto print:py-1 print:text-xs">
+                        <div className="flex items-center justify-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-muted-foreground print:hidden" />
                           Sem
                         </div>
+                      </TableHead>
+
+                      <TableHead className="w-[50px] h-10 text-right print:hidden">
+                        Action
                       </TableHead>
                     </TableRow>
                   </TableHeader>
 
-                  <motion.tbody
-                    key={tableAnimationKey}
-                    variants={tableContainerVariants}
-                    initial="hidden"
-                    animate="visible"
-                    className="[&_tr:last-child]:border-0"
-                  >
+                  <TableBody className="[&_tr:last-child]:border-0">
                     {paginatedData.length > 0 ? (
                       paginatedData.map((course) => (
-                        <motion.tr
-                          layout
+                        <TableRow
                           key={course.id}
-                          variants={rowVariants}
-                          className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted group whitespace-nowrap print:whitespace-normal"
+                          className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted group whitespace-nowrap print:whitespace-normal print:border-black/70"
                         >
-                          <TableCell className="p-3 font-mono font-medium text-primary/90">
+                          <TableCell className="p-3 font-mono font-medium text-primary/90 print:p-1 print:text-xs">
                             {course.course_code}
                           </TableCell>
 
-                          <TableCell className="p-3 font-medium text-wrap max-w-[250px]">
+                          <TableCell className="p-3 font-medium text-wrap max-w-[350px] print:p-1 print:text-xs print:max-w-none">
                             {course.course_name}
                           </TableCell>
 
-                          <TableCell className="p-3 text-muted-foreground">
+                          <TableCell className="p-3 text-muted-foreground text-center print:p-1 print:text-xs print:text-black">
                             {course.room_number}
                           </TableCell>
 
-                          <TableCell className="p-3">
-                            <div className="flex items-center gap-1.5">
+                          <TableCell className="p-3 print:p-1 print:text-xs">
+                            <div className="flex items-center justify-center gap-1.5">
                               <div
                                 className={cn(
-                                  "w-1.5 h-1.5 rounded-full",
+                                  "w-1.5 h-1.5 rounded-full print:hidden",
                                   course.credits >= 3
                                     ? "bg-emerald-500"
                                     : "bg-amber-500"
@@ -832,11 +777,11 @@ export default function AutomatedRoutineCourses({
                             </div>
                           </TableCell>
 
-                          <TableCell className="p-3">
+                          <TableCell className="p-3 print:p-1 print:text-xs">
                             <Badge
                               variant="outline"
                               className={cn(
-                                "font-normal capitalize",
+                                "font-normal capitalize print:border-0 print:p-0 print:text-black",
                                 course.course_type === "Theory"
                                   ? "border-blue-500/30 text-blue-600 dark:text-blue-400 bg-blue-500/5"
                                   : course.course_type === "Lab"
@@ -848,27 +793,55 @@ export default function AutomatedRoutineCourses({
                             </Badge>
                           </TableCell>
 
-                          <TableCell className="p-3 font-medium text-muted-foreground">
+                          <TableCell className="p-3 font-medium text-muted-foreground text-center print:p-1 print:text-xs print:text-black">
                             {getInitials(course.teacher_name)}
                           </TableCell>
 
-                          <TableCell className="p-3 text-muted-foreground">
+                          <TableCell className="p-3 text-muted-foreground text-center print:p-1 print:text-xs print:text-black">
                             {getInitials(course.department_name)}
                           </TableCell>
 
-                          <TableCell className="p-3">
+                          <TableCell className="p-3 text-center print:p-1 print:text-xs">
                             <Badge
                               variant="secondary"
-                              className="font-normal bg-muted text-muted-foreground hover:bg-muted"
+                              className="font-normal bg-muted text-muted-foreground hover:bg-muted print:bg-transparent print:text-black print:p-0"
                             >
                               {course.semester_name}
                             </Badge>
                           </TableCell>
-                        </motion.tr>
+
+                          {/* ACTION CELL */}
+                          <TableCell className="p-3 text-right print:hidden">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuItem
+                                  onClick={() => openEditCourse(course)}
+                                  className="cursor-pointer"
+                                >
+                                  <Edit className="mr-2 h-4 w-4" /> Update
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => openDeleteCourse(course)}
+                                  className="cursor-pointer text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={10} className="h-64 text-center">
+                        <TableCell colSpan={11} className="h-64 text-center">
                           <div className="flex flex-col items-center justify-center text-muted-foreground h-full">
                             <div className="h-12 w-12 bg-muted/30 rounded-full flex items-center justify-center mb-4">
                               <FolderOpen className="h-6 w-6 opacity-50" />
@@ -890,7 +863,7 @@ export default function AutomatedRoutineCourses({
                         </TableCell>
                       </TableRow>
                     )}
-                  </motion.tbody>
+                  </TableBody>
                 </Table>
               </div>
             </CardContent>
@@ -898,13 +871,17 @@ export default function AutomatedRoutineCourses({
             {/* -- Pagination Footer -- */}
             {paginatedData.length > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-background/50 print:hidden">
-                <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-2 text-sm text-muted-foreground">
-                  <span>Rows:</span>
+                <div className="text-sm text-muted-foreground order-2 sm:order-1">
+                  Showing {paginatedData.length} of {filteredData.length}{" "}
+                  courses
+                </div>
+                <div className="flex items-center gap-2 order-1 sm:order-2">
+                  <span className="text-xs text-muted-foreground">Rows:</span>
                   <Select
                     value={pageSize.toString()}
                     onValueChange={(val) => {
                       setPageSize(Number(val));
-                      setCurrentPage(1);
+                      setPage(1);
                     }}
                   >
                     <SelectTrigger className="h-8 w-[70px]">
@@ -919,18 +896,13 @@ export default function AutomatedRoutineCourses({
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="text-sm font-medium order-3 sm:order-2">
-                  Page {currentPage} of {totalPages || 1}
-                </div>
-
-                <div className="flex items-center gap-1 order-2 sm:order-3">
+                <div className="flex items-center gap-1 order-3">
                   <Button
                     variant="outline"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
+                    onClick={() => setPage(1)}
+                    disabled={page === 1}
                   >
                     <ChevronsLeft className="h-4 w-4" />
                   </Button>
@@ -938,21 +910,22 @@ export default function AutomatedRoutineCourses({
                     variant="outline"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(prev - 1, 1))
-                    }
-                    disabled={currentPage === 1}
+                    onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={page === 1}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
+                  <span className="text-sm font-medium px-2">
+                    {page} / {totalPages}
+                  </span>
                   <Button
                     variant="outline"
                     size="icon"
                     className="h-8 w-8"
                     onClick={() =>
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                      setPage((prev) => Math.min(prev + 1, totalPages))
                     }
-                    disabled={currentPage === totalPages || totalPages === 0}
+                    disabled={page === totalPages || totalPages === 0}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -960,8 +933,8 @@ export default function AutomatedRoutineCourses({
                     variant="outline"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages || totalPages === 0}
+                    onClick={() => setPage(totalPages)}
+                    disabled={page === totalPages || totalPages === 0}
                   >
                     <ChevronsRight className="h-4 w-4" />
                   </Button>
@@ -970,17 +943,246 @@ export default function AutomatedRoutineCourses({
             )}
           </Card>
         </motion.div>
-
-        <motion.div variants={pageItemVariants}>
-          <Button
-            variant="outline"
-            onClick={() => window.print()}
-            className="w-full lg:hidden print:hidden gap-2 mt-4"
-          >
-            <Printer className="h-4 w-4" /> Print List
-          </Button>
-        </motion.div>
       </motion.div>
+
+      {/* --- ADD/EDIT MODAL --- */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="sm:max-w-[700px] w-full max-h-[85vh] overflow-y-auto overflow-x-hidden scrollbar-thin">
+          <DialogHeader>
+            <DialogTitle>
+              {editingCourse ? "Edit Course" : "Add New Course"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingCourse
+                ? "Modify the details of the existing course."
+                : "Fill in the details to create a new course curriculum."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+            {/* Course Code */}
+            <div className="space-y-2">
+              <Label>
+                Course Code <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                {...form.register("course_code")}
+                placeholder="e.g. CSE 3601"
+              />
+              {errors.course_code && (
+                <p className="text-xs text-red-500">
+                  {errors.course_code.message}
+                </p>
+              )}
+            </div>
+
+            {/* Course Name */}
+            <div className="space-y-2">
+              <Label>
+                Course Name <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                {...form.register("course_name")}
+                placeholder="e.g. Operating System"
+              />
+              {errors.course_name && (
+                <p className="text-xs text-red-500">
+                  {errors.course_name.message}
+                </p>
+              )}
+            </div>
+
+            {/* Room Number */}
+            <div className="space-y-2">
+              <Label>
+                Room Number <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                {...form.register("room_number")}
+                placeholder="e.g. B319"
+              />
+              {errors.room_number && (
+                <p className="text-xs text-red-500">
+                  {errors.room_number.message}
+                </p>
+              )}
+            </div>
+
+            {/* Credits */}
+            <div className="space-y-2">
+              <Label>
+                Credits <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                {...form.register("credits")}
+                type="number"
+                step="0.25"
+                placeholder="e.g. 3.0"
+              />
+              {errors.credits && (
+                <p className="text-xs text-red-500">{errors.credits.message}</p>
+              )}
+            </div>
+
+            {/* Department - Populated via API */}
+            <div className="space-y-2">
+              <Label>
+                Department <span className="text-red-500">*</span>
+              </Label>
+              <Controller
+                control={control}
+                name="department"
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select Dept" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={String(d.id)}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.department && (
+                <p className="text-xs text-red-500">
+                  {errors.department.message}
+                </p>
+              )}
+            </div>
+
+            {/* Semester - Populated via API */}
+            <div className="space-y-2">
+              <Label>
+                Semester <span className="text-red-500">*</span>
+              </Label>
+              <Controller
+                control={control}
+                name="semester"
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select Sem" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {semesters.map((s) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.semester && (
+                <p className="text-xs text-red-500">
+                  {errors.semester.message}
+                </p>
+              )}
+            </div>
+
+            {/* Teacher - Populated via API */}
+            <div className="space-y-2">
+              <Label>
+                Teacher <span className="text-red-500">*</span>
+              </Label>
+              <Controller
+                control={control}
+                name="teacher"
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select Teacher" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teachers.map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.teacher && (
+                <p className="text-xs text-red-500">{errors.teacher.message}</p>
+              )}
+            </div>
+
+            {/* Course Type */}
+            <div className="space-y-2">
+              <Label>
+                Course Type <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                {...form.register("course_type")}
+                placeholder="e.g. Theory"
+              />
+              {errors.course_type && (
+                <p className="text-xs text-red-500">
+                  {errors.course_type.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsEditModalOpen(false)}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmit(onSubmit)}
+              disabled={isSaving}
+              className="min-w-[100px]"
+            >
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {editingCourse ? "Update Course" : "Create Course"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- DELETE CONFIRMATION MODAL --- */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-red-500 mb-2">
+              <ShieldBan className="h-6 w-6" />
+              <DialogTitle>Confirm Deletion</DialogTitle>
+            </div>
+            <DialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-bold text-foreground">
+                {deletingCourse?.course_code} - {deletingCourse?.course_name}
+              </span>
+              ?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{" "}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
