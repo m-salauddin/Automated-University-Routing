@@ -515,13 +515,14 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
     return () => clearTimeout(timer);
   }, [inputValue]);
 
+  // --- BUG FIX HERE: Added selectedDept and selectedSemester to dependency array ---
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
     setGenerationVersion((prev) => prev + 1);
-  }, [routineList, timeSlots]);
+  }, [routineList, timeSlots, selectedDept, selectedSemester]);
 
   const departments = useMemo(() => {
     const depts = Array.from(
