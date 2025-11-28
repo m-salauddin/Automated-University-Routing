@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronsUpDown, LogOut, User } from "lucide-react";
+import { ChevronsUpDown, LogOut, User, Sparkles } from "lucide-react"; // 1. Added Sparkles icon
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -43,7 +43,6 @@ export function NavUser() {
 
   const [isMounted, setIsMounted] = useState(false);
 
-  // FIX: Use setTimeout to satisfy the "synchronous setState" linter rule.
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsMounted(true);
@@ -55,6 +54,9 @@ export function NavUser() {
   const displayName = username || "Guest User";
   const secondary = role ? String(role) : "";
   const initials = getInitials(displayName);
+
+  // Helper to check if user is admin (case-insensitive)
+  const isAdmin = String(role).toLowerCase() === "admin";
 
   const handleLogout = async () => {
     try {
@@ -80,7 +82,6 @@ export function NavUser() {
     }
   };
 
-  // LOADING STATE: Prevents "Guest User" flash and Hydration Mismatch
   if (!isMounted) {
     return (
       <SidebarMenu className="border-t pt-2">
@@ -104,7 +105,6 @@ export function NavUser() {
     );
   }
 
-  // AUTHENTICATED STATE
   return (
     <SidebarMenu className="border-t pt-2">
       <SidebarMenuItem>
@@ -174,12 +174,27 @@ export function NavUser() {
                 Profile
               </DropdownMenuItem>
             </Link>
+
+            {isAdmin && (
+              <>
+                <a target="1" href="https://routineproject-s6dh.onrender.com/admin/">
+                  <DropdownMenuItem
+                    className="cursor-pointer animate-in fade-in slide-in-from-left-8 duration-500 fill-mode-backwards"
+                    style={{ animationDelay: "100ms" }}
+                  >
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Advanced
+                  </DropdownMenuItem>
+                </a>
+              </>
+            )}
+
             <DropdownMenuSeparator />
 
             <DropdownMenuItem
               onClick={handleLogout}
               className="cursor-pointer animate-in hover:text-red-400! text-red-400 fade-in slide-in-from-left-8 duration-500 fill-mode-backwards"
-              style={{ animationDelay: "150ms" }}
+              style={{ animationDelay: "200ms" }}
             >
               <LogOut className="mr-2 h-4 w-4 text-red-400" />
               Log out
