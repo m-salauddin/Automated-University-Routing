@@ -164,7 +164,6 @@ export default function AutomatedRoutineCourses({
   // --- LOCAL STATE ---
   const [coursesList, setCoursesList] = useState<Course[]>(courses);
 
-  // Sync prop changes
   useEffect(() => {
     setCoursesList(courses);
   }, [courses]);

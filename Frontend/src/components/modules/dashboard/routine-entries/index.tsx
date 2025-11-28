@@ -24,14 +24,12 @@ import {
   Printer,
   User,
   MapPin,
-  GraduationCap,
   Utensils,
   CalendarX,
   Loader2,
   ShieldBan,
   Info,
   ChevronLeft,
-  Building2,
   Sparkles,
   BookOpen,
   Lock,
@@ -907,7 +905,6 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
             >
               {/* Department Select */}
               <div className="flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all flex-1 min-w-[150px]">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
                 <Select value={selectedDept} onValueChange={setSelectedDept}>
                   <SelectTrigger className="h-10 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
                     <SelectValue placeholder="Select Department" />
@@ -924,7 +921,6 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
 
               {/* Semester Select */}
               <div className="flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all flex-1 min-w-[150px]">
-                <GraduationCap className="h-4 w-4 text-muted-foreground" />
                 <Select
                   value={selectedSemester}
                   onValueChange={setSelectedSemester}
@@ -956,7 +952,7 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
                     Total Credits
                   </span>
                   <span className="text-sm font-bold text-foreground">
-                    {currentRoutineSchedule.totalCredits.toFixed(1)}
+                    {currentRoutineSchedule.totalCredits}
                   </span>
                 </div>
               </div>

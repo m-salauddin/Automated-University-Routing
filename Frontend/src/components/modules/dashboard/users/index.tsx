@@ -76,7 +76,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import DataLoader from "@/components/ui/data-loader";
 import { createUser, updateUser, deleteUser } from "@/services/users";
 
 // --- TYPES ---
@@ -111,7 +110,6 @@ interface UsersPageClientProps {
   semesters: Semester[];
 }
 
-// --- ANIMATION VARIANTS ---
 const pageVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
@@ -190,29 +188,33 @@ const toPascalCase = (str: string) => {
 };
 
 const getRoleBadge = (role: string) => {
+  // Added print styles to badges to remove background color and use black borders for ink saving
   switch (role) {
     case "ADMIN":
       return (
-        <Badge variant="destructive" className="gap-1 shadow-sm">
-          <ShieldBan className="h-3 w-3" /> Admin
+        <Badge
+          variant="destructive"
+          className="gap-1 shadow-sm print:bg-transparent print:text-black print:border-black print:border"
+        >
+          <ShieldBan className="h-3 w-3 print:hidden" /> Admin
         </Badge>
       );
     case "TEACHER":
       return (
         <Badge
           variant="secondary"
-          className="bg-blue-100 text-blue-700 hover:bg-blue-100/80 dark:bg-blue-900/30 dark:text-blue-300 gap-1 shadow-sm border-blue-200 dark:border-blue-800"
+          className="bg-blue-100 text-blue-700 hover:bg-blue-100/80 dark:bg-blue-900/30 dark:text-blue-300 gap-1 shadow-sm border-blue-200 dark:border-blue-800 print:bg-transparent print:text-black print:border-black print:border"
         >
-          <BookOpen className="h-3 w-3" /> Teacher
+          <BookOpen className="h-3 w-3 print:hidden" /> Teacher
         </Badge>
       );
     case "STUDENT":
       return (
         <Badge
           variant="secondary"
-          className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100/80 dark:bg-emerald-900/30 dark:text-emerald-300 gap-1 shadow-sm border-emerald-200 dark:border-emerald-800"
+          className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100/80 dark:bg-emerald-900/30 dark:text-emerald-300 gap-1 shadow-sm border-emerald-200 dark:border-emerald-800 print:bg-transparent print:text-black print:border-black print:border"
         >
-          <GraduationCap className="h-3 w-3" /> Student
+          <GraduationCap className="h-3 w-3 print:hidden" /> Student
         </Badge>
       );
     default:
@@ -231,6 +233,16 @@ export default function UsersPageClient({
   // --- STATE ---
   const [usersList, setUsersList] = useState<User[]>(initialUsers);
 
+  // FIX: Add state for date to prevent hydration mismatch
+  const [currentDate, setCurrentDate] = useState("");
+
+  // FIX: Separated the effects.
+  // 1. One for setting the client-side date (Fixes hydration error)
+  useEffect(() => {
+    setCurrentDate(new Date().toLocaleString());
+  }, []);
+
+  // 2. One for syncing users if the parent prop changes (Fixes "syncing state" error by isolating it)
   useEffect(() => {
     setUsersList(initialUsers);
   }, [initialUsers]);
@@ -305,7 +317,6 @@ export default function UsersPageClient({
     }
   }, [watchedPassword, editingUser, setValue]);
 
-
   // --- DYNAMIC FILTERS ---
   const uniqueDepartmentNames = useMemo(() => {
     const names = new Set<string>();
@@ -327,19 +338,11 @@ export default function UsersPageClient({
     return Array.from(names).sort();
   }, [usersList]);
 
-  // Reset Dept Filter when Role changes
-  useEffect(() => {
-    setDeptFilter("All");
-  }, [roleFilter]);
 
   // --- FILTER LOGIC ---
   const isFiltered = useMemo(() => {
     return searchQuery !== "" || deptFilter !== "All" || semFilter !== "All";
   }, [searchQuery, deptFilter, semFilter]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [searchQuery, roleFilter, deptFilter, semFilter]);
 
   const filteredUsers = useMemo(() => {
     return usersList.filter((user) => {
@@ -376,6 +379,8 @@ export default function UsersPageClient({
     const start = (page - 1) * pageSize;
     return filteredUsers.slice(start, start + pageSize);
   }, [filteredUsers, page, pageSize]);
+
+  const displayUsers = pagedUsers;
 
   // --- MODAL HANDLERS ---
   const openAddUser = () => {
@@ -465,7 +470,7 @@ export default function UsersPageClient({
 
     try {
       if (editingUser) {
-        // --- UPDATE (department, semester) ---
+        // --- UPDATE ---
         const payload: any = {
           ...basePayload,
           department: data.department_id ? Number(data.department_id) : null,
@@ -510,7 +515,7 @@ export default function UsersPageClient({
           setIsSaving(false);
         }
       } else {
-        // --- CREATE (department_id, semester_id) ---
+        // --- CREATE ---
         const payload: any = {
           ...basePayload,
           password: data.password,
@@ -580,42 +585,51 @@ export default function UsersPageClient({
       <div className="grid grid-cols-1 print:block">
         <div className="w-full overflow-x-auto print:overflow-visible">
           <div className="min-w-[1000px] print:min-w-0 print:w-full">
-            <Table>
-              <TableHeader className="bg-muted/40">
-                <TableRow>
-                  <TableHead>
+            {/* COMPACT PRINT: text-xs */}
+            <Table className="print:text-xs">
+              <TableHeader className="bg-muted/40 print:bg-transparent">
+                <TableRow className="print:border-b-2 print:border-black">
+                  <TableHead className="print:text-black print:font-bold">
                     <div className="flex items-center gap-2">
-                      <UserIcon className="size-3.5 text-muted-foreground" />{" "}
+                      {/* ICON HIDDEN IN PRINT */}
+                      <UserIcon className="size-3.5 text-muted-foreground print:hidden" />{" "}
                       User Profile
                     </div>
                   </TableHead>
-                  <TableHead>
+                  <TableHead className="print:text-black print:font-bold">
                     <div className="flex items-center gap-2">
-                      <Mail className="size-3.5 text-muted-foreground" /> Email
+                      {/* ICON HIDDEN IN PRINT */}
+                      <Mail className="size-3.5 text-muted-foreground print:hidden" />{" "}
+                      Email
                     </div>
                   </TableHead>
                   {roleFilter !== "ADMIN" && (
-                    <TableHead>
+                    <TableHead className="print:text-black print:font-bold">
                       <div className="flex items-center gap-2">
-                        <Building2 className="size-3.5 text-muted-foreground" />{" "}
+                        {/* ICON HIDDEN IN PRINT */}
+                        <Building2 className="size-3.5 text-muted-foreground print:hidden" />{" "}
                         Department
                       </div>
                     </TableHead>
                   )}
                   {roleFilter === "STUDENT" && (
-                    <TableHead>
+                    <TableHead className="print:text-black print:font-bold">
                       <div className="flex items-center gap-2">
-                        <GraduationCap className="size-3.5 text-muted-foreground" />{" "}
+                        {/* ICON HIDDEN IN PRINT */}
+                        <GraduationCap className="size-3.5 text-muted-foreground print:hidden" />{" "}
                         Semester
                       </div>
                     </TableHead>
                   )}
-                  <TableHead>
+                  <TableHead className="print:text-black print:font-bold">
                     <div className="flex items-center gap-2">
-                      <Shield className="size-3.5 text-muted-foreground" /> Role
+                      {/* ICON HIDDEN IN PRINT */}
+                      <Shield className="size-3.5 text-muted-foreground print:hidden" />{" "}
+                      Role
                     </div>
                   </TableHead>
-                  <TableHead className="text-right">
+                  {/* ACTIONS HIDDEN IN PRINT */}
+                  <TableHead className="text-right print:hidden">
                     <div className="flex items-center justify-end gap-2">
                       <UserCog className="size-3.5 text-muted-foreground" />{" "}
                       Actions
@@ -624,7 +638,7 @@ export default function UsersPageClient({
                 </TableRow>
               </TableHeader>
               <TableBody className="[&_tr:last-child]:border-0">
-                {pagedUsers.length === 0 ? (
+                {displayUsers.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={6}
@@ -637,39 +651,43 @@ export default function UsersPageClient({
                     </TableCell>
                   </TableRow>
                 ) : (
-                  pagedUsers.map((user, index) => (
+                  displayUsers.map((user, index) => (
                     <TableRow
                       key={user.id ? `${user.id}-${index}` : `user-${index}`}
-                      className="group border-b last:border-0"
+                      className="group border-b last:border-0 print:break-inside-avoid print:border-black/30"
                     >
-                      <TableCell>
+                      {/* COMPACT CELL PADDING: print:py-1 */}
+                      <TableCell className="print:py-1">
                         <div className="flex flex-col">
-                          <span className="font-semibold text-foreground">
+                          <span className="font-semibold text-foreground print:text-black">
                             {!user.name || user.name === "N/A"
                               ? formatNameFromUsername(user.username)
                               : user.name}
                           </span>
-                          <span className="text-xs text-muted-foreground font-mono">
+                          <span className="text-xs text-muted-foreground font-mono print:text-black/70">
                             @{user.username}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <TableCell className="print:py-1">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground print:text-black">
                           {user.email || "N/A"}
                         </div>
                       </TableCell>
                       {roleFilter !== "ADMIN" && (
-                        <TableCell>
+                        <TableCell className="print:py-1 print:text-black">
                           {user.department_name || (
                             <span className="text-muted-foreground/50">-</span>
                           )}
                         </TableCell>
                       )}
                       {roleFilter === "STUDENT" && (
-                        <TableCell>
+                        <TableCell className="print:py-1 print:text-black">
                           {user.semester_name ? (
-                            <Badge variant="outline">
+                            <Badge
+                              variant="outline"
+                              className="print:border-black print:text-black"
+                            >
                               {user.semester_name}
                             </Badge>
                           ) : (
@@ -677,8 +695,10 @@ export default function UsersPageClient({
                           )}
                         </TableCell>
                       )}
-                      <TableCell>{getRoleBadge(user.role)}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="print:py-1">
+                        {getRoleBadge(user.role)}
+                      </TableCell>
+                      <TableCell className="text-right print:hidden">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -713,10 +733,8 @@ export default function UsersPageClient({
         </div>
       </div>
     ),
-    [pagedUsers, roleFilter, openEditUser, openDeleteUser]
+    [displayUsers, roleFilter, openEditUser, openDeleteUser]
   );
-
-
 
   return (
     <>
@@ -724,31 +742,48 @@ export default function UsersPageClient({
         variants={pageVariants}
         initial="hidden"
         animate="visible"
-        className="w-full font-lexend max-w-full mx-auto p-5 space-y-4 overflow-x-hidden print:overflow-visible"
+        className="w-full font-lexend max-w-full mx-auto p-5 space-y-4 overflow-x-hidden print:overflow-visible print:p-0"
       >
+        {/* --- PRINT ONLY HEADER --- */}
+        <div className="hidden print:block mb-6 border-b-2 border-black pb-2">
+          <div className="flex justify-between items-end">
+            <div>
+              <h1 className="text-2xl font-bold uppercase tracking-wider text-black">
+                University Admin Panel
+              </h1>
+              <h2 className="text-lg font-medium text-black/80">
+                User Management Report
+              </h2>
+            </div>
+            <div className="text-right text-xs font-mono text-black">
+              {/* Use state currentDate here instead of direct new Date() to fix hydration error */}
+              <p>Generated: {currentDate}</p>
+              <p>
+                Role: <span className="uppercase font-bold">{roleFilter}</span>{" "}
+                | Count: {filteredUsers.length}
+              </p>
+              {deptFilter !== "All" && <p>Dept: {deptFilter}</p>}
+            </div>
+          </div>
+        </div>
+
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 print:hidden mb-6">
-          <div className="space-y-2">
-            <motion.div variants={pageItemVariants}>
+          {/* GROUPED HEADER ANIMATION TO REDUCE JANK */}
+          <motion.div variants={pageItemVariants} className="space-y-2">
+            <div>
               <Badge
                 variant="outline"
                 className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
               >
                 Admin Panel
               </Badge>
-            </motion.div>
-            <motion.h1
-              variants={pageItemVariants}
-              className="text-3xl font-bold"
-            >
-              User Management
-            </motion.h1>
-            <motion.p
-              variants={pageItemVariants}
-              className="text-muted-foreground"
-            >
+            </div>
+            <h1 className="text-3xl font-bold">User Management</h1>
+            <p className="text-muted-foreground">
               Manage access, roles, and profiles for the university.
-            </motion.p>
-          </div>
+            </p>
+          </motion.div>
+
           <motion.div variants={pageItemVariants} className="flex gap-3">
             <Badge
               variant="secondary"
@@ -757,7 +792,7 @@ export default function UsersPageClient({
               <Users className="h-4 w-4 text-muted-foreground" />
               <span>{filteredUsers.length} Users</span>
             </Badge>
-            <Button onClick={openAddUser} className="gap-2 bg-primary h-10">
+            <Button onClick={openAddUser} className="gap-2 bg-primary">
               <Plus className="h-4 w-4" /> Add User
             </Button>
             <Button
@@ -770,8 +805,13 @@ export default function UsersPageClient({
           </motion.div>
         </div>
 
-        <motion.div variants={pageItemVariants} className="w-full min-w-0">
-          <Card className="w-full overflow-hidden border shadow-sm">
+        {/* Added will-change-transform for GPU acceleration */}
+        <motion.div
+          variants={pageItemVariants}
+          className="w-full min-w-0"
+          style={{ willChange: "transform, opacity" }}
+        >
+          <Card className="w-full overflow-hidden border shadow-sm print:border-none print:shadow-none">
             <CardHeader className="p-4 bg-muted/30 border-b print:hidden">
               <div className="flex flex-wrap items-end gap-4">
                 <div className="flex-1 min-w-[200px] space-y-2">
@@ -784,7 +824,11 @@ export default function UsersPageClient({
                       placeholder="Search users..."
                       className="pl-9 bg-background h-10"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        // FIX: Reset page on search change immediately
+                        setPage(1);
+                      }}
                     />
                   </div>
                 </div>
@@ -792,7 +836,15 @@ export default function UsersPageClient({
                   <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                     Role
                   </span>
-                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <Select
+                    value={roleFilter}
+                    onValueChange={(val) => {
+                      setRoleFilter(val);
+                      // FIX: Reset filters and page immediately on role change
+                      setDeptFilter("All");
+                      setPage(1);
+                    }}
+                  >
                     <SelectTrigger className="w-full bg-background h-10">
                       <SelectValue />
                     </SelectTrigger>
@@ -808,7 +860,14 @@ export default function UsersPageClient({
                     <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                       Department
                     </span>
-                    <Select value={deptFilter} onValueChange={setDeptFilter}>
+                    <Select
+                      value={deptFilter}
+                      onValueChange={(val) => {
+                        setDeptFilter(val);
+                        // FIX: Reset page on dept change immediately
+                        setPage(1);
+                      }}
+                    >
                       <SelectTrigger className="w-full bg-background h-10">
                         <SelectValue />
                       </SelectTrigger>
@@ -828,7 +887,14 @@ export default function UsersPageClient({
                     <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                       Semester
                     </span>
-                    <Select value={semFilter} onValueChange={setSemFilter}>
+                    <Select
+                      value={semFilter}
+                      onValueChange={(val) => {
+                        setSemFilter(val);
+                        // FIX: Reset page on sem change immediately
+                        setPage(1);
+                      }}
+                    >
                       <SelectTrigger className="w-full bg-background h-10">
                         <SelectValue />
                       </SelectTrigger>
@@ -942,7 +1008,7 @@ export default function UsersPageClient({
 
       {/* --- ADD/EDIT USER MODAL --- */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="sm:max-w-[700px] w-full max-h-[85vh] overflow-y-auto overflow-x-hidden scrollbar-thin">
+        <DialogContent className="sm:max-w-[700px] w-full max-h-[85vh] overflow-y-auto overflow-x-hidden scrollbar-thin print:hidden">
           <div className="flex flex-col gap-4">
             <DialogHeader>
               <DialogTitle>
@@ -1233,7 +1299,7 @@ export default function UsersPageClient({
 
       {/* --- DELETE CONFIRMATION MODAL --- */}
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md print:hidden">
           <div className="flex flex-col gap-4">
             <DialogHeader>
               <div className="flex items-center gap-2 text-red-500 mb-2">
