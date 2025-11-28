@@ -3,13 +3,6 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Table, TableCell, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -52,7 +45,6 @@ export type APIRoutineItem = {
   room_number: string;
 };
 
-// UPDATED: Added fields required for unique key generation
 type ClassSession = {
   course: string;
   teacher: string;
@@ -114,7 +106,6 @@ const getTeacherInitials = (name: string) => {
     .join("");
 };
 
-// UPDATED: Helper to match abbreviated day format
 const abbreviateDay = (day: string) => {
   return day ? day.substring(0, 3) : "";
 };
@@ -136,7 +127,6 @@ const itemVariants = {
   },
 };
 
-// --- NEW ANIMATION VARIANTS FOR DIALOG ---
 const dialogContainerVariants = {
   hidden: { opacity: 0, scale: 0.95 },
   visible: {
@@ -174,7 +164,9 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
   );
 
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedSemester, setSelectedSemester] = useState<string>("");
+  // Note: selectedSemester state is technically unused for filtering now
+  // since we force a single view, but kept for logic consistency if needed.
+  const [selectedSemester] = useState<string>("");
   const [inputValue, setInputValue] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const auth = useSelector((s: RootState) => s.auth) as any;
@@ -202,7 +194,9 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
 
   const formattedRoutineData = useMemo(() => {
     const grouped: Record<string, RoutineData> = {};
+    const semesterUniqueCourses: Record<string, Set<string>> = {};
 
+    // 1. Initialize Groups
     routineList.forEach((item) => {
       if (!grouped[item.semester_name]) {
         grouped[item.semester_name] = {
@@ -214,12 +208,17 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
             slots: Array(9).fill(null),
           })),
         };
+        semesterUniqueCourses[item.semester_name] = new Set();
       }
     });
 
+    // 2. Populate Slots
     routineList.forEach((item) => {
       const semesterGroup = grouped[item.semester_name];
       if (!semesterGroup) return;
+
+      semesterUniqueCourses[item.semester_name].add(item.course_code);
+
       const dayRow = semesterGroup.schedule.find((d) => d.day === item.day);
       if (!dayRow) return;
 
@@ -227,7 +226,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
       const slotIndex = TIME_TO_SLOT_INDEX[normalizedApiTime];
 
       if (slotIndex !== undefined && slotIndex >= 0 && slotIndex < 9) {
-        // UPDATED: Populate new fields
         dayRow.slots[slotIndex] = {
           course: item.course_code,
           teacher: item.teacher_name,
@@ -241,6 +239,12 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
       }
     });
 
+    // 3. Calculate Credits
+    Object.keys(grouped).forEach((semesterName) => {
+      const uniqueCount = semesterUniqueCourses[semesterName].size;
+      grouped[semesterName].credits = uniqueCount * 3.0;
+    });
+
     return grouped;
   }, [routineList]);
 
@@ -251,6 +255,8 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
     }));
   }, [formattedRoutineData]);
 
+  // Determine which semester to show.
+  // It prefers the student's assigned semester, otherwise defaults to the first available one.
   const activeSemesterId = useMemo(() => {
     if (selectedSemester && formattedRoutineData[selectedSemester])
       return selectedSemester;
@@ -280,17 +286,39 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
     return () => clearTimeout(timer);
   }, [inputValue]);
 
+  // --- SEARCH LOGIC ---
+  const validTeacherShortNames = useMemo(() => {
+    const uniqueShortNames = new Set<string>();
+    routineList.forEach((item) => {
+      const short = getTeacherInitials(item.teacher_name).toLowerCase();
+      if (short) uniqueShortNames.add(short);
+    });
+    return uniqueShortNames;
+  }, [routineList]);
+
   const isMatch = useMemo(() => {
     return (session: ClassSession | null) => {
       if (!session || !debouncedSearch) return false;
-      const query = debouncedSearch.toLowerCase();
+
+      const query = debouncedSearch.toLowerCase().trim();
+      const sessionTeacherShortName = getTeacherInitials(
+        session.teacher
+      ).toLowerCase();
+
+      const isSearchingForTeacherShortName = validTeacherShortNames.has(query);
+
+      if (isSearchingForTeacherShortName) {
+        return sessionTeacherShortName === query;
+      }
+
       return (
         session.course.toLowerCase().includes(query) ||
         session.teacher.toLowerCase().includes(query) ||
-        session.room.toLowerCase().includes(query)
+        session.room.toLowerCase().includes(query) ||
+        sessionTeacherShortName === query
       );
     };
-  }, [debouncedSearch]);
+  }, [debouncedSearch, validTeacherShortNames]);
 
   if (isLoading)
     return (
@@ -473,24 +501,14 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
               variants={itemVariants}
               className="lg:col-span-8 flex justify-between flex-col sm:flex-row gap-3 bg-card border rounded-xl p-1.5 shadow-sm"
             >
-              <div className=" flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all">
+              {/* --- STATIC SEMESTER LABEL (Replaces Dropdown) --- */}
+              <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 rounded-lg border border-transparent transition-all">
                 <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                <Select
-                  value={activeSemesterId}
-                  onValueChange={setSelectedSemester}
-                >
-                  <SelectTrigger className="h-10 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium">
-                    <SelectValue placeholder="Select Semester" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {semesterOptions.map((sem) => (
-                      <SelectItem key={sem.id} value={sem.id}>
-                        {sem.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <span className="text-sm font-medium text-foreground">
+                  {currentRoutine.label}
+                </span>
               </div>
+
               <div className="flex font-lexend items-center justify-between px-4 py-2 bg-muted/30 rounded-lg min-w-[140px]">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Total Credits
@@ -507,7 +525,7 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
               <div className="flex items-center gap-3 px-3 h-full bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all">
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Find course, teacher, room..."
+                  placeholder="Search course, teacher (e.g., SI)..."
                   className="border-none font-lexend shadow-none bg-transparent! focus-visible:ring-0 h-10 px-0 text-sm"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
@@ -533,15 +551,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                 As a student, you are only authorized to view the routine for
                 your assigned semester (<strong>{studentSemester}</strong>).
               </p>
-              <div className="mt-6 flex gap-3">
-                <Button
-                  variant="outline"
-                  className="border-amber-200 hover:bg-amber-100 text-amber-800"
-                  onClick={() => setSelectedSemester(studentSemester)}
-                >
-                  View My Routine
-                </Button>
-              </div>
             </motion.div>
           ) : (
             <>
@@ -653,10 +662,8 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                 ? session.teacherId ?? session.teacher
                                 : undefined;
 
-                              // UPDATED: Using full context for key generation
-                              const startTimeRaw =
-                                session?.originalTime || "";
-                              
+                              const startTimeRaw = session?.originalTime || "";
+
                               const key =
                                 session && teacherKey
                                   ? generateClassKey(
@@ -677,13 +684,11 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                 classOffData?.status
                               );
                               const cancellationReason =
-                                classOffData?.reason ||
-                                "No reason provided.";
+                                classOffData?.reason || "No reason provided.";
 
                               const isTeacherOff =
                                 (!!teacherKey &&
-                                  availabilityMap[teacherKey] ===
-                                    false) ||
+                                  availabilityMap[teacherKey] === false) ||
                                 isClassOffToday;
 
                               const highlighted = isMatch(session);
@@ -728,7 +733,7 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                       ? "cursor-pointer"
                                       : "cursor-default",
                                     highlighted
-                                      ? "bg-foreground/5 print:bg-transparent"
+                                      ? "bg-emerald-100/50 dark:bg-emerald-900/20 print:bg-transparent"
                                       : "bg-transparent print:bg-white"
                                   )}
                                 >
@@ -741,7 +746,7 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                           isTeacherOff
                                             ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
                                             : highlighted
-                                            ? "bg-background border-foreground shadow-md ring-1 ring-foreground/10"
+                                            ? "bg-background border-emerald-500 shadow-md"
                                             : "bg-card border-border/50 hover:border-foreground/20 hover:shadow-md"
                                         )}
                                       >
@@ -768,9 +773,7 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                       <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
                                         <span className="font-bold text-[11px]">
                                           {session.course}, T-
-                                          {getTeacherInitials(
-                                            session.teacher
-                                          )}
+                                          {getTeacherInitials(session.teacher)}
                                         </span>
                                         <span className="font-bold text-[11px]">
                                           {session.room}
