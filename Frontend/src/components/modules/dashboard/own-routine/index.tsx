@@ -446,7 +446,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
           type: isLab ? "Lab" : "Theory",
           room: item.room_number,
           semester: item.semester_name,
-          department: item.department_name, // UPDATED: Mapping department
+          department: item.department_name,
           teacherId: item.teacher_name,
         };
       });
@@ -473,7 +473,6 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
 
   const processedRows = useMemo(() => {
     return rows.filter((r) => {
-      // UPDATED: Using new key generation logic with dept, sem, day
       const key = generateClassKey(
         r.department,
         r.semester,
@@ -749,7 +748,6 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       zIndex: isDragging ? 50 : "auto",
     };
 
-    // UPDATED: Using new identifiers for key generation in row component
     const key = generateClassKey(
       row.department,
       row.semester,
@@ -764,7 +762,6 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
 
     const handleStatusChange = () => {
       if (currentStatus === "on") {
-        // UPDATED: Set detailed info for pending cancellation
         setPendingCancellation({
           id: row.id,
           teacherId: row.teacherId,
@@ -776,7 +773,6 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
         });
         setIsReasonModalOpen(true);
       } else {
-        // UPDATED: Dispatch includes new identifiers
         dispatch(
           markOn({
             department: row.department,

@@ -809,7 +809,7 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
       >
         <div className="space-y-8 print:space-y-0 print:w-full">
           {/* Header Controls */}
-          <div className="flex flex-col lg:flex-row justify-between items-start md:items-end gap-6 print:hidden">
+          <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-6 print:hidden">
             <div className="space-y-2">
               <motion.div variants={itemVariants}>
                 <Badge

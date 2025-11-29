@@ -256,7 +256,6 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
   }, [formattedRoutineData]);
 
   // Determine which semester to show.
-  // It prefers the student's assigned semester, otherwise defaults to the first available one.
   const activeSemesterId = useMemo(() => {
     if (selectedSemester && formattedRoutineData[selectedSemester])
       return selectedSemester;
