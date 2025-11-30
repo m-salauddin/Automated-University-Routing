@@ -128,3 +128,34 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Print adjustments to ensure readable output in dark mode */
+@media print {
+  :root,
+  .dark {
+    /* Force light theme colors for print */
+    --background: #ffffff;
+    --foreground: #000000;
+    --card: #ffffff;
+    --card-foreground: #000000;
+    --popover: #ffffff;
+    --popover-foreground: #000000;
+    --muted: #f3f4f6;
+    --muted-foreground: #1f2937;
+    --border: #e5e7eb;
+  }
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Remove sticky positioning and shadows when printing */
+  .no-print-sticky {
+    position: static !important;
+    top: auto !important;
+  }
+  .no-print-shadow {
+    box-shadow: none !important;
+  }
+}
