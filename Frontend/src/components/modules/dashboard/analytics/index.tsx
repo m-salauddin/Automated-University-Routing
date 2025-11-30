@@ -632,7 +632,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
             variant="outline"
             className="text-muted-foreground border-muted-foreground/30 uppercase tracking-widest font-medium rounded-sm"
           >
-            Admin Panel
+            {auth?.role?.toUpperCase()} Panel
           </Badge>
         </motion.div>
         <motion.header

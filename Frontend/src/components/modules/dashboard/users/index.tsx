@@ -77,6 +77,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createUser, updateUser, deleteUser } from "@/services/users";
+import { cn } from "@/lib/utils";
 
 // --- TYPES ---
 export type Department = {
@@ -738,34 +739,27 @@ export default function UsersPageClient({
 
   return (
     <>
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: landscape;
+            margin: 10mm;
+          }
+          body {
+            background-color: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}</style>
+
       <motion.div
         variants={pageVariants}
         initial="hidden"
         animate="visible"
-        className="w-full font-lexend max-w-full mx-auto p-5 space-y-4 overflow-x-hidden print:overflow-visible print:p-0"
+        className="w-full font-lexend max-w-full mx-auto p-5 space-y-4 overflow-x-hidden print:hidden"
       >
-        {/* --- PRINT ONLY HEADER --- */}
-        <div className="hidden print:block mb-6 border-b-2 border-black pb-2">
-          <div className="flex justify-between items-end">
-            <div>
-              <h1 className="text-2xl font-bold uppercase tracking-wider text-black">
-                University Admin Panel
-              </h1>
-              <h2 className="text-lg font-medium text-black/80">
-                User Management Report
-              </h2>
-            </div>
-            <div className="text-right text-xs font-mono text-black">
-              {/* Use state currentDate here instead of direct new Date() to fix hydration error */}
-              <p>Generated: {currentDate}</p>
-              <p>
-                Role: <span className="uppercase font-bold">{roleFilter}</span>{" "}
-                | Count: {filteredUsers.length}
-              </p>
-              {deptFilter !== "All" && <p>Dept: {deptFilter}</p>}
-            </div>
-          </div>
-        </div>
+
 
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 print:hidden mb-6">
           {/* GROUPED HEADER ANIMATION TO REDUCE JANK */}
@@ -1335,6 +1329,126 @@ export default function UsersPageClient({
           </div>
         </DialogContent>
       </Dialog>
+
+
+
+      {/* -- PRINT VIEW (Visible only in print) -- */}
+      <div className="hidden print:block w-full font-lexend p-0">
+        {/* Print Header */}
+        <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-8 w-8 bg-black text-white flex items-center justify-center rounded-md font-bold text-lg">
+                U
+              </div>
+              <h1 className="text-2xl font-bold text-black tracking-tight">
+                University User Management
+              </h1>
+            </div>
+            <p className="text-sm text-gray-600 font-medium">
+              User Directory Report
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Generated: {currentDate}
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="bg-gray-100 border border-gray-200 rounded-md px-3 py-2">
+              <p className="text-sm font-bold text-black">
+                Total Users: {filteredUsers.length}
+              </p>
+              <div className="text-[10px] text-gray-500 mt-1 space-y-0.5">
+                <p>
+                  Role Filter: <span className="font-bold">{roleFilter}</span>
+                </p>
+                {deptFilter !== "All" && <p>Dept: {deptFilter}</p>}
+                {semFilter !== "All" && <p>Semester: {semFilter}</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Print Table */}
+        <table className="w-full border-collapse text-[10px]">
+          <thead>
+            <tr className="bg-gray-100 border-b border-black">
+              <th className="p-2 text-left font-bold border border-gray-300">
+                User Profile
+              </th>
+              <th className="p-2 text-left font-bold border border-gray-300">
+                Email
+              </th>
+              {roleFilter !== "ADMIN" && (
+                <th className="p-2 text-center font-bold border border-gray-300">
+                  Department
+                </th>
+              )}
+              {roleFilter === "STUDENT" && (
+                <th className="p-2 text-center font-bold border border-gray-300">
+                  Semester
+                </th>
+              )}
+              <th className="p-2 text-center font-bold border border-gray-300 w-[100px]">
+                Role
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredUsers.map((user, index) => (
+              <tr
+                key={user.id}
+                className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+              >
+                <td className="p-1.5 border border-gray-300">
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-black">
+                      {!user.name || user.name === "N/A"
+                        ? formatNameFromUsername(user.username)
+                        : user.name}
+                    </span>
+                    <span className="text-[9px] text-gray-500 font-mono">
+                      @{user.username}
+                    </span>
+                  </div>
+                </td>
+                <td className="p-1.5 border border-gray-300 text-gray-700">
+                  {user.email || "N/A"}
+                </td>
+                {roleFilter !== "ADMIN" && (
+                  <td className="p-1.5 border border-gray-300 text-center">
+                    {user.department_name || "-"}
+                  </td>
+                )}
+                {roleFilter === "STUDENT" && (
+                  <td className="p-1.5 border border-gray-300 text-center">
+                    {user.semester_name || "-"}
+                  </td>
+                )}
+                <td className="p-1.5 border border-gray-300 text-center">
+                  <span
+                    className={cn(
+                      "px-1.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider",
+                      user.role === "ADMIN"
+                        ? "bg-red-50 text-red-700 border-red-200"
+                        : user.role === "TEACHER"
+                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    )}
+                  >
+                    {user.role}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Print Footer */}
+        <div className="mt-8 pt-4 border-t border-gray-300 flex justify-between text-[10px] text-gray-500">
+          <p>Confidential Report • For Internal Use Only</p>
+          <p>University Admin Panel</p>
+        </div>
+      </div>
     </>
   );
 }

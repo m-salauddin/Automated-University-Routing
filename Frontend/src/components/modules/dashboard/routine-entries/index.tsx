@@ -48,6 +48,7 @@ import {
   normalizeTime,
   resetAll,
 } from "@/store/classOffSlice";
+import { setIsLocked } from "@/store/routineSlice";
 import DataLoader from "@/components/ui/data-loader";
 import {
   Dialog,
@@ -469,7 +470,7 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isRoutineLocked, setIsRoutineLocked] = useState(false);
+  const isRoutineLocked = useSelector((s: RootState) => s.routine.isLocked);
 
   // --- LOCK CONFIRMATION STATE ---
   const [lockConfirmModal, setLockConfirmModal] = useState<{
@@ -598,11 +599,11 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
     const input = lockConfirmInput.trim();
 
     if (type === "lock" && input === "lock") {
-      setIsRoutineLocked(true);
+      dispatch(setIsLocked(true));
       toast.success("Routine locked. Generation is now disabled.");
       setLockConfirmModal((prev) => ({ ...prev, isOpen: false }));
     } else if (type === "unlock" && input === "unlock") {
-      setIsRoutineLocked(false);
+      dispatch(setIsLocked(false));
       toast.success("Routine unlocked. Generation enabled.");
       setLockConfirmModal((prev) => ({ ...prev, isOpen: false }));
     }
@@ -683,7 +684,7 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
       });
     });
 
-    const totalCredits = uniqueCourses.size * 3.0;
+    const totalCredits = uniqueCourses.size * 3;
 
     return {
       label: selectedDept || "Select Department",
@@ -823,7 +824,7 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
                 variants={itemVariants}
                 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"
               >
-                {currentRoutineSchedule.label}
+               Department of {currentRoutineSchedule.label}
               </motion.h1>
               <motion.div
                 variants={itemVariants}
@@ -978,7 +979,7 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
           {/* Print Header */}
           <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-2 pt-0 text-center w-full font-serif text-black">
             <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
-              {currentRoutineSchedule.label}
+              Department of {currentRoutineSchedule.label}
             </h1>
             <div className="border-2 border-black! border-double px-8 py-0.5 mb-2">
               <h2 className="text-base font-bold uppercase text-black tracking-wide">
@@ -990,7 +991,7 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
             <div className="flex justify-between w-full px-4 mb-2 font-bold text-xs uppercase border-b border-black">
               <span>Semester: {currentRoutineSchedule.subLabel}</span>
               <span>
-                Total Credit: {currentRoutineSchedule.totalCredits.toFixed(1)}
+                Total Credit: {currentRoutineSchedule.totalCredits}
               </span>
             </div>
           </div>

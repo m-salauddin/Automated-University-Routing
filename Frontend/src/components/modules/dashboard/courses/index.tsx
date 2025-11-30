@@ -483,10 +483,13 @@ export default function AutomatedRoutineCourses({
       <style jsx global>{`
         @media print {
           @page {
-            margin: 0.5cm;
+            size: landscape;
+            margin: 10mm;
           }
           body {
-            -webkit-print-color-adjust: exact;
+            background-color: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
         }
       `}</style>
@@ -495,7 +498,7 @@ export default function AutomatedRoutineCourses({
         variants={pageVariants}
         initial="hidden"
         animate="visible"
-        className="w-full font-lexend min-w-0 max-w-full mx-auto p-4 md:p-6 space-y-6 overflow-x-hidden print:p-0 print:max-w-none print:w-full"
+        className="w-full font-lexend min-w-0 max-w-full mx-auto p-4 md:p-6 space-y-6 overflow-x-hidden print:hidden"
       >
         {/* -- Header Section -- */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 print:hidden mb-6">
@@ -512,7 +515,7 @@ export default function AutomatedRoutineCourses({
               variants={pageItemVariants}
               className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"
             >
-              Course Curriculum
+              Course Management
             </motion.h1>
             <motion.p
               variants={pageItemVariants}
@@ -551,7 +554,7 @@ export default function AutomatedRoutineCourses({
 
         {/* -- Print Only Header -- */}
         <div className="hidden print:block mb-4 text-center">
-          <h1 className="text-2xl font-bold">Course Curriculum</h1>
+          <h1 className="text-2xl font-bold">Course Management</h1>
           <p className="text-sm text-muted-foreground">
             Generated Report - Total Courses: {filteredData.length}
           </p>
@@ -1182,6 +1185,129 @@ export default function AutomatedRoutineCourses({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* -- PRINT VIEW (Visible only in print) -- */}
+      <div className="hidden print:block w-full font-lexend p-0">
+        {/* Print Header */}
+        <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-8 w-8 bg-black text-white flex items-center justify-center rounded-md font-bold text-lg">
+                U
+              </div>
+              <h1 className="text-2xl font-bold text-black tracking-tight">
+                University Course Management
+              </h1>
+            </div>
+            <p className="text-sm text-gray-600 font-medium">
+              Course Curriculum Report
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Generated on {new Date().toLocaleDateString()} at{" "}
+              {new Date().toLocaleTimeString()}
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="bg-gray-100 border border-gray-200 rounded-md px-3 py-2">
+              <p className="text-sm font-bold text-black">
+                Total Courses: {filteredData.length}
+              </p>
+              <div className="text-[10px] text-gray-500 mt-1 space-y-0.5">
+                {semesterFilter !== "All" && (
+                  <p>Semester: {semesterFilter}</p>
+                )}
+                {deptFilter !== "All" && <p>Dept: {deptFilter}</p>}
+                {teacherFilter !== "All" && <p>Teacher: {teacherFilter}</p>}
+                {semesterFilter === "All" &&
+                  deptFilter === "All" &&
+                  teacherFilter === "All" && <p>Filters: None</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Print Table */}
+        <table className="w-full border-collapse text-[10px]">
+          <thead>
+            <tr className="bg-gray-100 border-b border-black">
+              <th className="p-2 text-left font-bold border border-gray-300 w-[80px]">
+                Code
+              </th>
+              <th className="p-2 text-left font-bold border border-gray-300">
+                Course Name
+              </th>
+              <th className="p-2 text-center font-bold border border-gray-300 w-[60px]">
+                Room
+              </th>
+              <th className="p-2 text-center font-bold border border-gray-300 w-[50px]">
+                Cr.
+              </th>
+              <th className="p-2 text-center font-bold border border-gray-300 w-[70px]">
+                Type
+              </th>
+              <th className="p-2 text-center font-bold border border-gray-300 w-[60px]">
+                Teacher
+              </th>
+              <th className="p-2 text-center font-bold border border-gray-300 w-[60px]">
+                Dept
+              </th>
+              <th className="p-2 text-center font-bold border border-gray-300 w-[80px]">
+                Semester
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredData.map((course, index) => (
+              <tr
+                key={course.id}
+                className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+              >
+                <td className="p-1.5 border border-gray-300 font-mono font-semibold">
+                  {course.course_code}
+                </td>
+                <td className="p-1.5 border border-gray-300">
+                  {course.course_name}
+                </td>
+                <td className="p-1.5 border border-gray-300 text-center">
+                  {course.room_number}
+                </td>
+                <td className="p-1.5 border border-gray-300 text-center font-medium">
+                  {course.credits}
+                </td>
+                <td className="p-1.5 border border-gray-300 text-center">
+                  <span
+                    className={cn(
+                      "px-1.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider",
+                      course.course_type === "Theory"
+                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                        : course.course_type === "Lab"
+                        ? "bg-purple-50 text-purple-700 border-purple-200"
+                        : "bg-gray-50 text-gray-700 border-gray-200"
+                    )}
+                  >
+                    {course.course_type}
+                  </span>
+                </td>
+                <td className="p-1.5 border border-gray-300 text-center">
+                  {getInitials(course.teacher_name)}
+                </td>
+                <td className="p-1.5 border border-gray-300 text-center">
+                  {getInitials(course.department_name)}
+                </td>
+                <td className="p-1.5 border border-gray-300 text-center">
+                  {course.semester_name}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Print Footer */}
+        <div className="mt-8 pt-4 border-t border-gray-300 flex justify-between text-[10px] text-gray-500">
+          <p>Confidential Report • For Internal Use Only</p>
+          <p>University Course Management System</p>
+        </div>
+      </div>
     </>
   );
 }
