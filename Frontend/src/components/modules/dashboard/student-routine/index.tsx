@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -16,6 +15,8 @@ import {
   Loader2,
   ShieldAlert,
   Info,
+  ShieldBan,
+  ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
 
 export type APIRoutineItem = {
   id: number;
@@ -156,6 +158,38 @@ interface Props {
 }
 
 export default function DepartmentRoutinePage({ routineList }: Props) {
+  const auth = useSelector((s: RootState) => s.auth) as any;
+
+  if (auth?.role?.toLowerCase() !== "student") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="h-[80vh] w-full flex flex-col font-lexend items-center justify-center gap-6 text-center px-4"
+      >
+        <div className="rounded-full bg-red-100 p-6 dark:bg-red-900/20 ring-1 ring-red-200 dark:ring-red-900/40 shadow-sm">
+          <ShieldBan className="h-12 w-12 text-red-600 dark:text-red-500" />
+        </div>
+        <div className="space-y-3 max-w-[500px]">
+          <h2 className="sm:text-2xl text-xl font-bold tracking-tight text-foreground">
+            Access Restricted
+          </h2>
+          <p className="text-muted-foreground text-xs sm:text-base leading-relaxed">
+            This page is exclusively for students. It seems you do not
+            have the required permissions to view this content.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => window.history.back()}
+        >
+          <ChevronLeft className="h-4 w-4" /> Go Back
+        </Button>
+      </motion.div>
+    );
+  }
+
   const availabilityMap = useSelector(
     (s: RootState) => s.teacherAvailability?.map || EMPTY_OBJ
   );
@@ -169,7 +203,7 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
   const [selectedSemester] = useState<string>("");
   const [inputValue, setInputValue] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-  const auth = useSelector((s: RootState) => s.auth) as any;
+
 
   const [viewReasonModal, setViewReasonModal] = useState<{
     isOpen: boolean;
