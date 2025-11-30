@@ -6,6 +6,13 @@ A comprehensive, role-based web application designed to provide hassle-free, aut
 
 The primary goal is to automate the generation of academic routines, minimizing manual effort and eliminating conflicts. The system serves three main roles: **Admin**, **Teacher**, and **Student**, each with tailored features to visualize workload, manage schedules, and access academic information.
 
+## 🌐 Live Demo
+
+Experience the application live:
+
+-   **Frontend**: [https://automated-university-routine.vercel.app/](https://automated-university-routine.vercel.app/)
+-   **Backend Admin Panel**: [https://routineproject-s6dh.onrender.com/admin/](https://routineproject-s6dh.onrender.com/admin/)
+
 ## 🚀 Key Features by Role
 
 ### 🅰️ Admin Panel
