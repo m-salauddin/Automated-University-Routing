@@ -1,35 +1,96 @@
 # Automated University Routine Management
 
-A modern, comprehensive web application designed to streamline university routine management, course scheduling, and academic administration. Built with Next.js 15, TypeScript, and a focus on a premium user experience.
+A comprehensive, role-based web application designed to provide hassle-free, automated routine generation for the entire university. Unlike department-specific solutions, this system manages the complex scheduling needs of the whole institution, handling department batches, time slots, and courses to ensure conflict-free routine generation.
 
-## 🚀 Features
+## 🎯 Project Goal
 
-### 📊 Dashboard
--   **Centralized Hub**: Get a bird's-eye view of academic activities, upcoming classes, and important notices.
--   **Analytics**: Visual insights into student attendance, course completion, and resource utilization.
+The primary goal is to automate the generation of academic routines, minimizing manual effort and eliminating conflicts. The system serves three main roles: **Admin**, **Teacher**, and **Student**, each with tailored features to visualize workload, manage schedules, and access academic information.
 
-### 📅 Routine Management
--   **Interactive Schedule**: Drag-and-drop interface for managing class routines.
--   **Personal & Student Views**: Dedicated views for both faculty (own routine) and students.
--   **Time Slots**: Flexible time slot configuration.
+## 🚀 Key Features by Role
 
-### 📚 Course & Curriculum
--   **Course Management**: Create, update, and manage university courses.
--   **Curriculum Planning**: Organize syllabi and academic requirements.
--   **Department Management**: Handle department-specific data and settings.
+### 🅰️ Admin Panel
+The Admin panel is the command center of the application, featuring **6 main routes** to manage the entire system.
 
-### 🛠️ Administrative Tools
--   **User Management**: Manage student and faculty profiles.
--   **Class Off Management**: Efficiently handle class cancellations and rescheduling.
--   **Semester Planning**: Manage semester dates and academic calendars.
+1.  **Analytics (Global)**
+    *   Provides a bird's-eye view of the entire university's academic status.
+    *   Visualizes **Workload**, **Room Usage**, **Class Credits**, and a breakdown of **Lab vs. Theory classes**.
+    *   Aggregates data across all teacher and student panels.
 
-### 🎨 User Experience
--   **Modern UI**: Built with Shadcn UI and Tailwind CSS for a sleek, accessible design.
--   **Dark Mode**: Fully supported dark mode for comfortable viewing.
--   **Responsive Design**: Optimized for all devices, from desktops to mobile phones.
+2.  **Curriculum (Common Route)**
+    *   Accessible by **Admins, Teachers, and Students**.
+    *   Displays a comprehensive list of all courses in a table format.
+    *   Includes details like **Course Codes**, **Credits**, **Marks**, and **Type** (Lab/Theory).
+    *   Features advanced **filtering** to help users find specific courses.
+    *   Includes a **Print** feature for offline access.
+
+3.  **Courses**
+    *   Allows Admins to **create courses** and assign them to specific teachers.
+    *   Enables selection of rooms, departments, and other logistical details during course creation.
+
+4.  **Academic Config**
+    *   Manages the foundational data of the institution.
+    *   Perform **CRUD operations** for **Departments**, **Semesters**, and **Time Slots**.
+
+5.  **Routine Entries**
+    *   **Core Feature**: Generate new routines with **zero conflicts** (collision detection).
+    *   View routines for all departments with **Semester filters**.
+    *   Search for specific teachers to see their classes for a particular semester.
+    *   **Lock/Unlock Mechanism**: Admins can lock the routine generation to prevent accidental overwrites. Unlocking requires a confirmation (typing "unlock" in a modal).
+
+6.  **Users**
+    *   Perform **CRUD operations** for user accounts.
+    *   Filter users by role: **Admin**, **Teacher**, or **Student**.
+    *   All tables include **pagination** for easy navigation.
+
+---
+
+### 👨‍🏫 Teacher Panel
+The Teacher panel focuses on personal workload management and schedule visibility, consisting of **3 main routes**.
+
+1.  **Analytics (Personal)**
+    *   Displays stats and workload specific to the logged-in teacher.
+    *   Helps teachers visualize their schedule distribution.
+
+2.  **Curriculum (Common Route)**
+    *   Same access and features as the Admin panel (View all courses, filter, print).
+
+3.  **Own Routine**
+    *   View assigned classes with detailed info: **Date**, **Time Slot**, **Batch**, **Course Name**, and **Room No**.
+    *   **Class Cancellation**: Teachers can mark a class as "Off" if they cannot attend.
+        *   Requires a valid reason (max 100 chars).
+        *   This status is reflected in the Admin's *Routine Entries* and the Student's *Routine* with a **red mark**.
+        *   Clicking the mark reveals the reason.
+    *   **Reactivate Class**: Teachers can reactivate a cancelled class if plans change.
+
+---
+
+### 👨‍ Student Panel
+The Student panel is designed to keep students informed about their classes and schedule, featuring **3 main routes**.
+
+1.  **Analytics (Personal)**
+    *   Displays stats and workload specific to the student's enrolled courses.
+
+2.  **Curriculum (Common Route)**
+    *   Same access and features as the Admin panel (View all courses, filter, print).
+
+3.  **Student Routine**
+    *   View the routine specific to their **Department** and **Semester**.
+    *   **Class Off Notifications**: Students can see if a teacher has cancelled a class (marked in red).
+    *   View detailed reasoning for class cancellations.
+
+## 🛡️ Security & Usability
+
+### Route Security
+-   **Role-Based Access Control (RBAC)**: All routes are secured with strict role-based checks. Users attempting to access unauthorized routes are redirected or shown error restrictions.
+-   **Error Handling**: Comprehensive error restrictions are in place to prevent unauthorized access and ensure data integrity.
+
+### Enhanced Usability
+-   **Pagination**: All pages featuring data tables are equipped with pagination to handle large datasets efficiently.
+-   **Print View**: Every page with a table includes a print-friendly view, allowing users to easily export or print data for offline use.
 
 ## 🛠️ Tech Stack
 
+### Frontend
 -   **Framework**: [Next.js 15](https://nextjs.org/) (App Router)
 -   **Language**: [TypeScript](https://www.typescriptlang.org/)
 -   **Styling**: [Tailwind CSS](https://tailwindcss.com/)
@@ -42,6 +103,14 @@ A modern, comprehensive web application designed to streamline university routin
 -   **Charts**: [Recharts](https://recharts.org/)
 -   **PDF Generation**: [jsPDF](https://github.com/parallax/jsPDF), [html2canvas](https://html2canvas.hertzen.com/)
 -   **Date Handling**: [date-fns](https://date-fns.org/)
+
+### Backend
+-   **Framework**: [Django](https://www.djangoproject.com/)
+-   **API**: [Django REST Framework](https://www.django-rest-framework.org/)
+-   **Authentication**: [Simple JWT](https://django-rest-framework-simplejwt.readthedocs.io/)
+-   **Database**: PostgreSQL (via psycopg2)
+-   **Data Processing**: [NumPy](https://numpy.org/), [Matplotlib](https://matplotlib.org/)
+-   **Utilities**: [Django Filter](https://django-filter.readthedocs.io/), [Django CORS Headers](https://github.com/adamchainz/django-cors-headers)
 
 ## 🏁 Getting Started
 
