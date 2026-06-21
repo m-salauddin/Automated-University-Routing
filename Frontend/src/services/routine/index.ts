@@ -175,4 +175,131 @@ const rollbackRoutine = async (params: { department_id: number }) => {
     }
 };
 
-export { getRoutine, generateRoutine, rollbackRoutine };
+const cancelClass = async (routineId: number, cancelMessage: string) => {
+    try {
+        const CANCEL_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/`;
+        const cookieStore = await cookies();
+        const token = cookieStore.get("accessToken")?.value;
+
+        if (!token) {
+            return { success: false, message: "No access token found" };
+        }
+
+        const res = await fetch(CANCEL_CLASS_URL, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ routine_id: routineId, cancel_message: cancelMessage }),
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            let errorMessage = `Cancellation failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
+            } catch {}
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+        return { success: true, data: rawResult };
+    } catch (error) {
+        console.error("[Routine] Failed to cancel class:", error);
+        return { success: false, message: "Failed to cancel class" };
+    }
+};
+
+const swapRoutineEntries = async (entry1Id: number, entry2Id: number) => {
+    try {
+        const SWAP_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/routine/swap/`;
+        const cookieStore = await cookies();
+        const token = cookieStore.get("accessToken")?.value;
+
+        if (!token) {
+            return { success: false, message: "No access token found" };
+        }
+
+        const res = await fetch(SWAP_ROUTINE_URL, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ entry1_id: entry1Id, entry2_id: entry2Id }),
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            let errorMessage = `Swap failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
+            } catch {}
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+        return { success: true, data: rawResult };
+    } catch (error) {
+        console.error("[Routine] Failed to swap routine entries:", error);
+        return { success: false, message: "Failed to swap routine entries" };
+    }
+};
+
+const updateRoutineEntry = async (
+    entryId: string | number,
+    dayId: number,
+    timeSlotId: number,
+    roomId?: number
+) => {
+    try {
+        const UPDATE_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/routine/update/${entryId}/`;
+        const cookieStore = await cookies();
+        const token = cookieStore.get("accessToken")?.value;
+
+        if (!token) {
+            return { success: false, message: "No access token found" };
+        }
+
+        const bodyData: Record<string, any> = {
+            day_id: dayId,
+            time_slot_id: timeSlotId,
+        };
+        if (roomId !== undefined && roomId !== null) {
+            bodyData.room_id = roomId;
+        }
+
+        const res = await fetch(UPDATE_ROUTINE_URL, {
+            method: "PUT",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(bodyData),
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            let errorMessage = `Update routine entry failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
+            } catch {}
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+        return { success: true, data: rawResult };
+    } catch (error) {
+        console.error("[Routine] Failed to update routine entry:", error);
+        return { success: false, message: "Failed to update routine entry" };
+    }
+};
+
+export { getRoutine, generateRoutine, rollbackRoutine, cancelClass, swapRoutineEntries, updateRoutineEntry };

@@ -111,10 +111,43 @@ const abbreviateDay = (day: string) => {
   return day ? day.substring(0, 3) : "";
 };
 
+const isBreakSlot = (slot: any) => {
+  if (!slot) return false;
+  return Boolean(slot.is_lunch_break) || Boolean(slot.is_launch_break) || Boolean(slot.islaunchbreak);
+};
+
+const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string) => {
+  if (!courseCode) return false;
+  const codeLower = courseCode.toLowerCase();
+  const nameLower = (courseName || "").toLowerCase();
+  const roomLower = (roomNumber || "").toLowerCase();
+  
+  if (codeLower.includes("lab") || codeLower.includes("sessional") || codeLower.includes("practical") || codeLower.includes("work")) {
+    return true;
+  }
+  if (nameLower.includes("lab") || nameLower.includes("laboratory") || nameLower.includes("sessional") || nameLower.includes("practical")) {
+    return true;
+  }
+  if (roomLower.includes("lab") || roomLower.includes("laboratory") || roomLower.includes("computer center")) {
+    return true;
+  }
+  
+  const match = courseCode.match(/\d+/);
+  if (match) {
+    const numStr = match[0];
+    const lastDigit = parseInt(numStr.charAt(numStr.length - 1), 10);
+    return lastDigit % 2 === 0;
+  }
+  return false;
+};
+
 const formatTimeSlotLabel = (timeStr: string) => {
   if (!timeStr) return "";
   const [hStr, mStr] = timeStr.split(":");
-  let h = parseInt(hStr);
+  let h = parseInt(hStr, 10);
+  if (h >= 1 && h <= 5) {
+    h += 12;
+  }
   const ampm = h >= 12 ? "PM" : "AM";
   h = h % 12;
   h = h ? h : 12;
@@ -236,10 +269,11 @@ const MemoizedRoutineTable = React.memo(
               </TableCell>
             )}
 
-            {timeSlots.map((slot, i) => (
-              <React.Fragment key={slot.id}>
-                {i === BREAK_INSERT_INDEX && (
-                  <TableCell className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border/60 !print:border-r !print:border-black">
+            {timeSlots.map((slot, idx) => {
+              const hasClass = schedule.some(rowItem => rowItem.slots[idx] !== null);
+              if (isBreakSlot(slot) && !hasClass) {
+                return (
+                  <TableCell key={slot.id} className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border/60 !print:border-r !print:border-black">
                     <div className="h-full flex items-center justify-center print:hidden">
                       <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background">
                         Break
@@ -251,9 +285,11 @@ const MemoizedRoutineTable = React.memo(
                       </span>
                     </div>
                   </TableCell>
-                )}
-
+                );
+              }
+              return (
                 <TableCell
+                  key={slot.id}
                   className={cn(
                     "text-center align-middle h-[60px] border-r border-border/60 last:border-r-0 p-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto",
                     "min-w-[100px] bg-muted/10 print:bg-white print:min-w-0"
@@ -265,10 +301,15 @@ const MemoizedRoutineTable = React.memo(
                       <span className="mx-1">-</span>
                       {formatTimeSlotLabel(slot.end_time)}
                     </span>
+                    {isBreakSlot(slot) && (
+                      <span className="text-[9px] uppercase font-black tracking-wider text-muted-foreground mt-0.5 px-1 py-0.2 bg-muted rounded border border-border/40">
+                        Break
+                      </span>
+                    )}
                   </div>
                 </TableCell>
-              </React.Fragment>
-            ))}
+              );
+            })}
           </TableRow>
         </TableHeader>
         <motion.tbody
@@ -324,6 +365,28 @@ const MemoizedRoutineTable = React.memo(
 
                   {/* Dynamic Columns */}
                   {rowItem.slots.map((session, index) => {
+                    const slot = timeSlots[index];
+                    if (isBreakSlot(slot) && !session) {
+                      return (
+                        <TableCell key={index} className="p-0 align-middle border-r border-border/60 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black">
+                          <div
+                            className="absolute inset-0 opacity-10 print:hidden"
+                            style={{
+                              backgroundImage:
+                                "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
+                              backgroundSize: "4px 4px",
+                            }}
+                          />
+                          <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden">
+                            <Utensils className="w-3 h-3 text-foreground/40" />
+                          </div>
+                          <div className="hidden print:flex h-full w-full items-center justify-center relative z-10">
+                            <Utensils className="w-3 h-3 text-black" />
+                          </div>
+                        </TableCell>
+                      );
+                    }
+
                     const teacherKey = session
                       ? session.teacherId ?? session.teacher
                       : undefined;
@@ -353,96 +416,88 @@ const MemoizedRoutineTable = React.memo(
                       isClassOffToday;
 
                     const highlighted = isMatch(session);
+                    const isLab = session ? isLabClass(session.course, undefined, session.room) : false;
 
                     return (
-                      <React.Fragment key={index}>
-                        {index === BREAK_INSERT_INDEX && (
-                          <TableCell className="p-0 align-middle border-r border-border/60 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black">
-                            <div
-                              className="absolute inset-0 opacity-10 print:hidden"
-                              style={{
-                                backgroundImage:
-                                  "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
-                                backgroundSize: "4px 4px",
-                              }}
-                            />
-                            <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden">
-                              <Utensils className="w-3 h-3 text-foreground/40" />
-                            </div>
-                            <div className="hidden print:flex h-full w-full items-center justify-center relative z-10">
-                              <Utensils className="w-3 h-3 text-black" />
-                            </div>
-                          </TableCell>
+                      <TableCell
+                        key={index}
+                        onClick={() => {
+                          if (session && isClassOffToday) {
+                            onCellClick({
+                              course: session.course,
+                              teacher: session.teacher,
+                              reason: cancellationReason,
+                            });
+                          }
+                        }}
+                        className={cn(
+                          "p-1.5 align-middle border-r border-border/60 transition-colors duration-200 !print:border-r !print:border-black print:p-0.5",
+                          isClassOffToday
+                            ? "cursor-pointer"
+                            : "cursor-default",
+                          highlighted
+                            ? "bg-emerald-100/50 dark:bg-emerald-900/20 print:bg-transparent"
+                            : "bg-transparent print:bg-white"
                         )}
-
-                        <TableCell
-                          onClick={() => {
-                            if (session && isClassOffToday) {
-                              onCellClick({
-                                course: session.course,
-                                teacher: session.teacher,
-                                reason: cancellationReason,
-                              });
-                            }
-                          }}
-                          className={cn(
-                            "p-1.5 align-middle border-r border-border/60 transition-colors duration-200 !print:border-r !print:border-black print:p-0.5",
-                            isClassOffToday
-                              ? "cursor-pointer"
-                              : "cursor-default",
-                            highlighted
-                              ? "bg-emerald-100/50 dark:bg-emerald-900/20 print:bg-transparent"
-                              : "bg-transparent print:bg-white"
-                          )}
-                        >
-                          {session ? (
-                            <>
-                              <div
-                                className={cn(
-                                  "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden",
-                                  "transition-colors duration-200",
-                                  isTeacherOff
-                                    ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
-                                    : highlighted
-                                    ? "bg-background border-emerald-500 shadow-md"
-                                    : "bg-card border-border/50 hover:border-foreground/20 hover:shadow-md"
+                      >
+                        {session ? (
+                          <>
+                            <div
+                              className={cn(
+                                "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden",
+                                "transition-colors duration-200",
+                                isTeacherOff
+                                  ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                                  : highlighted
+                                  ? "bg-background border-emerald-500 shadow-md"
+                                  : isLab
+                                  ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40 hover:shadow-md"
+                                  : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40 hover:shadow-md"
+                              )}
+                            >
+                              <div className="flex justify-between items-start w-full">
+                                <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
+                                  {session.course}
+                                </span>
+                                {isLab ? (
+                                  <span className="text-[9px] font-black uppercase tracking-wider bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-1 py-0.2 rounded border border-violet-200/50 dark:border-violet-800/40">
+                                    Lab
+                                  </span>
+                                ) : (
+                                  <span className="text-[9px] font-black uppercase tracking-wider bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 px-1 py-0.2 rounded border border-teal-200/50 dark:border-teal-800/40">
+                                    Theory
+                                  </span>
                                 )}
-                              >
-                                <div className="flex justify-between items-start">
-                                  <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
-                                    {session.course}
+                              </div>
+                              <div className="flex flex-col gap-0.5 mt-1">
+                                <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                                  <User className="w-3 h-3 opacity-70" />
+                                  <span>
+                                    {getTeacherInitials(session.teacher)}
                                   </span>
                                 </div>
-                                <div className="flex flex-col gap-0.5 mt-1">
-                                  <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                                    <User className="w-3 h-3 opacity-70" />
-                                    <span>
-                                      {getTeacherInitials(session.teacher)}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-                                    <MapPin className="w-3 h-3 opacity-70" />
-                                    <span>{session.room}</span>
-                                  </div>
+                                <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
+                                  <MapPin className="w-3 h-3 opacity-70" />
+                                  <span>{session.room}</span>
                                 </div>
                               </div>
-                              <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
-                                <span className="font-bold text-[11px]">
-                                  {session.course}, T-
-                                  {getTeacherInitials(session.teacher)}
-                                </span>
-                                <span className="font-bold text-[11px]">
-                                  {session.room}
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center">
-                              <div className="w-1 h-1 rounded-full bg-border print:hidden" />
                             </div>
-                          )}
-                        </TableCell>
-                      </React.Fragment>
+                            <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
+                              <span className="font-bold text-[11px]">
+                                {session.course}{isLab ? " (Lab)" : " (Theory)"}, T-
+                                {getTeacherInitials(session.teacher)}
+                              </span>
+                              <span className="font-bold text-[11px]">
+                                {session.room}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center">
+                            <div className="w-1 h-1 rounded-full bg-border print:hidden" />
+                          </div>
+                        )}
+                      </TableCell>
                     );
                   })}
                 </motion.tr>
@@ -479,6 +534,18 @@ export default function AdminRoutinePage({
   dbDepartments = [],
   dbSemesters = [],
 }: Props) {
+  const sortedTimeSlots = useMemo(() => {
+    const getMinutes = (timeStr: string) => {
+      if (!timeStr) return 0;
+      const [hStr, mStr] = timeStr.split(":");
+      let h = parseInt(hStr, 10);
+      const m = parseInt(mStr, 10);
+      if (h >= 1 && h <= 5) h += 12;
+      return h * 60 + m;
+    };
+    return [...timeSlots].sort((a, b) => getMinutes(a.start_time) - getMinutes(b.start_time));
+  }, [timeSlots]);
+
   const router = useRouter();
   const dispatch = useDispatch();
 
@@ -551,7 +618,7 @@ export default function AdminRoutinePage({
       return;
     }
     setGenerationVersion((prev) => prev + 1);
-  }, [localRoutineList, timeSlots, selectedDept, selectedSemester]);
+  }, [localRoutineList, sortedTimeSlots, selectedDept, selectedSemester]);
 
   const departments = useMemo(() => {
     if (dbDepartments.length > 0) {
@@ -724,12 +791,12 @@ export default function AdminRoutinePage({
       slots: (ClassSession | null)[];
     }[] = [];
 
-    const slotStartTimes = timeSlots.map((ts) => normalizeTime(ts.start_time));
+    const slotStartTimes = sortedTimeSlots.map((ts) => normalizeTime(ts.start_time));
     const uniqueCourses = new Set<string>();
 
     DAYS_ORDER.forEach((day) => {
       targetSemesters.forEach((sem) => {
-        const rowSlots = Array(timeSlots.length).fill(
+        const rowSlots = Array(sortedTimeSlots.length).fill(
           null
         ) as (ClassSession | null)[];
 
@@ -788,7 +855,7 @@ export default function AdminRoutinePage({
       isEmpty: scheduleRows.length === 0,
       isAllSemestersMode: isAllSemesters,
     };
-  }, [localRoutineList, selectedDept, selectedSemester, semesters, timeSlots]);
+  }, [localRoutineList, selectedDept, selectedSemester, semesters, sortedTimeSlots]);
 
   const validTeacherShortNames = useMemo(() => {
     const uniqueShortNames = new Set<string>();
@@ -1120,7 +1187,7 @@ export default function AdminRoutinePage({
                 {/* --- MEMOIZED TABLE RENDERED HERE --- */}
                 <MemoizedRoutineTable
                   schedule={currentRoutineSchedule.schedule}
-                  timeSlots={timeSlots}
+                  timeSlots={sortedTimeSlots}
                   isMatch={isMatch}
                   isAllSemestersMode={currentRoutineSchedule.isAllSemestersMode}
                   classOffMap={classOffMap}
