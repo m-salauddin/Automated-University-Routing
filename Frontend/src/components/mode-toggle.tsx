@@ -14,16 +14,16 @@ import {
 export function ModeToggle() {
   const { setTheme } = useTheme();
 
-
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
+          id="mode-toggle-trigger"
           variant="ghost"
           size="icon"
           aria-label="Toggle theme"
           className="h-9 w-9 cursor-pointer"
-       >
+        >
           {/* Sun for light, Moon for dark; both mounted so no layout shift */}
           <Sun className="h-[1.1rem] w-[1.1rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-[1.1rem] w-[1.1rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />

@@ -372,7 +372,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowCharts(true);
-    }, 600);
+    }, 100);
     return () => clearTimeout(timer);
   }, []);
 

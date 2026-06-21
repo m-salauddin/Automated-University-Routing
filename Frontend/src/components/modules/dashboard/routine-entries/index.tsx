@@ -58,13 +58,14 @@ import {
   DialogDescription,
   DialogClose,
 } from "@/components/ui/dialog";
-import { generateRoutine } from "@/services/routine";
+import { generateRoutine, getRoutine } from "@/services/routine";
 import { toast } from "sonner";
 
 // --- TYPES ---
 export type APIRoutineItem = {
   id: number;
-  day: string;
+  day: number | string;
+  day_name: string;
   start_time: string;
   end_time: string;
   course_name: string;
@@ -195,8 +196,15 @@ const MemoizedRoutineTable = React.memo(
     onCellClick,
     generationVersion,
   }: RoutineTableProps) => {
-    return (
-      <Table className="w-full overflow-hidden min-w-[1000px] print:min-w-0 print:w-full border-collapse text-sm print:border-collapse !print:border-black">
+    try {
+      console.log("Rendering MemoizedRoutineTable with:", {
+        schedule,
+        timeSlots,
+        isAllSemestersMode,
+        generationVersion
+      });
+      return (
+        <Table className="w-full overflow-hidden min-w-[1000px] print:min-w-0 print:w-full border-collapse text-sm print:border-collapse !print:border-black">
         <TableHeader>
           <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b">
             {/* Fixed Day Header */}
@@ -443,7 +451,16 @@ const MemoizedRoutineTable = React.memo(
           </AnimatePresence>
         </motion.tbody>
       </Table>
-    );
+      );
+    } catch (error) {
+      console.error("MemoizedRoutineTable render error:", error);
+      return (
+        <div className="p-6 border border-red-500/30 rounded-xl bg-red-500/5 text-red-500 font-medium font-lexend text-center">
+          <p className="text-lg font-bold mb-1">Failed to render routine table</p>
+          <p className="text-xs opacity-80">{String(error)}</p>
+        </div>
+      );
+    }
   }
 );
 MemoizedRoutineTable.displayName = "MemoizedRoutineTable";
@@ -452,13 +469,20 @@ MemoizedRoutineTable.displayName = "MemoizedRoutineTable";
 interface Props {
   routineList: APIRoutineItem[];
   timeSlots: TimeSlot[];
+  dbDepartments?: { id: number; name: string }[];
+  dbSemesters?: { id: number; name: string; order: number }[];
 }
 
-export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
+export default function AdminRoutinePage({
+  routineList,
+  timeSlots,
+  dbDepartments = [],
+  dbSemesters = [],
+}: Props) {
   const router = useRouter();
   const dispatch = useDispatch();
 
-  const { role, isLoading: isAuthLoading } = useSelector(
+  const { role } = useSelector(
     (s: RootState) => s.auth
   );
   const availabilityMap = useSelector(
@@ -468,7 +492,12 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
     (s: RootState) => s.classOff.offMap || EMPTY_OBJ
   );
 
-  const [isLoading, setIsLoading] = useState(true);
+  // --- HYDRATION FIX ---
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [isGenerating, setIsGenerating] = useState(false);
   const isRoutineLocked = useSelector((s: RootState) => s.routine.isLocked);
 
@@ -491,6 +520,13 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [selectedSemester, setSelectedSemester] = useState<string>("");
 
+  const [localRoutineList, setLocalRoutineList] = useState<APIRoutineItem[]>(routineList);
+  const [isLoadingRoutine, setIsLoadingRoutine] = useState(false);
+
+  useEffect(() => {
+    setLocalRoutineList(routineList);
+  }, [routineList]);
+
   const [viewReasonModal, setViewReasonModal] = useState<{
     isOpen: boolean;
     course: string;
@@ -504,12 +540,6 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
   });
 
   useEffect(() => {
-    const delay = 1500;
-    const timer = setTimeout(() => setIsLoading(false), delay);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(inputValue), 150);
     return () => clearTimeout(timer);
   }, [inputValue]);
@@ -521,16 +551,26 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
       return;
     }
     setGenerationVersion((prev) => prev + 1);
-  }, [routineList, timeSlots, selectedDept, selectedSemester]);
+  }, [localRoutineList, timeSlots, selectedDept, selectedSemester]);
 
   const departments = useMemo(() => {
+    if (dbDepartments.length > 0) {
+      return Array.from(new Set(dbDepartments.map((d) => d.name))).sort();
+    }
     const depts = Array.from(
       new Set(routineList.map((item) => item.department_name))
     );
     return depts.sort();
-  }, [routineList]);
+  }, [dbDepartments, routineList]);
 
   const semesters = useMemo(() => {
+    if (dbSemesters.length > 0) {
+      const sems = Array.from(new Set(dbSemesters.map((s) => s.name)));
+      const sortedSems = sems.sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true })
+      );
+      return ["All Semesters", ...sortedSems];
+    }
     let filteredList = routineList;
     if (selectedDept) {
       filteredList = routineList.filter(
@@ -544,7 +584,18 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
       a.localeCompare(b, undefined, { numeric: true })
     );
     return ["All Semesters", ...sortedSems];
-  }, [routineList, selectedDept]);
+  }, [dbSemesters, routineList, selectedDept]);
+
+  const selectedDeptId = useMemo(() => {
+    const found = dbDepartments.find((d) => d.name === selectedDept);
+    return found ? found.id : undefined;
+  }, [dbDepartments, selectedDept]);
+
+  const selectedSemesterId = useMemo(() => {
+    if (selectedSemester === "All Semesters") return undefined;
+    const found = dbSemesters.find((s) => s.name === selectedSemester);
+    return found ? found.id : undefined;
+  }, [dbSemesters, selectedSemester]);
 
   useEffect(() => {
     if (departments.length > 0 && !selectedDept) {
@@ -563,15 +614,55 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
     }
   }, [semesters, selectedSemester]);
 
+  useEffect(() => {
+    if (selectedDeptId === undefined) return;
+
+    const fetchUpdatedRoutine = async () => {
+      setIsLoadingRoutine(true);
+      try {
+        const res = await getRoutine({
+          department_id: selectedDeptId,
+          semester_id: selectedSemesterId,
+        });
+        if (res.success && Array.isArray(res.data)) {
+          setLocalRoutineList(res.data);
+        } else {
+          setLocalRoutineList([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch routine:", err);
+      } finally {
+        setIsLoadingRoutine(false);
+      }
+    };
+
+    fetchUpdatedRoutine();
+  }, [selectedDeptId, selectedSemesterId]);
+
   const handleGenerate = async () => {
     if (isRoutineLocked) return;
+    if (selectedDeptId === undefined) {
+      toast.error("Please select a valid department to generate routine.");
+      return;
+    }
 
     setIsGenerating(true);
     try {
-      const result = await generateRoutine();
+      const result = await generateRoutine({
+        department_id: selectedDeptId,
+        semester_id: selectedSemesterId,
+      });
       if (result.success) {
         dispatch(resetAll());
         toast.success("Routine generated successfully!");
+        // Refresh local list
+        const res = await getRoutine({
+          department_id: selectedDeptId,
+          semester_id: selectedSemesterId,
+        });
+        if (res.success && Array.isArray(res.data)) {
+          setLocalRoutineList(res.data);
+        }
         router.refresh();
       } else {
         toast.error(result.message || "Failed to generate routine");
@@ -642,12 +733,12 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
           null
         ) as (ClassSession | null)[];
 
-        const itemsForCell = routineList.filter((item) => {
+        const itemsForCell = localRoutineList.filter((item) => {
           if (!selectedDept) return false;
 
           const matchDept = item.department_name === selectedDept;
           const matchSem = item.semester_name === sem;
-          const matchDay = item.day === day;
+          const matchDay = item.day_name === day;
 
           return matchDept && matchSem && matchDay;
         });
@@ -667,7 +758,7 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
               originalTime: item.start_time,
               department: item.department_name,
               semester: item.semester_name,
-              day: item.day,
+              day: item.day_name,
             };
             uniqueCourses.add(item.course_code);
             hasContent = true;
@@ -697,16 +788,16 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
       isEmpty: scheduleRows.length === 0,
       isAllSemestersMode: isAllSemesters,
     };
-  }, [routineList, selectedDept, selectedSemester, semesters, timeSlots]);
+  }, [localRoutineList, selectedDept, selectedSemester, semesters, timeSlots]);
 
   const validTeacherShortNames = useMemo(() => {
     const uniqueShortNames = new Set<string>();
-    routineList.forEach((item) => {
+    localRoutineList.forEach((item) => {
       const short = getTeacherInitials(item.teacher_name).toLowerCase();
       if (short) uniqueShortNames.add(short);
     });
     return uniqueShortNames;
-  }, [routineList]);
+  }, [localRoutineList]);
 
   const isMatch = useMemo(() => {
     return (session: ClassSession | null) => {
@@ -714,7 +805,7 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
 
       const query = debouncedSearch.toLowerCase().trim();
       const sessionTeacherShortName = getTeacherInitials(
-        session.teacher
+        session.teacher || ""
       ).toLowerCase();
 
       const isSearchingForTeacherShortName = validTeacherShortNames.has(query);
@@ -723,22 +814,20 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
         return sessionTeacherShortName === query;
       }
 
+      const courseName = (session.course || "").toLowerCase();
+      const teacherName = (session.teacher || "").toLowerCase();
+      const roomName = (session.room || "").toLowerCase();
+
       return (
-        session.course.toLowerCase().includes(query) ||
-        session.teacher.toLowerCase().includes(query) ||
-        session.room.toLowerCase().includes(query) ||
+        courseName.includes(query) ||
+        teacherName.includes(query) ||
+        roomName.includes(query) ||
         sessionTeacherShortName === query
       );
     };
   }, [debouncedSearch, validTeacherShortNames]);
 
-  if (isAuthLoading || isLoading) {
-    return (
-      <div className="w-full h-[70vh] flex items-center justify-center bg-background">
-        <DataLoader />
-      </div>
-    );
-  }
+  if (!mounted) return null;
 
   if (role !== "admin") {
     return (
@@ -997,9 +1086,16 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
           </div>
 
           {/* Main Content */}
-          {currentRoutineSchedule.isEmpty ? (
+          {isLoadingRoutine ? (
+            <div className="min-h-[400px] flex flex-col items-center justify-center">
+              <Loader2 className="w-8 h-8 text-primary animate-spin" />
+              <span className="text-sm text-muted-foreground mt-2 font-lexend">Loading routine...</span>
+            </div>
+          ) : currentRoutineSchedule.isEmpty ? (
             <motion.div
               variants={itemVariants}
+              initial="hidden"
+              animate="visible"
               className="min-h-[400px] flex flex-col items-center justify-center text-center p-8 border rounded-xl bg-muted/5"
             >
               <div className="rounded-full p-6 mb-6 bg-muted/20">
@@ -1016,6 +1112,8 @@ export default function AdminRoutinePage({ routineList, timeSlots }: Props) {
             <motion.div
               id="print-container-wrapper"
               variants={itemVariants}
+              initial="hidden"
+              animate="visible"
               className="rounded-xl font-lexend bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:shadow-none print:bg-transparent print:overflow-visible"
             >
               <div className="overflow-x-auto w-full print:overflow-visible">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Table, TableCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -36,7 +36,8 @@ import { useRouter } from "next/navigation";
 
 export type APIRoutineItem = {
   id: number;
-  day: string;
+  day: number | string;
+  day_name: string;
   start_time: string;
   end_time: string;
   course_name: string;
@@ -45,6 +46,12 @@ export type APIRoutineItem = {
   department_name: string;
   semester_name: string;
   room_number: string;
+};
+
+export type TimeSlot = {
+  id: number;
+  start_time: string;
+  end_time: string;
 };
 
 type ClassSession = {
@@ -70,29 +77,16 @@ type RoutineData = {
   schedule: DayRow[];
 };
 
-const timeSlots = [
-  "8.45-9.35",
-  "9.40-10.30",
-  "10.35-11.25",
-  "11.30-12.20",
-  "12.25-1.15",
-  "Break",
-  "2.00-2.45",
-  "2.45-3.30",
-  "3.30-4.15",
-];
+const BREAK_INSERT_INDEX = 4;
 
-const LUNCH_SLOT_INDEX = 5;
-
-const TIME_TO_SLOT_INDEX: Record<string, number> = {
-  [normalizeTime("08:45:00")]: 0,
-  [normalizeTime("09:40:00")]: 1,
-  [normalizeTime("10:35:00")]: 2,
-  [normalizeTime("11:30:00")]: 3,
-  [normalizeTime("12:25:00")]: 4,
-  [normalizeTime("14:00:00")]: 6,
-  [normalizeTime("14:45:00")]: 7,
-  [normalizeTime("15:30:00")]: 8,
+const formatTimeSlotLabel = (timeStr: string) => {
+  if (!timeStr) return "";
+  const [hStr, mStr] = timeStr.split(":");
+  let h = parseInt(hStr);
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  h = h ? h : 12;
+  return `${h}:${mStr} ${ampm}`;
 };
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
@@ -155,40 +149,13 @@ const EMPTY_OBJ = {};
 
 interface Props {
   routineList: APIRoutineItem[];
+  timeSlots: TimeSlot[];
 }
 
-export default function DepartmentRoutinePage({ routineList }: Props) {
+export default function DepartmentRoutinePage({ routineList, timeSlots }: Props) {
   const auth = useSelector((s: RootState) => s.auth) as any;
 
-  if (auth?.role?.toLowerCase() !== "student") {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="h-[80vh] w-full flex flex-col font-lexend items-center justify-center gap-6 text-center px-4"
-      >
-        <div className="rounded-full bg-red-100 p-6 dark:bg-red-900/20 ring-1 ring-red-200 dark:ring-red-900/40 shadow-sm">
-          <ShieldBan className="h-12 w-12 text-red-600 dark:text-red-500" />
-        </div>
-        <div className="space-y-3 max-w-[500px]">
-          <h2 className="sm:text-2xl text-xl font-bold tracking-tight text-foreground">
-            Access Restricted
-          </h2>
-          <p className="text-muted-foreground text-xs sm:text-base leading-relaxed">
-            This page is exclusively for students. It seems you do not
-            have the required permissions to view this content.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => window.history.back()}
-        >
-          <ChevronLeft className="h-4 w-4" /> Go Back
-        </Button>
-      </motion.div>
-    );
-  }
+
 
   const availabilityMap = useSelector(
     (s: RootState) => s.teacherAvailability?.map || EMPTY_OBJ
@@ -197,13 +164,11 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
     (s: RootState) => s.classOff.offMap || EMPTY_OBJ
   );
 
-  const [isLoading, setIsLoading] = useState(true);
   // Note: selectedSemester state is technically unused for filtering now
   // since we force a single view, but kept for logic consistency if needed.
   const [selectedSemester] = useState<string>("");
   const [inputValue, setInputValue] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-
 
   const [viewReasonModal, setViewReasonModal] = useState<{
     isOpen: boolean;
@@ -220,15 +185,10 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
   const isStudent = auth?.role?.toLowerCase() === "student";
   const studentSemester = auth?.semester_name;
 
-  useEffect(() => {
-    const delay = 1500;
-    const timer = setTimeout(() => setIsLoading(false), delay);
-    return () => clearTimeout(timer);
-  }, []);
-
   const formattedRoutineData = useMemo(() => {
     const grouped: Record<string, RoutineData> = {};
     const semesterUniqueCourses: Record<string, Set<string>> = {};
+    const slotStartTimes = timeSlots.map((ts) => normalizeTime(ts.start_time));
 
     // 1. Initialize Groups
     routineList.forEach((item) => {
@@ -239,7 +199,7 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
           credits: 0,
           schedule: DAYS_ORDER.map((day) => ({
             day,
-            slots: Array(9).fill(null),
+            slots: Array(timeSlots.length).fill(null),
           })),
         };
         semesterUniqueCourses[item.semester_name] = new Set();
@@ -253,13 +213,13 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
 
       semesterUniqueCourses[item.semester_name].add(item.course_code);
 
-      const dayRow = semesterGroup.schedule.find((d) => d.day === item.day);
+      const dayRow = semesterGroup.schedule.find((d) => d.day === item.day_name);
       if (!dayRow) return;
 
       const normalizedApiTime = normalizeTime(item.start_time);
-      const slotIndex = TIME_TO_SLOT_INDEX[normalizedApiTime];
+      const slotIndex = slotStartTimes.indexOf(normalizedApiTime);
 
-      if (slotIndex !== undefined && slotIndex >= 0 && slotIndex < 9) {
+      if (slotIndex !== -1 && slotIndex < timeSlots.length) {
         dayRow.slots[slotIndex] = {
           course: item.course_code,
           teacher: item.teacher_name,
@@ -268,7 +228,7 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
           originalTime: item.start_time,
           department: item.department_name,
           semester: item.semester_name,
-          day: item.day,
+          day: item.day_name,
         };
       }
     });
@@ -280,7 +240,7 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
     });
 
     return grouped;
-  }, [routineList]);
+  }, [routineList, timeSlots]);
 
   const semesterOptions = useMemo(() => {
     return Object.keys(formattedRoutineData).map((key) => ({
@@ -353,12 +313,18 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
     };
   }, [debouncedSearch, validTeacherShortNames]);
 
-  if (isLoading)
-    return (
-      <div className="w-full h-[70vh] flex items-center justify-center bg-background">
-        <DataLoader />
-      </div>
-    );
+
+
+  // --- MOUNTED CHECK FOR HYDRATION FIX ---
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
 
   if (!currentRoutine) {
     const isEmpty = routineList.length === 0;
@@ -399,6 +365,36 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
             Refresh Page
           </Button>
         )}
+      </motion.div>
+    );
+  }
+
+  if (auth?.role?.toLowerCase() !== "student") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="h-[80vh] w-full flex flex-col font-lexend items-center justify-center gap-6 text-center px-4"
+      >
+        <div className="rounded-full bg-red-100 p-6 dark:bg-red-900/20 ring-1 ring-red-200 dark:ring-red-900/40 shadow-sm">
+          <ShieldBan className="h-12 w-12 text-red-600 dark:text-red-500" />
+        </div>
+        <div className="space-y-3 max-w-[500px]">
+          <h2 className="sm:text-2xl text-xl font-bold tracking-tight text-foreground">
+            Access Restricted
+          </h2>
+          <p className="text-muted-foreground text-xs sm:text-base leading-relaxed">
+            This page is exclusively for students. It seems you do not
+            have the required permissions to view this content.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => window.history.back()}
+        >
+          <ChevronLeft className="h-4 w-4" /> Go Back
+        </Button>
       </motion.div>
     );
   }
@@ -643,29 +639,36 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                           </span>
                         </TableCell>
                         {timeSlots.map((slot, i) => (
-                          <TableCell
-                            key={i}
-                            className={cn(
-                              "text-center align-middle h-[60px] border-r border-border/60 last:border-r-0 p-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto",
-                              i === LUNCH_SLOT_INDEX
-                                ? "w-10 min-w-10 bg-foreground text-background print:bg-white print:text-black print:w-6 print:min-w-0"
-                                : "min-w-[100px] bg-muted/10 print:bg-white print:min-w-0"
-                            )}
-                          >
-                            <div className="flex flex-col items-center justify-center h-full w-full px-1">
-                              {i === LUNCH_SLOT_INDEX ? (
+                          <React.Fragment key={slot.id}>
+                            {i === BREAK_INSERT_INDEX && (
+                              <TableCell className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border/60 !print:border-r !print:border-black">
                                 <div className="h-full flex items-center justify-center print:hidden">
                                   <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background">
                                     Break
                                   </span>
                                 </div>
-                              ) : (
-                                <span className="font-bold text-xs whitespace-nowrap print:text-[11px] print:font-bold print:text-black">
-                                  {slot}
-                                </span>
+                                <div className="hidden print:flex h-full w-full items-center justify-center">
+                                  <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-black">
+                                    Break
+                                  </span>
+                                </div>
+                              </TableCell>
+                            )}
+                            <TableCell
+                              className={cn(
+                                "text-center align-middle h-[60px] border-r border-border/60 last:border-r-0 p-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto",
+                                "min-w-[100px] bg-muted/10 print:bg-white print:min-w-0"
                               )}
-                            </div>
-                          </TableCell>
+                            >
+                              <div className="flex flex-col items-center justify-center h-full w-full px-1">
+                                <span className="font-bold text-xs whitespace-nowrap print:text-[11px] print:font-bold print:text-black">
+                                  {formatTimeSlotLabel(slot.start_time)}
+                                  <span className="mx-1">-</span>
+                                  {formatTimeSlotLabel(slot.end_time)}
+                                </span>
+                              </div>
+                            </TableCell>
+                          </React.Fragment>
                         ))}
                       </TableRow>
                     </TableHeader>
@@ -725,100 +728,99 @@ export default function DepartmentRoutinePage({ routineList }: Props) {
                                 isClassOffToday;
 
                               const highlighted = isMatch(session);
-                              const isLunch = index === LUNCH_SLOT_INDEX;
-
-                              if (isLunch)
-                                return (
-                                  <TableCell
-                                    key={index}
-                                    className="p-0 align-middle border-r-0 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black"
-                                  >
-                                    <div
-                                      className="absolute inset-0 opacity-10 print:hidden"
-                                      style={{
-                                        backgroundImage:
-                                          "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
-                                        backgroundSize: "4px 4px",
-                                      }}
-                                    />
-                                    <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden">
-                                      <Utensils className="w-3 h-3 text-foreground/40" />
-                                    </div>
-                                  </TableCell>
-                                );
 
                               return (
-                                <TableCell
-                                  key={index}
-                                  onClick={() => {
-                                    if (session && isClassOffToday) {
-                                      setViewReasonModal({
-                                        isOpen: true,
-                                        course: session.course,
-                                        teacher: session.teacher,
-                                        reason: cancellationReason,
-                                      });
-                                    }
-                                  }}
-                                  className={cn(
-                                    "p-1.5 align-middle border-r border-border/60 transition-colors duration-200 !print:border-r !print:border-black print:p-0.5",
-                                    isClassOffToday
-                                      ? "cursor-pointer"
-                                      : "cursor-default",
-                                    highlighted
-                                      ? "bg-emerald-100/50 dark:bg-emerald-900/20 print:bg-transparent"
-                                      : "bg-transparent print:bg-white"
-                                  )}
-                                >
-                                  {session ? (
-                                    <>
+                                <React.Fragment key={index}>
+                                  {index === BREAK_INSERT_INDEX && (
+                                    <TableCell className="p-0 align-middle border-r border-border/60 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black">
                                       <div
-                                        className={cn(
-                                          "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden",
-                                          "transition-colors duration-200",
-                                          isTeacherOff
-                                            ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
-                                            : highlighted
-                                            ? "bg-background border-emerald-500 shadow-md"
-                                            : "bg-card border-border/50 hover:border-foreground/20 hover:shadow-md"
-                                        )}
-                                      >
-                                        <div className="flex justify-between items-start">
-                                          <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
-                                            {session.course}
-                                          </span>
-                                        </div>
-                                        <div className="flex flex-col gap-0.5 mt-1">
-                                          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                                            <User className="w-3 h-3 opacity-70" />
-                                            <span>
-                                              {getTeacherInitials(
-                                                session.teacher
-                                              )}
+                                        className="absolute inset-0 opacity-10 print:hidden"
+                                        style={{
+                                          backgroundImage:
+                                            "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
+                                          backgroundSize: "4px 4px",
+                                        }}
+                                      />
+                                      <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden">
+                                        <Utensils className="w-3 h-3 text-foreground/40" />
+                                      </div>
+                                      <div className="hidden print:flex h-full w-full items-center justify-center relative z-10">
+                                        <Utensils className="w-3 h-3 text-black" />
+                                      </div>
+                                    </TableCell>
+                                  )}
+
+                                  <TableCell
+                                    onClick={() => {
+                                      if (session && isClassOffToday) {
+                                        setViewReasonModal({
+                                          isOpen: true,
+                                          course: session.course,
+                                          teacher: session.teacher,
+                                          reason: cancellationReason,
+                                        });
+                                      }
+                                    }}
+                                    className={cn(
+                                      "p-1.5 align-middle border-r border-border/60 transition-colors duration-200 !print:border-r !print:border-black print:p-0.5",
+                                      isClassOffToday
+                                        ? "cursor-pointer"
+                                        : "cursor-default",
+                                      highlighted
+                                        ? "bg-emerald-100/50 dark:bg-emerald-900/20 print:bg-transparent"
+                                        : "bg-transparent print:bg-white"
+                                    )}
+                                  >
+                                    {session ? (
+                                      <>
+                                        <div
+                                          className={cn(
+                                            "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden",
+                                            "transition-colors duration-200",
+                                            isTeacherOff
+                                              ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                                              : highlighted
+                                              ? "bg-background border-emerald-500 shadow-md"
+                                              : "bg-card border-border/50 hover:border-foreground/20 hover:shadow-md"
+                                          )}
+                                        >
+                                          <div className="flex justify-between items-start">
+                                            <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
+                                              {session.course}
                                             </span>
                                           </div>
-                                          <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-                                            <MapPin className="w-3 h-3 opacity-70" />
-                                            <span>{session.room}</span>
+                                          <div className="flex flex-col gap-0.5 mt-1">
+                                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                                              <User className="w-3 h-3 opacity-70" />
+                                              <span>
+                                                {getTeacherInitials(
+                                                  session.teacher
+                                                )}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
+                                              <MapPin className="w-3 h-3 opacity-70" />
+                                              <span>{session.room}</span>
+                                            </div>
                                           </div>
                                         </div>
+                                        <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
+                                          <span className="font-bold text-[11px]">
+                                            {session.course}, T-
+                                            {getTeacherInitials(session.teacher)}
+                                          </span>
+                                          <span className="font-bold text-[11px]">
+                                            {session.room}
+                                          </span>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <div className="h-full w-full flex items-center justify-center">
+                                        <div className="w-1 h-1 rounded-full bg-border print:hidden" />
                                       </div>
-                                      <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
-                                        <span className="font-bold text-[11px]">
-                                          {session.course}, T-
-                                          {getTeacherInitials(session.teacher)}
-                                        </span>
-                                        <span className="font-bold text-[11px]">
-                                          {session.room}
-                                        </span>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="h-full w-full flex items-center justify-center">
-                                      <div className="w-1 h-1 rounded-full bg-border print:hidden" />
-                                    </div>
-                                  )}
-                                </TableCell>
+                                    )}
+                                  </TableCell>
+                                </React.Fragment>
                               );
                             })}
                           </motion.tr>

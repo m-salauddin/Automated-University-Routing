@@ -104,7 +104,8 @@ import { Label } from "@/components/ui/label";
 // --- TYPES ---
 export type APIRoutineItem = {
   id: number;
-  day: string;
+  day: number | string;
+  day_name: string;
   start_time: string;
   end_time: string;
   course_name: string;
@@ -438,7 +439,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
 
         return {
           id: item.id,
-          day: abbreviateDay(item.day),
+          day: abbreviateDay(item.day_name),
           time: formatTimeRange(item.start_time, item.end_time),
           startTimeRaw: item.start_time,
           course: item.course_code,
@@ -894,13 +895,15 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     );
   }
 
-  // --- AUTH LOADING STATE ---
-  if (isAuthLoading || isLoading) {
-    return (
-      <div className="w-full h-[70vh] flex items-center justify-center bg-background">
-        <DataLoader />
-      </div>
-    );
+  // --- MOUNTED CHECK FOR HYDRATION FIX ---
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
   }
 
   // --- ROLE CHECK & BEAUTIFUL ERROR UI ---

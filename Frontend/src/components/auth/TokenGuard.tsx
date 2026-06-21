@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState } from "@/store";
 import { resetAuth, setAuthenticated } from "@/store/authSlice";
@@ -49,11 +49,14 @@ function flushQueuedToast() {
 export default function TokenGuard() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const dispatch = useDispatch();
   const isAuthed = useSelector((s: RootState) => s.auth.isAuthenticated);
   const notifiedRef = useRef(false);
 
   useEffect(() => {
+
+
     const checkAuth = async () => {
       flushQueuedToast();
 
@@ -66,7 +69,8 @@ export default function TokenGuard() {
 
       if (pathname === "/login" && hasToken) {
         if (!isTokenExpired(token)) {
-          router.replace("/dashboard/analytics");
+          const redirectPath = searchParams.get("redirect");
+          router.replace(redirectPath || "/dashboard/analytics");
           return;
         }
       }
@@ -106,7 +110,8 @@ export default function TokenGuard() {
     };
 
     checkAuth();
-  }, [dispatch, isAuthed, pathname, router]);
+
+  }, [dispatch, isAuthed, pathname, router, searchParams]);
 
   return null;
 }
