@@ -113,7 +113,9 @@ const abbreviateDay = (day: string) => {
 
 const isBreakSlot = (slot: any) => {
   if (!slot) return false;
-  return Boolean(slot.is_lunch_break) || Boolean(slot.is_launch_break) || Boolean(slot.islaunchbreak);
+  const time = slot.start_time;
+  const isTimeMatch = time && (time.startsWith("01:15") || time.startsWith("13:15") || time.startsWith("1:15"));
+  return Boolean(isTimeMatch) || Boolean(slot.is_lunch_break) || Boolean(slot.is_launch_break) || Boolean(slot.islaunchbreak);
 };
 
 const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string) => {

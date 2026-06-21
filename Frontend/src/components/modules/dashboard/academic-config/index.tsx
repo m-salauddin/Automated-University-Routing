@@ -74,10 +74,12 @@ type TimeSlot = {
   [key: string]: any;
 };
 
-const isSlotBreak = (slot: TimeSlot) =>
-  Boolean((slot as any).is_lunch_break) ||
-  Boolean((slot as any).is_launch_break) ||
-  Boolean((slot as any).islaunchbreak);
+const isSlotBreak = (slot: TimeSlot) => {
+  if (!slot) return false;
+  const time = slot.start_time;
+  const isTimeMatch = time && (time.startsWith("01:15") || time.startsWith("13:15") || time.startsWith("1:15"));
+  return Boolean(isTimeMatch) || Boolean(slot.is_lunch_break) || Boolean(slot.is_launch_break) || Boolean(slot.islaunchbreak);
+};
 
 const sortTimeSlotsHelper = (slots: TimeSlot[]): TimeSlot[] => {
   const getMinutes = (timeStr: string) => {
@@ -568,9 +570,16 @@ export default function AcademicSettingsPage({
 
     try {
       let res;
+      let finalStart = newSlotStart;
+      let finalEnd = newSlotEnd;
+      if (newSlotIsLaunchBreak) {
+        finalStart = "13:15:00";
+        finalEnd = "14:00:00";
+      }
+
       const payload = {
-        start_time: newSlotStart,
-        end_time: newSlotEnd,
+        start_time: finalStart,
+        end_time: finalEnd,
         is_launch_break: newSlotIsLaunchBreak,
         islaunchbreak: newSlotIsLaunchBreak,
       };
@@ -582,8 +591,8 @@ export default function AcademicSettingsPage({
               slot.id === editingSlot.id
                 ? {
                     ...slot,
-                    start_time: newSlotStart,
-                    end_time: newSlotEnd,
+                    start_time: finalStart,
+                    end_time: finalEnd,
                     is_launch_break: newSlotIsLaunchBreak,
                     islaunchbreak: newSlotIsLaunchBreak,
                   }
@@ -607,7 +616,7 @@ export default function AcademicSettingsPage({
           router.refresh();
         });
       } else {
-        setTimeSlotsList(sortTimeSlotsHelper(initialTimeSlots)); // Revert
+        setTimeSlotsList(sortTimeSlotsHelper(initialTimeSlots));
         toast.error(res.message || "Operation failed");
       }
     } catch (err) {
