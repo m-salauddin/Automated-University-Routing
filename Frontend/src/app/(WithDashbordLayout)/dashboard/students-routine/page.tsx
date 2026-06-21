@@ -1,18 +1,34 @@
 import DepartmentRoutinePage from "@/components/modules/dashboard/student-routine";
 import { getRoutine } from "@/services/routine";
+import { getUserProfile } from "@/services/users";
+import { getAllTimeSlots } from "@/services/time-slots";
 
 const StudentRoutine = async () => {
-  const routineResponse = await getRoutine();
-  console.log("Routine Response", routineResponse);
+  const [profileResponse, timeSlotsResponse] = await Promise.all([
+    getUserProfile(),
+    getAllTimeSlots(),
+  ]);
 
-  const routineList =
-    routineResponse.success && Array.isArray(routineResponse.data)
-      ? routineResponse.data
+  let routineList = [];
+  if (profileResponse.success && profileResponse.data) {
+    const { department, semester } = profileResponse.data;
+    const routineResponse = await getRoutine({
+      department_id: department,
+      semester_id: semester,
+    });
+    if (routineResponse.success && Array.isArray(routineResponse.data)) {
+      routineList = routineResponse.data;
+    }
+  }
+
+  const timeSlots =
+    timeSlotsResponse.success && Array.isArray(timeSlotsResponse.data)
+      ? timeSlotsResponse.data
       : [];
 
   return (
     <>
-      <DepartmentRoutinePage routineList={routineList} />
+      <DepartmentRoutinePage routineList={routineList} timeSlots={timeSlots} />
     </>
   );
 };

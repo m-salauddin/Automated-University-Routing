@@ -127,3 +127,20 @@ export const deleteUser = async (userId: string): Promise<ActionResponse> => {
         return { success: false, message: "Network error occurred", data: null };
     }
 };
+
+export const getUserProfile = async (): Promise<ActionResponse> => {
+    try {
+        const headers = await getAuthHeaders();
+        if (!headers) return { success: false, message: "No access token found", data: null };
+
+        const res = await fetch(`${API_BASE}/profile/`, {
+            method: "GET",
+            headers,
+            cache: "no-store",
+        });
+
+        return handleResponse(res);
+    } catch (error) {
+        return { success: false, message: "Network error occurred", data: null };
+    }
+};

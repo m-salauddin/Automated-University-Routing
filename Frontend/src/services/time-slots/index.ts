@@ -36,7 +36,7 @@ export const getAllTimeSlots = async () => {
     }
 };
 
-export const createTimeSlot = async (timeSlotData: Record<string, string>) => {
+export const createTimeSlot = async (timeSlotData: Record<string, any>) => {
     try {
         const TIME_SLOTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/timeslots/`;
         const cookiesStore = await cookies();
@@ -72,7 +72,7 @@ export const createTimeSlot = async (timeSlotData: Record<string, string>) => {
     }
 };
 
-export const updateTimeSlot = async (id: string, timeSlotData: Record<string, string>) => {
+export const updateTimeSlot = async (id: string, timeSlotData: Record<string, any>) => {
     try {
         const TIME_SLOTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/timeslots/${id}/`;
         const cookiesStore = await cookies();

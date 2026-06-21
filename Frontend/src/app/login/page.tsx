@@ -2,7 +2,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,6 +44,11 @@ function LoginContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isForgotOpen, setIsForgotOpen] = useState(false);
+  
+  useEffect(() => {
+    const redirectPath = searchParams.get("redirect");
+    router.prefetch(redirectPath || "/dashboard/analytics");
+  }, [router, searchParams]);
 
 
   const {
@@ -98,13 +103,16 @@ function LoginContent() {
           })
         );
 
+        const redirectPath = searchParams.get("redirect");
+        const target = redirectPath || "/dashboard/analytics";
+        router.prefetch(target);
+        router.replace(target);
+        
         toast.success("Login successful!", {
           description: `Welcome back, ${finalUsername}`,
           duration: 3000,
         });
 
-          const redirectPath = searchParams.get("redirect");
-          router.push(redirectPath || "/dashboard/analytics");
       } else {
         toast.error("Login Failed", {
           description: result.message || "Invalid credentials provided.",

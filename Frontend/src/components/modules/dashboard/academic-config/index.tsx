@@ -50,6 +50,7 @@ import {
   deleteDepartment,
   updateDepartment,
 } from "@/services/departments";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   addSemester,
   deleteSemester,
@@ -65,7 +66,30 @@ import { RootState } from "@/store";
 
 type Department = { id: number; name: string };
 type Semester = { id: number; name: string; order: number };
-type TimeSlot = { id: number; start_time: string; end_time: string };
+type TimeSlot = {
+  id: number;
+  start_time: string;
+  end_time: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+};
+
+const isSlotBreak = (slot: TimeSlot) =>
+  Boolean((slot as any).is_lunch_break) ||
+  Boolean((slot as any).is_launch_break) ||
+  Boolean((slot as any).islaunchbreak);
+
+const sortTimeSlotsHelper = (slots: TimeSlot[]): TimeSlot[] => {
+  const getMinutes = (timeStr: string) => {
+    if (!timeStr) return 0;
+    const [hStr, mStr] = timeStr.split(":");
+    let h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    if (h >= 1 && h <= 5) h += 12;
+    return h * 60 + m;
+  };
+  return [...slots].sort((a, b) => getMinutes(a.start_time) - getMinutes(b.start_time));
+};
 
 interface AcademicSettingsPageProps {
   departments: Department[];
@@ -236,35 +260,7 @@ export default function AcademicSettingsPage({
 }: AcademicSettingsPageProps) {
   const user = useSelector((state: RootState) => state.auth);
 
-  if (user?.role !== "admin") {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="h-[80vh] w-full flex flex-col font-lexend items-center justify-center gap-6 text-center px-4"
-      >
-        <div className="rounded-full bg-red-100 p-6 dark:bg-red-900/20 ring-1 ring-red-200 dark:ring-red-900/40 shadow-sm">
-          <ShieldBan className="h-12 w-12 text-red-600 dark:text-red-500" />
-        </div>
-        <div className="space-y-3 max-w-[500px]">
-          <h2 className="sm:text-2xl text-xl font-bold tracking-tight text-foreground">
-            Access Restricted
-          </h2>
-          <p className="text-muted-foreground text-xs sm:text-base leading-relaxed">
-            This page is exclusively for administrators. It seems you do not
-            have the required permissions to view this content.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => window.history.back()}
-        >
-          <ChevronLeft className="h-4 w-4" /> Go Back
-        </Button>
-      </motion.div>
-    );
-  }
+
 
   const router = useRouter();
 
@@ -296,7 +292,7 @@ export default function AcademicSettingsPage({
 
   // --- TIME SLOT STATE ---
   const [timeSlotsList, setTimeSlotsList] =
-    useState<TimeSlot[]>(initialTimeSlots);
+    useState<TimeSlot[]>(() => sortTimeSlotsHelper(initialTimeSlots));
 
   const timeSlotsDependency = useMemo(
     () => JSON.stringify(initialTimeSlots),
@@ -304,7 +300,7 @@ export default function AcademicSettingsPage({
   );
 
   useEffect(() => {
-    setTimeSlotsList(initialTimeSlots);
+    setTimeSlotsList(sortTimeSlotsHelper(initialTimeSlots));
   }, [timeSlotsDependency, initialTimeSlots]);
 
   // Modal States
@@ -332,11 +328,15 @@ export default function AcademicSettingsPage({
   const [newSemOrder, setNewSemOrder] = useState("");
   const [newSlotStart, setNewSlotStart] = useState("09:00:00");
   const [newSlotEnd, setNewSlotEnd] = useState("10:00:00");
+  const [newSlotIsLaunchBreak, setNewSlotIsLaunchBreak] = useState(false);
 
   const formatDisplayTime = (timeStr: string) => {
     if (!timeStr) return "";
     const [h, m] = timeStr.split(":");
-    const hour = parseInt(h);
+    let hour = parseInt(h, 10);
+    if (hour >= 1 && hour <= 5) {
+      hour += 12;
+    }
     const suffix = hour >= 12 ? "PM" : "AM";
     const formattedHour = hour % 12 || 12;
     return `${formattedHour}:${m} ${suffix}`;
@@ -541,6 +541,7 @@ export default function AcademicSettingsPage({
     setEditingSlot(null);
     setNewSlotStart("09:00:00");
     setNewSlotEnd("10:00:00");
+    setNewSlotIsLaunchBreak(false);
     setIsSlotModalOpen(true);
   };
 
@@ -548,6 +549,7 @@ export default function AcademicSettingsPage({
     setEditingSlot(slot);
     setNewSlotStart(slot.start_time);
     setNewSlotEnd(slot.end_time);
+    setNewSlotIsLaunchBreak(isSlotBreak(slot));
     setIsSlotModalOpen(true);
   };
 
@@ -566,24 +568,32 @@ export default function AcademicSettingsPage({
 
     try {
       let res;
+      const payload = {
+        start_time: newSlotStart,
+        end_time: newSlotEnd,
+        is_launch_break: newSlotIsLaunchBreak,
+        islaunchbreak: newSlotIsLaunchBreak,
+      };
       if (editingSlot) {
         // Optimistic Update
         setTimeSlotsList((prev) =>
-          prev.map((slot) =>
-            slot.id === editingSlot.id
-              ? { ...slot, start_time: newSlotStart, end_time: newSlotEnd }
-              : slot
+          sortTimeSlotsHelper(
+            prev.map((slot) =>
+              slot.id === editingSlot.id
+                ? {
+                    ...slot,
+                    start_time: newSlotStart,
+                    end_time: newSlotEnd,
+                    is_launch_break: newSlotIsLaunchBreak,
+                    islaunchbreak: newSlotIsLaunchBreak,
+                  }
+                : slot
+            )
           )
         );
-        res = await updateTimeSlot(editingSlot.id.toString(), {
-          start_time: newSlotStart,
-          end_time: newSlotEnd,
-        });
+        res = await updateTimeSlot(editingSlot.id.toString(), payload);
       } else {
-        res = await createTimeSlot({
-          start_time: newSlotStart,
-          end_time: newSlotEnd,
-        });
+        res = await createTimeSlot(payload);
       }
 
       if (res.success) {
@@ -597,7 +607,7 @@ export default function AcademicSettingsPage({
           router.refresh();
         });
       } else {
-        setTimeSlotsList(initialTimeSlots); // Revert
+        setTimeSlotsList(sortTimeSlotsHelper(initialTimeSlots)); // Revert
         toast.error(res.message || "Operation failed");
       }
     } catch (err) {
@@ -625,7 +635,7 @@ export default function AcademicSettingsPage({
           router.refresh();
         });
       } else {
-        setTimeSlotsList(previousList);
+        setTimeSlotsList(sortTimeSlotsHelper(previousList));
         toast.error(res.message || "Failed to delete time slot");
       }
     } catch (err) {
@@ -635,6 +645,47 @@ export default function AcademicSettingsPage({
       setIsLoading(false);
     }
   };
+
+  // --- MOUNTED CHECK FOR HYDRATION FIX ---
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
+  }
+
+  if (user?.role !== "admin") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="h-[80vh] w-full flex flex-col font-lexend items-center justify-center gap-6 text-center px-4"
+      >
+        <div className="rounded-full bg-red-100 p-6 dark:bg-red-900/20 ring-1 ring-red-200 dark:ring-red-900/40 shadow-sm">
+          <ShieldBan className="h-12 w-12 text-red-600 dark:text-red-500" />
+        </div>
+        <div className="space-y-3 max-w-[500px]">
+          <h2 className="sm:text-2xl text-xl font-bold tracking-tight text-foreground">
+            Access Restricted
+          </h2>
+          <p className="text-muted-foreground text-xs sm:text-base leading-relaxed">
+            This page is exclusively for administrators. It seems you do not
+            have the required permissions to view this content.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => window.history.back()}
+        >
+          <ChevronLeft className="h-4 w-4" /> Go Back
+        </Button>
+      </motion.div>
+    );
+  }
 
   return (
     <>
@@ -850,6 +901,11 @@ export default function AcademicSettingsPage({
                           <span className="text-muted-foreground mx-1">-</span>{" "}
                           {formatDisplayTime(slot.end_time)}
                         </span>
+                        {isSlotBreak(slot) && (
+                          <Badge variant="secondary" className="bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-none text-[10px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 ml-2">
+                            Break
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center">
@@ -1096,6 +1152,16 @@ export default function AcademicSettingsPage({
                 value={newSlotEnd}
                 onChange={setNewSlotEnd}
               />
+              <div className="flex items-center space-x-2 pt-2 border-t border-border/40">
+                <Checkbox
+                  id="is-launch-break"
+                  checked={newSlotIsLaunchBreak}
+                  onCheckedChange={(checked) => setNewSlotIsLaunchBreak(!!checked)}
+                />
+                <Label htmlFor="is-launch-break" className="text-sm font-medium leading-none cursor-pointer">
+                  Is Lunch/Launch Break Slot
+                </Label>
+              </div>
             </motion.div>
             <div className="bg-muted/50 p-3 rounded-md text-center text-sm mb-4">
               <span className="text-muted-foreground">Preview: </span>

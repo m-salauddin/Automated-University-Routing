@@ -1,3 +1,5 @@
+"use client";
+
 import { motion, SVGMotionProps } from "framer-motion";
 
 interface LogoProps extends SVGMotionProps<SVGSVGElement> {

@@ -104,7 +104,8 @@ import { Label } from "@/components/ui/label";
 // --- TYPES ---
 export type APIRoutineItem = {
   id: number;
-  day: string;
+  day: number | string;
+  day_name: string;
   start_time: string;
   end_time: string;
   course_name: string;
@@ -438,7 +439,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
 
         return {
           id: item.id,
-          day: abbreviateDay(item.day),
+          day: abbreviateDay(item.day_name),
           time: formatTimeRange(item.start_time, item.end_time),
           startTimeRaw: item.start_time,
           course: item.course_code,
@@ -825,8 +826,8 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
                   className={cn(
                     "rounded-md px-2.5 py-0.5 font-medium border shadow-sm",
                     row.type === "Lab"
-                      ? "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/10 dark:text-purple-300 dark:border-purple-500/20"
-                      : "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/20"
+                      ? "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/20"
+                      : "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/20"
                   )}
                 >
                   {row.type}
@@ -894,13 +895,15 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     );
   }
 
-  // --- AUTH LOADING STATE ---
-  if (isAuthLoading || isLoading) {
-    return (
-      <div className="w-full h-[70vh] flex items-center justify-center bg-background">
-        <DataLoader />
-      </div>
-    );
+  // --- MOUNTED CHECK FOR HYDRATION FIX ---
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return null;
   }
 
   // --- ROLE CHECK & BEAUTIFUL ERROR UI ---

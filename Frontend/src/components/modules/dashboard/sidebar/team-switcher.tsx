@@ -64,6 +64,7 @@ export function TeamSwitcher() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <div
+              id="team-switcher-trigger"
               className={cn(
                 "group relative overflow-hidden transition-all duration-300 ease-in-out cursor-pointer flex font-pacifico bg-muted/60 rounded-md items-center gap-2 w-full",
                 showContent ? "p-2" : "justify-center size-8 p-0"
