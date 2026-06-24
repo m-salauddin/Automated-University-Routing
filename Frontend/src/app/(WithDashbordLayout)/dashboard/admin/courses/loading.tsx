@@ -64,7 +64,7 @@ function CourseCardSkeleton({ index }: { index: number }) {
 
 export default function Loading() {
   return (
-    <div className="skeleton-sweep w-full max-w-full overflow-x-hidden p-4 font-lexend md:p-6">
+    <div className="skeleton-sweep w-full min-w-0 max-w-full overflow-x-hidden p-4 font-lexend md:p-6">
       <div className="space-y-6">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div className="max-w-2xl space-y-3">
