@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, RefreshCw, ChevronLeft, Home, Terminal } from "lucide-react";
+import { AlertTriangle, RefreshCw, ChevronLeft, Home, Terminal, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ErrorProps {
@@ -13,6 +13,7 @@ interface ErrorProps {
 
 export default function GlobalError({ error, reset }: ErrorProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     // Log the error to an error reporting service
@@ -31,35 +32,31 @@ export default function GlobalError({ error, reset }: ErrorProps) {
     }
   };
 
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 sm:p-6 font-lexend relative overflow-hidden select-none">
-      {/* Decorative Blur Background Blobs */}
-      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-[500px] h-80 sm:h-[500px] bg-red-500/10 rounded-full blur-[100px] pointer-events-none animate-pulse duration-[6000ms]" />
-      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-80 sm:w-[500px] h-80 sm:h-[500px] bg-amber-500/10 rounded-full blur-[100px] pointer-events-none animate-pulse duration-[8000ms]" />
+  const handleCopy = async () => {
+    try {
+      const textToCopy = `Digest: ${error.digest || "N/A"}\n\n${error.stack || error.toString()}`;
+      await navigator.clipboard.writeText(textToCopy);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy text: ", err);
+    }
+  };
 
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-background p-4 sm:p-6 font-lexend relative select-none">
       <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.98 }}
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 100, damping: 20 }}
         className="w-full max-w-lg z-10"
       >
-        <div className="bg-card/40 backdrop-blur-xl border border-border/50 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden">
+        <div className="bg-card border border-border rounded-2xl p-6 sm:p-8 shadow-xl space-y-6 relative overflow-hidden">
           {/* Header Section */}
           <div className="flex flex-col items-center text-center space-y-4">
-            <motion.div
-              animate={{
-                scale: [1, 1.05, 1],
-                rotate: [0, 2, -2, 0],
-              }}
-              transition={{
-                repeat: Infinity,
-                duration: 5,
-                ease: "easeInOut",
-              }}
-              className="p-4 bg-red-500/10 dark:bg-red-500/15 border border-red-500/30 text-red-500 rounded-2xl shadow-[0_0_20px_rgba(239,68,68,0.2)]"
-            >
+            <div className="p-4 bg-red-500/10 dark:bg-red-500/15 border border-red-500/20 text-red-500 rounded-xl">
               <AlertTriangle className="w-10 h-10 sm:w-12 sm:h-12" />
-            </motion.div>
+            </div>
 
             <div className="space-y-2">
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
@@ -82,7 +79,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <Button
               onClick={() => reset()}
-              className="flex-1 gap-2 cursor-pointer shadow-md bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-sm h-11 transition-all"
+              className="flex-1 gap-2 cursor-pointer shadow-sm bg-red-600 hover:bg-red-500 dark:bg-red-500 dark:hover:bg-red-600 text-white font-bold text-sm h-11 transition-all"
             >
               <RefreshCw className="w-4 h-4" /> Try Again
             </Button>
@@ -128,14 +125,39 @@ export default function GlobalError({ error, reset }: ErrorProps) {
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
-                className="mt-3 bg-neutral-950 text-neutral-300 font-mono text-[10px] sm:text-xs p-3 rounded-lg overflow-x-auto border border-border/30 max-h-40 compact-scrollbar selection:bg-neutral-800"
+                className="mt-3 overflow-hidden border border-border/60 rounded-lg bg-zinc-950/20"
               >
-                <p className="font-bold text-red-400 mb-1">
-                  Digest: {error.digest || "N/A"}
-                </p>
-                <p className="whitespace-pre-wrap select-text leading-relaxed">
-                  {error.stack || error.toString()}
-                </p>
+                {/* Custom toolbar header */}
+                <div className="flex items-center justify-between px-3 py-2 bg-neutral-900 border-b border-border/40 text-[10px] text-neutral-400 font-semibold tracking-wider">
+                  <span>LOG DETAILS / STACK TRACE</span>
+                  <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer py-1 px-2 rounded bg-neutral-800 border border-neutral-700/60 hover:bg-neutral-700 text-neutral-300 font-bold"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-3 h-3 text-green-400" />
+                        <span className="text-green-400">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Copy Details</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                {/* Scrollable code block */}
+                <div className="p-3 bg-neutral-950 text-neutral-300 font-mono text-[10px] sm:text-xs overflow-x-auto max-h-40 compact-scrollbar selection:bg-neutral-800">
+                  {error.digest && (
+                    <p className="font-bold text-red-400 mb-1">
+                      Digest: {error.digest}
+                    </p>
+                  )}
+                  <p className="whitespace-pre-wrap select-text leading-relaxed">
+                    {error.stack || error.toString()}
+                  </p>
+                </div>
               </motion.div>
             )}
           </div>
