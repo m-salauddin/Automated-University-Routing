@@ -208,19 +208,27 @@ export default function AutomatedRoutineCourses({
       const creditsSet = new Set<number>();
 
       courses.forEach((c) => {
-        teachersMap.set(c.teacher, c.teacher_name);
-        deptsMap.set(c.department, c.department_name);
-        semsMap.set(c.semester, c.semester_name);
-        creditsSet.add(c.credits);
+        if (c.teacher) {
+          teachersMap.set(c.teacher, c.teacher_name || "Unknown Teacher");
+        }
+        if (c.department) {
+          deptsMap.set(c.department, c.department_name || "Unknown Department");
+        }
+        if (c.semester) {
+          semsMap.set(c.semester, c.semester_name || "Unknown Semester");
+        }
+        if (c.credits !== undefined && c.credits !== null) {
+          creditsSet.add(c.credits);
+        }
       });
 
       return {
         uniqueTeachers: Array.from(teachersMap.entries())
           .map(([id, name]) => ({ id, name }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
+          .sort((a, b) => (a.name || "").localeCompare(b.name || "")),
         uniqueDepts: Array.from(deptsMap.entries())
           .map(([id, name]) => ({ id, name }))
-          .sort((a, b) => a.name.localeCompare(b.name)),
+          .sort((a, b) => (a.name || "").localeCompare(b.name || "")),
         uniqueSemesters: Array.from(semsMap.entries())
           .map(([id, name]) => ({ id, name }))
           .sort((a, b) => a.id - b.id),

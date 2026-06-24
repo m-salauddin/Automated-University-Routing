@@ -102,11 +102,6 @@ function LoginContent() {
             student_id: user?.student_id || null,
           })
         );
-
-        const redirectPath = searchParams.get("redirect");
-        const target = redirectPath || "/dashboard/analytics";
-        router.prefetch(target);
-        router.replace(target);
         
         toast.success("Login successful!", {
           description: `Welcome back, ${finalUsername}`,
@@ -117,13 +112,13 @@ function LoginContent() {
         toast.error("Login Failed", {
           description: result.message || "Invalid credentials provided.",
         });
+        setIsLoading(false);
       }
     } catch (error) {
       console.error("Login error:", error);
       toast.error("System Error", {
         description: "Something went wrong. Please try again later.",
       });
-    } finally {
       setIsLoading(false);
     }
   };
