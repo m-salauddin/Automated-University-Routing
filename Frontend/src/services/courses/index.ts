@@ -19,11 +19,11 @@ const handleResponse = async (res: Response) => {
         } catch {
             console.error(`[API] Non-JSON Error: ${errorText.slice(0, 100)}`);
         }
-        // Append status code for clarity
+        
         return { success: false, message: `${errorMessage} (Code: ${res.status})`, data: null };
     }
 
-    // Handle 204 No Content (often used for DELETE or updates)
+    
     if (res.status === 204) {
         return { success: true, data: null };
     }

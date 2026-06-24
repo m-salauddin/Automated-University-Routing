@@ -115,16 +115,16 @@ export const getCurrentUser = async () => {
         try {
             const decoded = jwtDecode(accessToken);
 
-            // Check expiration
+            
             if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-                // Token is expired, clean up
+                
                 await logout();
                 return null;
             }
 
             return decoded;
         } catch (e) {
-            // Token is invalid
+            
             await logout();
             return null;
         }

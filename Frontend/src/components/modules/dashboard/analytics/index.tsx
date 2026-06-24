@@ -39,7 +39,7 @@ import type { RootState } from "@/store";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// --- TYPES & INTERFACES ---
+
 
 export type APIRoutineItem = {
   id: number;
@@ -115,7 +115,7 @@ interface CustomTooltipProps {
   label?: string;
 }
 
-// --- ANIMATION VARIANTS ---
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -136,7 +136,7 @@ const itemVariants = {
   },
 };
 
-// --- CUSTOM ACTIVE SHAPE RENDERER ---
+
 const renderActiveShape = (props: any) => {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } =
     props;
@@ -158,7 +158,7 @@ const renderActiveShape = (props: any) => {
   );
 };
 
-// --- SHADCN-STYLE COMPONENTS ---
+
 
 const Card: React.FC<CardProps> = ({ children, className = "" }) => (
   <div
@@ -313,7 +313,7 @@ const MetricCard: React.FC<MetricCardProps> = ({
   );
 };
 
-// --- CHART & VISUAL HELPERS ---
+
 
 const COLORS = [
   "#3b82f6",
@@ -356,7 +356,7 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({
   return null;
 };
 
-// --- MAIN DASHBOARD ---
+
 
 interface Props {
   routineList: any;
@@ -657,7 +657,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
         initial="hidden"
         animate="visible"
       >
-        {/* HEADER */}
+        {}
         <motion.div variants={itemVariants}>
           <Badge
             variant="outline"
@@ -749,7 +749,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
           </div>
         </motion.header>
 
-        {/* METRICS GRID */}
+        {}
         <motion.div
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
           variants={itemVariants}
@@ -810,12 +810,12 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
           />
         </motion.div>
 
-        {/* ROW 2: Pie (Faculty/Course) + Bar (Schedule Composition) */}
+        {}
         <motion.div
           className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-6"
           variants={itemVariants}
         >
-          {/* --- PIE CHART (Left, col-span-2) --- */}
+          {}
           <Card className="xl:col-span-2 dark:bg-[#111113]! flex flex-col h-[420px] min-w-0 overflow-hidden">
             <CardHeader
               title={viewMode === "student" ? "Faculty Load" : "Course Dist."}
@@ -949,7 +949,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
             </CardContent>
           </Card>
 
-          {/* --- SCHEDULE COMPOSITION (Moved here, col-span-3) --- */}
+          {}
           <Card className="xl:col-span-3 h-[420px] dark:bg-[#111113]! flex flex-col min-w-0 overflow-hidden">
             <CardHeader
               title="Schedule Composition"
@@ -1040,7 +1040,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
           </Card>
         </motion.div>
 
-        {/* ROW 3: Daily Workload (Hours) & Class Room Usage */}
+        {}
         <motion.div
           className="grid grid-cols-1 lg:grid-cols-2 gap-6"
           variants={itemVariants}
@@ -1129,7 +1129,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
             </CardContent>
           </Card>
 
-          {/* --- CLASS ROOM USAGE (Right) --- */}
+          {}
           <Card className="h-[400px] dark:bg-[#111113]! flex flex-col min-w-0 overflow-hidden">
             <CardHeader
               title="Class Room Usage"

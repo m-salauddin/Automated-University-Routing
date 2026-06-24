@@ -10,7 +10,7 @@ export type Course = {
 };
 
 export const COURSE_DATA: Course[] = [
-  // Year 1, Semester 1
+  
   {
     id: "1",
     code: "CSE1101",
@@ -102,7 +102,7 @@ export const COURSE_DATA: Course[] = [
     type: "Viva",
   },
 
-  // Year 1, Semester 2
+  
   {
     id: "10",
     code: "CSE1201",
@@ -194,7 +194,7 @@ export const COURSE_DATA: Course[] = [
     type: "Viva",
   },
 
-  // Year 2, Semester 3
+  
   {
     id: "19",
     code: "CSE2301",
@@ -286,7 +286,7 @@ export const COURSE_DATA: Course[] = [
     type: "Viva",
   },
 
-  // Year 2, Semester 4
+  
   {
     id: "28",
     code: "CSE2401",
@@ -378,7 +378,7 @@ export const COURSE_DATA: Course[] = [
     type: "Viva",
   },
 
-  // Year 3, Semester 5
+  
   {
     id: "37",
     code: "CSE3501",
@@ -470,7 +470,7 @@ export const COURSE_DATA: Course[] = [
     type: "Viva",
   },
 
-  // Year 3, Semester 6
+  
   {
     id: "46",
     code: "CSE3601",
@@ -562,7 +562,7 @@ export const COURSE_DATA: Course[] = [
     type: "Viva",
   },
 
-  // Year 4, Semester 7
+  
   {
     id: "55",
     code: "CSE4701",
@@ -644,7 +644,7 @@ export const COURSE_DATA: Course[] = [
     type: "Viva",
   },
 
-  // Year 4, Semester 8
+  
   {
     id: "63",
     code: "CSE4801",

@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole>("student");
 
-  // hydrate from localStorage on mount
+  
   useEffect(() => {
     try {
       const authed = localStorage.getItem("isAuthenticated") === "true";
@@ -33,11 +33,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUsername(name);
       setRole(storedRole);
     } catch {
-      // ignore
+      
     }
   }, []);
 
-  // persist on change
+  
   useEffect(() => {
     try {
       localStorage.setItem("role", role);

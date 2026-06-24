@@ -70,7 +70,7 @@ export const importExcel = async (formData: FormData) => {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${token}`,
-                // Note: Do not set Content-Type for multipart/form-data so that boundary is auto-generated
+                
             },
             body: formData,
             cache: "no-store",

@@ -8,7 +8,7 @@ import {
   GalleryVerticalEnd,
   Users,
 } from "lucide-react";
-// import logo from "@/assets/logo.svg";
+
 
 import {
   DropdownMenu,
@@ -23,7 +23,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-// import Image from "next/image";
+
 import { cn } from "@/lib/utils";
 import Logo from "@/components/ui/logo";
 

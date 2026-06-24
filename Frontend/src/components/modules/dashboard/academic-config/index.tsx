@@ -17,6 +17,7 @@ import {
   Loader2,
   ShieldBan,
   ChevronLeft,
+  MapPin,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,7 +61,12 @@ import {
   createTimeSlot,
   deleteTimeSlot,
   updateTimeSlot,
-} from "@/services/time-slots"; // Assuming you saved the services here
+} from "@/services/time-slots";
+import {
+  createRoom,
+  updateRoom,
+  deleteRoom,
+} from "@/services/rooms";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 
@@ -76,7 +82,7 @@ type TimeSlot = {
 
 const isSlotBreak = (slot: TimeSlot) => {
   if (!slot) return false;
-  // Server field: is_lunch_break (from swagger definition)
+  
   return Boolean(slot.is_lunch_break);
 };
 
@@ -92,10 +98,20 @@ const sortTimeSlotsHelper = (slots: TimeSlot[]): TimeSlot[] => {
   return [...slots].sort((a, b) => getMinutes(a.start_time) - getMinutes(b.start_time));
 };
 
+type Room = {
+  id: number;
+  room_number: string;
+  capacity: number;
+  room_type: number;
+  department: number | null;
+  department_name: string | null;
+};
+
 interface AcademicSettingsPageProps {
   departments: Department[];
   semesters: Semester[];
   timeSlots: TimeSlot[];
+  rooms: Room[];
 }
 
 const containerVariants: Variants = {
@@ -253,11 +269,23 @@ const TimePicker = ({ label, value, onChange }: TimePickerProps) => {
   );
 };
 
-// --- MAIN COMPONENT ---
+
+const SLOT_COLORS = [
+  "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+  "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+  "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
+  "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+  "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
+  "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20",
+  "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+  "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20",
+];
+
 export default function AcademicSettingsPage({
   departments: initialDepartments,
   semesters: initialSemesters,
   timeSlots: initialTimeSlots,
+  rooms: initialRooms,
 }: AcademicSettingsPageProps) {
   const user = useSelector((state: RootState) => state.auth);
 
@@ -265,7 +293,7 @@ export default function AcademicSettingsPage({
 
   const router = useRouter();
 
-  // --- DEPARTMENT STATE ---
+  
   const [departmentsList, setDepartmentsList] =
     useState<Department[]>(initialDepartments);
 
@@ -278,7 +306,7 @@ export default function AcademicSettingsPage({
     setDepartmentsList(initialDepartments);
   }, [departmentsDependency, initialDepartments]);
 
-  // --- SEMESTER STATE ---
+  
   const [semestersList, setSemestersList] =
     useState<Semester[]>(initialSemesters);
 
@@ -291,7 +319,7 @@ export default function AcademicSettingsPage({
     setSemestersList(initialSemesters);
   }, [semestersDependency, initialSemesters]);
 
-  // --- TIME SLOT STATE ---
+  
   const [timeSlotsList, setTimeSlotsList] =
     useState<TimeSlot[]>(() => sortTimeSlotsHelper(initialTimeSlots));
 
@@ -304,32 +332,48 @@ export default function AcademicSettingsPage({
     setTimeSlotsList(sortTimeSlotsHelper(initialTimeSlots));
   }, [timeSlotsDependency, initialTimeSlots]);
 
-  // Modal States
+  const [roomsList, setRoomsList] = useState<Room[]>(initialRooms);
+
+  const roomsDependency = useMemo(
+    () => JSON.stringify(initialRooms),
+    [initialRooms]
+  );
+
+  useEffect(() => {
+    setRoomsList(initialRooms);
+  }, [roomsDependency, initialRooms]);
+
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [isSemModalOpen, setIsSemModalOpen] = useState(false);
   const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
+  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleteSemModalOpen, setIsDeleteSemModalOpen] = useState(false);
-  const [isDeleteSlotModalOpen, setIsDeleteSlotModalOpen] = useState(false); // New
+  const [isDeleteSlotModalOpen, setIsDeleteSlotModalOpen] = useState(false);
+  const [isDeleteRoomModalOpen, setIsDeleteRoomModalOpen] = useState(false);
 
-  // Loading States
+  
   const [isLoading, setIsLoading] = useState(false);
 
-  // Editing States
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [editingSem, setEditingSem] = useState<Semester | null>(null);
   const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
   const [deletingDeptId, setDeletingDeptId] = useState<number | null>(null);
   const [deletingSemId, setDeletingSemId] = useState<number | null>(null);
-  const [deletingSlotId, setDeletingSlotId] = useState<number | null>(null); // New
+  const [deletingSlotId, setDeletingSlotId] = useState<number | null>(null);
+  const [deletingRoomId, setDeletingRoomId] = useState<number | null>(null);
 
-  // Form States
   const [newDeptName, setNewDeptName] = useState("");
   const [newSemName, setNewSemName] = useState("");
   const [newSemOrder, setNewSemOrder] = useState("");
   const [newSlotStart, setNewSlotStart] = useState("09:00:00");
   const [newSlotEnd, setNewSlotEnd] = useState("10:00:00");
   const [newSlotIsLaunchBreak, setNewSlotIsLaunchBreak] = useState(false);
+  const [newRoomNumber, setNewRoomNumber] = useState("");
+  const [newRoomCapacity, setNewRoomCapacity] = useState("");
+  const [newRoomType, setNewRoomType] = useState("1");
+  const [newRoomDept, setNewRoomDept] = useState("");
 
   const formatDisplayTime = (timeStr: string) => {
     if (!timeStr) return "";
@@ -343,7 +387,7 @@ export default function AcademicSettingsPage({
     return `${formattedHour}:${m} ${suffix}`;
   };
 
-  // --- DEPARTMENT HANDLERS ---
+  
   const openAddDept = () => {
     setEditingDept(null);
     setNewDeptName("");
@@ -432,7 +476,7 @@ export default function AcademicSettingsPage({
     }
   };
 
-  // --- SEMESTER HANDLERS ---
+  
   const openAddSem = () => {
     setEditingSem(null);
     setNewSemName("");
@@ -537,7 +581,7 @@ export default function AcademicSettingsPage({
     }
   };
 
-  // --- TIME SLOT HANDLERS ---
+  
   const openAddSlot = () => {
     setEditingSlot(null);
     setNewSlotStart("09:00:00");
@@ -578,7 +622,7 @@ export default function AcademicSettingsPage({
         is_lunch_break: newSlotIsLaunchBreak,
       };
       if (editingSlot) {
-        // Optimistic Update
+        
         setTimeSlotsList((prev) =>
           sortTimeSlotsHelper(
             prev.map((slot) =>
@@ -648,7 +692,127 @@ export default function AcademicSettingsPage({
     }
   };
 
-  // --- MOUNTED CHECK FOR HYDRATION FIX ---
+  const openAddRoom = () => {
+    setEditingRoom(null);
+    setNewRoomNumber("");
+    setNewRoomCapacity("");
+    setNewRoomType("1");
+    setNewRoomDept("");
+    setIsRoomModalOpen(true);
+  };
+
+  const openEditRoom = (room: Room) => {
+    setEditingRoom(room);
+    setNewRoomNumber(room.room_number);
+    setNewRoomCapacity(room.capacity.toString());
+    setNewRoomType(room.room_type.toString());
+    setNewRoomDept(room.department ? room.department.toString() : "");
+    setIsRoomModalOpen(true);
+  };
+
+  const openDeleteRoom = (id: number) => {
+    setDeletingRoomId(id);
+    setIsDeleteRoomModalOpen(true);
+  };
+
+  const handleSaveRoom = async () => {
+    if (!newRoomNumber.trim() || !newRoomCapacity.trim()) {
+      toast.error("Room number and capacity are required");
+      return;
+    }
+
+    const capacityInt = parseInt(newRoomCapacity);
+    if (isNaN(capacityInt)) {
+      toast.error("Capacity must be a number");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      let res;
+      const payload: Record<string, any> = {
+        room_number: newRoomNumber,
+        capacity: capacityInt,
+        room_type: parseInt(newRoomType),
+      };
+
+      if (newRoomDept.trim() && newRoomDept !== "none") {
+        payload.department = parseInt(newRoomDept);
+      } else {
+        payload.department = null;
+      }
+
+      if (editingRoom) {
+        setRoomsList((prev) =>
+          prev.map((r) =>
+            r.id === editingRoom.id
+              ? {
+                  ...r,
+                  room_number: newRoomNumber,
+                  capacity: capacityInt,
+                  room_type: parseInt(newRoomType),
+                  department: payload.department,
+                  department_name: payload.department
+                    ? departmentsList.find((d) => d.id === payload.department)?.name || null
+                    : null,
+                }
+              : r
+          )
+        );
+        res = await updateRoom(editingRoom.id, payload);
+      } else {
+        res = await createRoom(payload);
+      }
+
+      if (res.success) {
+        toast.success(
+          editingRoom ? "Room updated successfully" : "Room added successfully"
+        );
+        setIsRoomModalOpen(false);
+        startTransition(() => {
+          router.refresh();
+        });
+      } else {
+        setRoomsList(initialRooms);
+        toast.error(res.message || "Operation failed");
+      }
+    } catch (err) {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteRoom = async () => {
+    if (!deletingRoomId) return;
+
+    setIsLoading(true);
+    const previousList = [...roomsList];
+    setRoomsList((prev) => prev.filter((r) => r.id !== deletingRoomId));
+
+    try {
+      const res = await deleteRoom(deletingRoomId);
+
+      if (res.success) {
+        toast.success("Room deleted successfully");
+        setIsDeleteRoomModalOpen(false);
+        setDeletingRoomId(null);
+        startTransition(() => {
+          router.refresh();
+        });
+      } else {
+        setRoomsList(previousList);
+        toast.error(res.message || "Failed to delete room");
+      }
+    } catch (err) {
+      setRoomsList(previousList);
+      toast.error("An unexpected error occurred during deletion");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -697,7 +861,7 @@ export default function AcademicSettingsPage({
         animate="visible"
         className="w-full max-w-5xl mx-auto p-4 sm:p-6 space-y-8 font-lexend text-foreground pb-20"
       >
-        {/* Header */}
+        {}
         <div className="flex flex-col gap-2">
           <motion.div variants={itemVariants}>
             <Badge
@@ -719,7 +883,7 @@ export default function AcademicSettingsPage({
           </motion.p>
         </div>
 
-        {/* --- SECTION 1: DEPARTMENTS --- */}
+        {}
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -756,8 +920,8 @@ export default function AcademicSettingsPage({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
-                            variant="ghost"
-                            className="h-8 w-8 p-0 hover:bg-muted"
+                            variant="outline"
+                            className="h-8 w-8 p-0 border border-border/60 bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
                           >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
@@ -789,7 +953,7 @@ export default function AcademicSettingsPage({
 
         <div className="w-full h-px bg-border/50" />
 
-        {/* --- SECTION 2: SEMESTERS --- */}
+        {}
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -823,8 +987,8 @@ export default function AcademicSettingsPage({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
-                            variant="ghost"
-                            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                            variant="outline"
+                            className="h-6 w-6 p-0 border border-border/60 bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
                           >
                             <MoreVertical className="h-3 w-3" />
                           </Button>
@@ -860,7 +1024,7 @@ export default function AcademicSettingsPage({
 
         <div className="w-full h-px bg-border/50" />
 
-        {/* --- SECTION 3: TIME SLOTS --- */}
+        {}
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -895,7 +1059,10 @@ export default function AcademicSettingsPage({
                         <Clock className="w-4 h-4" />
                       </div>
                       <div className="flex flex-wrap items-center gap-1 sm:gap-3">
-                        <Badge variant="outline" className="font-mono w-fit">
+                        <Badge
+                          variant="outline"
+                          className={`font-mono w-fit border ${SLOT_COLORS[(slot.id - 1) % SLOT_COLORS.length]}`}
+                        >
                           Slot {slot.id}
                         </Badge>
                         <span className="font-medium text-sm sm:text-base whitespace-nowrap">
@@ -914,9 +1081,9 @@ export default function AcademicSettingsPage({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            className="h-8 w-8 border border-border/60 bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </Button>
@@ -940,11 +1107,97 @@ export default function AcademicSettingsPage({
             </AnimatePresence>
           </div>
         </motion.div>
+
+        <div className="w-full h-px bg-border/50" />
+
+        <motion.div variants={itemVariants}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
+                <MapPin className="w-5 h-5" />
+              </div>
+              <h2 className="text-xl font-semibold">Rooms</h2>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 border-primary/20"
+              onClick={openAddRoom}
+            >
+              <Plus className="w-4 h-4" /> Add Room
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <AnimatePresence>
+              {roomsList.map((room) => (
+                <motion.div
+                  key={room.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                >
+                  <Card className="group hover:shadow-md transition-all h-full">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Capacity: {room.capacity}
+                      </CardTitle>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="h-8 w-8 p-0 border border-border/60 bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditRoom(room)}>
+                            <Edit2 className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                            onClick={() => openDeleteRoom(room.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </CardHeader>
+                    <CardContent className="space-y-1">
+                      <div className="text-lg font-bold leading-snug">
+                        Room {room.room_number}
+                      </div>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] uppercase font-bold tracking-wider border ${
+                            room.room_type === 2
+                              ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25"
+                              : "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25"
+                          }`}
+                        >
+                          {room.room_type === 2 ? "Lab" : "Theory"}
+                        </Badge>
+                        {room.department_name && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] uppercase font-semibold border border-border/80 whitespace-normal leading-tight text-left bg-muted/20 text-muted-foreground"
+                          >
+                            {room.department_name}
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </motion.div>
       </motion.div>
 
-      {/* --- MODALS --- */}
-
-      {/* DEPARTMENT MODAL */}
       <Dialog open={isDeptModalOpen} onOpenChange={setIsDeptModalOpen}>
         <DialogContent className="sm:max-w-[425px] w-[95vw] max-h-[85vh] overflow-y-auto">
           <motion.div
@@ -993,7 +1246,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {/* DELETE DEPARTMENT MODAL */}
+      {}
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent className="w-[95vw] sm:max-w-[425px]">
           <motion.div
@@ -1030,7 +1283,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {/* SEMESTER ADD/EDIT MODAL */}
+      {}
       <Dialog open={isSemModalOpen} onOpenChange={setIsSemModalOpen}>
         <DialogContent className="sm:max-w-[425px] w-[95vw]">
           <motion.div
@@ -1082,7 +1335,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {/* DELETE SEMESTER MODAL */}
+      {}
       <Dialog
         open={isDeleteSemModalOpen}
         onOpenChange={setIsDeleteSemModalOpen}
@@ -1122,7 +1375,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {/* SLOT ADD/EDIT MODAL */}
+      {}
       <Dialog open={isSlotModalOpen} onOpenChange={setIsSlotModalOpen}>
         <DialogContent className="sm:max-w-[425px] w-[95vw]">
           <motion.div
@@ -1182,7 +1435,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {/* DELETE SLOT MODAL */}
+      {}
       <Dialog
         open={isDeleteSlotModalOpen}
         onOpenChange={setIsDeleteSlotModalOpen}
@@ -1211,6 +1464,127 @@ export default function AcademicSettingsPage({
               <Button
                 variant="destructive"
                 onClick={handleDeleteTimeSlot}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Delete
+              </Button>
+            </DialogFooter>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRoomModalOpen} onOpenChange={setIsRoomModalOpen}>
+        <DialogContent className="compact-scrollbar sm:max-w-[425px] w-[95vw] max-h-[85vh] overflow-y-auto">
+          <motion.div
+            variants={modalContentVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {editingRoom ? "Edit Room" : "Add Room"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingRoom
+                  ? "Update existing room details."
+                  : "Create a new academic room."}
+              </DialogDescription>
+            </DialogHeader>
+            <motion.div
+              variants={formContainerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid gap-4 py-4"
+            >
+              <motion.div variants={formItemVariants} className="space-y-2">
+                <Label htmlFor="room-number">Room Number</Label>
+                <Input
+                  id="room-number"
+                  placeholder="e.g. 402 or Lab 1"
+                  value={newRoomNumber}
+                  onChange={(e) => setNewRoomNumber(e.target.value)}
+                />
+              </motion.div>
+              <motion.div variants={formItemVariants} className="space-y-2">
+                <Label htmlFor="room-capacity">Capacity</Label>
+                <Input
+                  id="room-capacity"
+                  type="number"
+                  placeholder="e.g. 50"
+                  value={newRoomCapacity}
+                  onChange={(e) => setNewRoomCapacity(e.target.value)}
+                />
+              </motion.div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <motion.div variants={formItemVariants} className="space-y-2">
+                  <Label htmlFor="room-type">Room Type</Label>
+                  <Select value={newRoomType} onValueChange={setNewRoomType}>
+                    <SelectTrigger id="room-type" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Theory</SelectItem>
+                      <SelectItem value="2">Lab</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </motion.div>
+                <motion.div variants={formItemVariants} className="space-y-2">
+                  <Label htmlFor="room-dept">Department</Label>
+                  <Select value={newRoomDept} onValueChange={setNewRoomDept}>
+                    <SelectTrigger id="room-dept" className="w-full">
+                      <SelectValue placeholder="Select Department (Optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None / General</SelectItem>
+                      {departmentsList.map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id.toString()}>
+                          {dept.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </motion.div>
+              </div>
+            </motion.div>
+            <DialogFooter>
+              <Button onClick={handleSaveRoom} disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {editingRoom ? "Update Changes" : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </motion.div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteRoomModalOpen} onOpenChange={setIsDeleteRoomModalOpen}>
+        <DialogContent className="w-[95vw] sm:max-w-[425px]">
+          <motion.div
+            variants={modalContentVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <DialogHeader>
+              <DialogTitle>Confirm Room Deletion</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this room? This action
+                cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-end mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteRoomModalOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteRoom}
                 disabled={isLoading}
                 className="w-full sm:w-auto"
               >

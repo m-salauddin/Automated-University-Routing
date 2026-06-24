@@ -66,7 +66,7 @@ const getRoutine = async (params?: GetRoutineParams) => {
         const rawResult = await res.json();
         console.log("[Routine] API Response:", JSON.stringify(rawResult, null, 2));
 
-        // Normalize: handle both plain array and DRF paginated response {count, results: [...]}
+        
         let normalizedData = rawResult;
         if (!Array.isArray(rawResult) && rawResult !== null && typeof rawResult === "object") {
             if (Array.isArray(rawResult.results)) {

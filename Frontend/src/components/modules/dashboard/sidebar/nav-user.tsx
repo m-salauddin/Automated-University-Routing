@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronsUpDown, LogOut, User, Sparkles } from "lucide-react"; // 1. Added Sparkles icon
+import { ChevronsUpDown, LogOut, User, Sparkles } from "lucide-react"; 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -50,12 +50,12 @@ export function NavUser() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Fallback values (Redux might be null initially)
+  
   const displayName = username || "Guest User";
   const secondary = role ? String(role) : "";
   const initials = getInitials(displayName);
 
-  // Helper to check if user is admin (case-insensitive)
+  
   const isAdmin = String(role).toLowerCase() === "admin";
 
   const handleLogout = async () => {

@@ -81,7 +81,7 @@ import { cn } from "@/lib/utils";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 
-// --- TYPES ---
+
 export type Department = {
   id: number;
   name: string;
@@ -130,7 +130,7 @@ const pageItemVariants: Variants = {
   },
 };
 
-// --- ZOD SCHEMA ---
+
 const userSchema = z
   .object({
     first_name: z.string().min(1, "First name is required"),
@@ -170,7 +170,7 @@ const userSchema = z
 
 type FormValues = z.infer<typeof userSchema>;
 
-// --- HELPERS ---
+
 const formatNameFromUsername = (username: string) => {
   if (!username) return "Unknown";
   try {
@@ -191,7 +191,7 @@ const toPascalCase = (str: string) => {
 };
 
 const getRoleBadge = (role: string) => {
-  // Added print styles to badges to remove background color and use black borders for ink saving
+  
   switch (role) {
     case "ADMIN":
       return (
@@ -225,7 +225,7 @@ const getRoleBadge = (role: string) => {
   }
 };
 
-// --- MAIN COMPONENT ---
+
 export default function UsersPageClient({
   initialUsers,
   departments,
@@ -237,19 +237,19 @@ export default function UsersPageClient({
 
   const router = useRouter();
 
-  // --- STATE ---
+  
   const [usersList, setUsersList] = useState<User[]>(initialUsers);
 
-  // FIX: Add state for date to prevent hydration mismatch
+  
   const [currentDate, setCurrentDate] = useState("");
 
-  // FIX: Separated the effects.
-  // 1. One for setting the client-side date (Fixes hydration error)
+  
+  
   useEffect(() => {
     setCurrentDate(new Date().toLocaleString());
   }, []);
 
-  // 2. One for syncing users if the parent prop changes (Fixes "syncing state" error by isolating it)
+  
   useEffect(() => {
     setUsersList(initialUsers);
   }, [initialUsers]);
@@ -257,7 +257,7 @@ export default function UsersPageClient({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Filters
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("TEACHER");
   const [deptFilter, setDeptFilter] = useState("All");
@@ -266,18 +266,18 @@ export default function UsersPageClient({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // Modals
+  
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  // Operation targets
+  
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingUser, setDeletingUser] = useState<User | null>(null);
 
-  // Password Visibility
+  
   const [showPassword, setShowPassword] = useState(false);
 
-  // --- REACT HOOK FORM ---
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(userSchema),
     defaultValues: {
@@ -307,7 +307,7 @@ export default function UsersPageClient({
   const watchedRole = useWatch({ control, name: "role" });
   const watchedPassword = useWatch({ control, name: "password" });
 
-  // Auto-generate Username
+  
   useEffect(() => {
     if (!editingUser) {
       const generated =
@@ -317,14 +317,14 @@ export default function UsersPageClient({
     }
   }, [watchedFirstName, watchedLastName, editingUser, setValue]);
 
-  // Auto-fill Confirm Password
+  
   useEffect(() => {
     if (!editingUser && watchedPassword) {
       setValue("confirmPassword", watchedPassword);
     }
   }, [watchedPassword, editingUser, setValue]);
 
-  // --- DYNAMIC FILTERS ---
+  
   const uniqueDepartmentNames = useMemo(() => {
     const names = new Set<string>();
     usersList.forEach((user) => {
@@ -346,7 +346,7 @@ export default function UsersPageClient({
   }, [usersList]);
 
 
-  // --- FILTER LOGIC ---
+  
   const isFiltered = useMemo(() => {
     return searchQuery !== "" || deptFilter !== "All" || semFilter !== "All";
   }, [searchQuery, deptFilter, semFilter]);
@@ -389,7 +389,7 @@ export default function UsersPageClient({
 
   const displayUsers = pagedUsers;
 
-  // --- MODAL HANDLERS ---
+  
   const openAddUser = () => {
     setEditingUser(null);
     setIsSaving(false);
@@ -458,7 +458,7 @@ export default function UsersPageClient({
     setPage(1);
   };
 
-  // --- SUBMIT HANDLER ---
+  
   const onSubmit = async (data: FormValues) => {
     if (!editingUser && (!data.password || data.password.length < 6)) {
       toast.error("Password is required and must be 6+ chars");
@@ -477,7 +477,7 @@ export default function UsersPageClient({
 
     try {
       if (editingUser) {
-        // --- UPDATE ---
+        
         const payload: any = {
           ...basePayload,
           department: data.department_id ? Number(data.department_id) : null,
@@ -522,7 +522,7 @@ export default function UsersPageClient({
           setIsSaving(false);
         }
       } else {
-        // --- CREATE ---
+        
         const payload: any = {
           ...basePayload,
           password: data.password,
@@ -592,20 +592,20 @@ export default function UsersPageClient({
       <div className="grid grid-cols-1 print:block">
         <div className="w-full overflow-x-auto print:overflow-visible">
           <div className="min-w-[1000px] print:min-w-0 print:w-full">
-            {/* COMPACT PRINT: text-xs */}
+            {}
             <Table className="print:text-xs">
               <TableHeader className="bg-muted/40 print:bg-transparent">
                 <TableRow className="print:border-b-2 print:border-black">
                   <TableHead className="print:text-black print:font-bold">
                     <div className="flex items-center gap-2">
-                      {/* ICON HIDDEN IN PRINT */}
+                      {}
                       <UserIcon className="size-3.5 text-muted-foreground print:hidden" />{" "}
                       User Profile
                     </div>
                   </TableHead>
                   <TableHead className="print:text-black print:font-bold">
                     <div className="flex items-center gap-2">
-                      {/* ICON HIDDEN IN PRINT */}
+                      {}
                       <Mail className="size-3.5 text-muted-foreground print:hidden" />{" "}
                       Email
                     </div>
@@ -613,7 +613,7 @@ export default function UsersPageClient({
                   {roleFilter !== "ADMIN" && (
                     <TableHead className="print:text-black print:font-bold">
                       <div className="flex items-center gap-2">
-                        {/* ICON HIDDEN IN PRINT */}
+                        {}
                         <Building2 className="size-3.5 text-muted-foreground print:hidden" />{" "}
                         Department
                       </div>
@@ -622,7 +622,7 @@ export default function UsersPageClient({
                   {roleFilter === "STUDENT" && (
                     <TableHead className="print:text-black print:font-bold">
                       <div className="flex items-center gap-2">
-                        {/* ICON HIDDEN IN PRINT */}
+                        {}
                         <GraduationCap className="size-3.5 text-muted-foreground print:hidden" />{" "}
                         Semester
                       </div>
@@ -630,12 +630,12 @@ export default function UsersPageClient({
                   )}
                   <TableHead className="print:text-black print:font-bold">
                     <div className="flex items-center gap-2">
-                      {/* ICON HIDDEN IN PRINT */}
+                      {}
                       <Shield className="size-3.5 text-muted-foreground print:hidden" />{" "}
                       Role
                     </div>
                   </TableHead>
-                  {/* ACTIONS HIDDEN IN PRINT */}
+                  {}
                   <TableHead className="text-right print:hidden">
                     <div className="flex items-center justify-end gap-2">
                       <UserCog className="size-3.5 text-muted-foreground" />{" "}
@@ -663,7 +663,7 @@ export default function UsersPageClient({
                       key={user.id ? `${user.id}-${index}` : `user-${index}`}
                       className="group border-b last:border-0 print:break-inside-avoid print:border-black/30"
                     >
-                      {/* COMPACT CELL PADDING: print:py-1 */}
+                      {}
                       <TableCell className="print:py-1">
                         <div className="flex flex-col">
                           <span className="font-semibold text-foreground print:text-black">
@@ -743,7 +743,7 @@ export default function UsersPageClient({
     [displayUsers, roleFilter, openEditUser, openDeleteUser]
   );
 
-  // --- MOUNTED CHECK FOR HYDRATION FIX ---
+  
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -809,7 +809,7 @@ export default function UsersPageClient({
 
 
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 print:hidden mb-6">
-          {/* GROUPED HEADER ANIMATION TO REDUCE JANK */}
+          {}
           <motion.div variants={pageItemVariants} className="space-y-2">
             <div>
               <Badge
@@ -846,7 +846,7 @@ export default function UsersPageClient({
           </motion.div>
         </div>
 
-        {/* Added will-change-transform for GPU acceleration */}
+        {}
         <motion.div
           variants={pageItemVariants}
           className="w-full min-w-0"
@@ -867,7 +867,7 @@ export default function UsersPageClient({
                       value={searchQuery}
                       onChange={(e) => {
                         setSearchQuery(e.target.value);
-                        // FIX: Reset page on search change immediately
+                        
                         setPage(1);
                       }}
                     />
@@ -881,7 +881,7 @@ export default function UsersPageClient({
                     value={roleFilter}
                     onValueChange={(val) => {
                       setRoleFilter(val);
-                      // FIX: Reset filters and page immediately on role change
+                      
                       setDeptFilter("All");
                       setPage(1);
                     }}
@@ -905,7 +905,7 @@ export default function UsersPageClient({
                       value={deptFilter}
                       onValueChange={(val) => {
                         setDeptFilter(val);
-                        // FIX: Reset page on dept change immediately
+                        
                         setPage(1);
                       }}
                     >
@@ -932,7 +932,7 @@ export default function UsersPageClient({
                       value={semFilter}
                       onValueChange={(val) => {
                         setSemFilter(val);
-                        // FIX: Reset page on sem change immediately
+                        
                         setPage(1);
                       }}
                     >
@@ -971,7 +971,7 @@ export default function UsersPageClient({
               </div>
             </CardHeader>
             <CardContent className="p-0">{tableContent}</CardContent>
-            {/* Pagination Controls */}
+            {}
             {pagedUsers.length > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-background/50 print:hidden">
                 <div className="text-sm text-muted-foreground">
@@ -1047,7 +1047,7 @@ export default function UsersPageClient({
         </motion.div>
       </motion.div>
 
-      {/* --- ADD/EDIT USER MODAL --- */}
+      {}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="sm:max-w-[700px] w-full max-h-[85vh] overflow-y-auto overflow-x-hidden scrollbar-thin print:hidden">
           <div className="flex flex-col gap-4">
@@ -1125,7 +1125,7 @@ export default function UsersPageClient({
                 </div>
               </div>
 
-              {/* Password Fields - ONLY SHOW IN CREATE MODE */}
+              {}
               {!editingUser && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2 relative">
@@ -1165,7 +1165,7 @@ export default function UsersPageClient({
                       Confirm Password <span className="text-red-500">*</span>
                     </Label>
                     <div className="relative">
-                      {/* Confirm password auto-fills via watcher but is editable */}
+                      {}
                       <Input
                         type={showPassword ? "text" : "password"}
                         {...register("confirmPassword")}
@@ -1338,7 +1338,7 @@ export default function UsersPageClient({
         </DialogContent>
       </Dialog>
 
-      {/* --- DELETE CONFIRMATION MODAL --- */}
+      {}
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent className="sm:max-w-md print:hidden">
           <div className="flex flex-col gap-4">
@@ -1379,9 +1379,9 @@ export default function UsersPageClient({
 
 
 
-      {/* -- PRINT VIEW (Visible only in print) -- */}
+      {}
       <div className="hidden print:block w-full font-lexend p-0">
-        {/* Print Header */}
+        {}
         <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -1415,7 +1415,7 @@ export default function UsersPageClient({
           </div>
         </div>
 
-        {/* Print Table */}
+        {}
         <table className="w-full border-collapse text-[10px]">
           <thead>
             <tr className="bg-gray-100 border-b border-black">
@@ -1490,7 +1490,7 @@ export default function UsersPageClient({
           </tbody>
         </table>
 
-        {/* Print Footer */}
+        {}
         <div className="mt-8 pt-4 border-t border-gray-300 flex justify-between text-[10px] text-gray-500">
           <p>Confidential Report • For Internal Use Only</p>
           <p>University Admin Panel</p>

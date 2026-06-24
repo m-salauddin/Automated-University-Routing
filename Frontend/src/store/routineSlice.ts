@@ -25,7 +25,7 @@ const initialState: RoutineState = {
     isLocked: false,
 };
 
-// Load initial state from local storage
+
 if (typeof window !== "undefined") {
     const persistedLocked = safeLocalStorageGet("routine_isLocked");
     if (persistedLocked !== null) {

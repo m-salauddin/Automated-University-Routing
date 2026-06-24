@@ -94,7 +94,7 @@ const formatTimeSlotLabel = (timeStr: string) => {
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 
-// --- HELPERS ---
+
 const getTeacherInitials = (name: string) => {
   if (!name) return "";
   const capitals = name.match(/[A-Z]/g);
@@ -211,8 +211,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     (s: RootState) => s.classOff.offMap || EMPTY_OBJ
   );
 
-  // Note: selectedSemester state is technically unused for filtering now
-  // since we force a single view, but kept for logic consistency if needed.
+  
+  
   const [selectedSemester] = useState<string>("");
   const [inputValue, setInputValue] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
@@ -237,7 +237,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     const semesterUniqueCourses: Record<string, Set<string>> = {};
     const slotStartTimes = sortedTimeSlots.map((ts) => normalizeTime(ts.start_time));
 
-    // 1. Initialize Groups
+    
     routineList.forEach((item) => {
       if (!grouped[item.semester_name]) {
         grouped[item.semester_name] = {
@@ -253,7 +253,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
       }
     });
 
-    // 2. Populate Slots
+    
     routineList.forEach((item) => {
       const semesterGroup = grouped[item.semester_name];
       if (!semesterGroup) return;
@@ -280,7 +280,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
       }
     });
 
-    // 3. Calculate Credits
+    
     Object.keys(grouped).forEach((semesterName) => {
       const uniqueCount = semesterUniqueCourses[semesterName].size;
       grouped[semesterName].credits = uniqueCount * 3.0;
@@ -296,7 +296,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     }));
   }, [formattedRoutineData]);
 
-  // Determine which semester to show.
+  
   const activeSemesterId = useMemo(() => {
     if (selectedSemester && formattedRoutineData[selectedSemester])
       return selectedSemester;
@@ -326,7 +326,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     return () => clearTimeout(timer);
   }, [inputValue]);
 
-  // --- SEARCH LOGIC ---
+  
   const validTeacherShortNames = useMemo(() => {
     const uniqueShortNames = new Set<string>();
     routineList.forEach((item) => {
@@ -362,7 +362,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
 
 
 
-  // --- MOUNTED CHECK FOR HYDRATION FIX ---
+  
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -577,7 +577,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
               variants={itemVariants}
               className="lg:col-span-8 flex justify-between flex-col sm:flex-row gap-3 bg-card border rounded-xl p-1.5 shadow-sm"
             >
-              {/* --- STATIC SEMESTER LABEL (Replaces Dropdown) --- */}
+              {}
               <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 rounded-lg border border-transparent transition-all">
                 <GraduationCap className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium text-foreground">
@@ -875,7 +875,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                       </div>
                                       <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
                                         <span className="font-bold text-[11px]">
-                                          {session.course}{isLab ? " (Lab)" : " (Theory)"}, T-
+                                          {session.course}, T-
                                           {getTeacherInitials(session.teacher)}
                                         </span>
                                         <span className="font-bold text-[11px]">

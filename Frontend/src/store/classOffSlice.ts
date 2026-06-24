@@ -11,7 +11,7 @@ export type ClassOffState = {
 
 const STORAGE_KEY = "classOffMap";
 
-// --- HELPER 1: Exported Normalize Time ---
+
 export const normalizeTime = (timeStr: string) => {
   if (!timeStr) return "";
   const [h, m] = timeStr.split(":");
@@ -19,15 +19,15 @@ export const normalizeTime = (timeStr: string) => {
   return `${normalizedH}:${m}`;
 };
 
-// --- HELPER 2: Exported Date Helper ---
+
 export const getLocalISODate = () => {
   const now = new Date();
   const offset = now.getTimezoneOffset() * 60000;
   return new Date(now.getTime() - offset).toISOString().split("T")[0];
 };
 
-// --- HELPER 3: Exported Key Generator (UPDATED) ---
-// Now includes department, semester, and day to prevent collisions
+
+
 export const generateClassKey = (
   department: string,
   semester: string,
@@ -38,13 +38,13 @@ export const generateClassKey = (
   const today = getLocalISODate();
   const time = normalizeTime(startTime);
 
-  // Sanitization
+  
   const safeDept = (department || "NA").trim();
   const safeSem = (semester || "NA").trim();
   const safeDay = (day || "NA").trim();
   const safeId = teacherId.trim();
 
-  // New Key Format: DATE | DEPT | SEM | DAY | TEACHER | TIME
+  
   return `${today}|${safeDept}|${safeSem}|${safeDay}|${safeId}|${time}`;
 };
 
@@ -59,7 +59,7 @@ function loadInitialState(): ClassOffState {
 
       Object.keys(rawMap).forEach((key) => {
         const val = rawMap[key];
-        // Basic validation or migration logic could go here if needed
+        
         if (typeof val === "object" && val !== null) {
           normalizedMap[key] = {
             status: !!val.status,

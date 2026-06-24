@@ -123,7 +123,7 @@ function LoginContent() {
     }
   };
 
-  // --- Animation Variants ---
+  
   const cardVariants = {
     hidden: { scale: 0.96, opacity: 0, y: 16 },
     visible: {

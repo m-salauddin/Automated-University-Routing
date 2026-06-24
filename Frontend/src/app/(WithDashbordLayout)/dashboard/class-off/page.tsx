@@ -43,7 +43,7 @@ export default function ClassOffPage() {
       toast.error("Please fill in all fields");
       return;
     }
-    // Replace with POST to your API
+    
     toast.success("Class off request submitted", {
       description: `${date} • ${slot} • ${course} (${section}) by ${username}`,
     });
