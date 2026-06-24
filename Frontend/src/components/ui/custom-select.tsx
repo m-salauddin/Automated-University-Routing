@@ -11,14 +11,15 @@ export interface SelectOption {
 }
 
 export interface CustomSelectProps {
-  value: string;
+  value?: string;
   onChange: (value: string) => void;
   options: SelectOption[];
   placeholder?: string;
   id?: string;
+  disabled?: boolean;
 }
 
-export function CustomSelect({ value, onChange, options, placeholder = "Select option", id }: CustomSelectProps) {
+export function CustomSelect({ value = "", onChange, options, placeholder = "Select option", id, disabled = false }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,8 +59,12 @@ export function CustomSelect({ value, onChange, options, placeholder = "Select o
     <div className="relative w-full" ref={containerRef} id={id}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex h-10 w-full items-center justify-between rounded-lg border border-border/80 bg-background/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground hover:bg-muted/40 focus:outline-none focus:ring-1 focus:ring-ring transition-all cursor-pointer"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={cn(
+          "flex h-10 w-full items-center justify-between rounded-lg border border-border/80 bg-background/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground hover:bg-muted/40 focus:outline-none focus:ring-1 focus:ring-ring transition-all cursor-pointer",
+          disabled && "opacity-50 cursor-not-allowed pointer-events-none bg-background/30 border-border/40"
+        )}
       >
         <span className={selectedOption ? "text-foreground font-medium" : "text-muted-foreground"}>
           {selectedOption ? selectedOption.label : placeholder}

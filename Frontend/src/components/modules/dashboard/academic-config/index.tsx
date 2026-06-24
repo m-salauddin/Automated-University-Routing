@@ -49,6 +49,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { toast } from "sonner";
 import {
   addNewDepartment,
@@ -439,6 +440,38 @@ export default function AcademicSettingsPage({
   const [newRoomCapacity, setNewRoomCapacity] = useState("");
   const [newRoomType, setNewRoomType] = useState("1");
   const [newRoomDept, setNewRoomDept] = useState("");
+
+  const isDeptModified = useMemo(() => {
+    if (!editingDept) return true;
+    return newDeptName.trim() !== (editingDept.name || "").trim();
+  }, [editingDept, newDeptName]);
+
+  const isSemModified = useMemo(() => {
+    if (!editingSem) return true;
+    const isNameDiff = newSemName.trim() !== (editingSem.name || "").trim();
+    const isOrderDiff = newSemOrder.trim() !== (editingSem.order?.toString() || "").trim();
+    return isNameDiff || isOrderDiff;
+  }, [editingSem, newSemName, newSemOrder]);
+
+  const isSlotModified = useMemo(() => {
+    if (!editingSlot) return true;
+    const isStartDiff = newSlotStart !== (editingSlot.start_time || "");
+    const isEndDiff = newSlotEnd !== (editingSlot.end_time || "");
+    const isBreakDiff = newSlotIsLaunchBreak !== (editingSlot.is_launch_break || false);
+    return isStartDiff || isEndDiff || isBreakDiff;
+  }, [editingSlot, newSlotStart, newSlotEnd, newSlotIsLaunchBreak]);
+
+  const isRoomModified = useMemo(() => {
+    if (!editingRoom) return true;
+    const isNumberDiff = newRoomNumber.trim() !== (editingRoom.room_number || "").trim();
+    const isCapacityDiff = newRoomCapacity.trim() !== (editingRoom.capacity?.toString() || "").trim();
+    const originalType = editingRoom.room_type?.toString() || "1";
+    const isTypeDiff = newRoomType !== originalType;
+    const originalDept = editingRoom.department ? editingRoom.department.toString() : "none";
+    const currentDept = newRoomDept || "none";
+    const isDeptDiff = currentDept !== originalDept;
+    return isNumberDiff || isCapacityDiff || isTypeDiff || isDeptDiff;
+  }, [editingRoom, newRoomNumber, newRoomCapacity, newRoomType, newRoomDept]);
 
   const formatDisplayTime = (timeStr: string) => {
     if (!timeStr) return "";
@@ -1201,33 +1234,32 @@ export default function AcademicSettingsPage({
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto font-lexend">
               {/* Department Dropdown */}
               <div className="w-[160px]">
-                <Select value={roomDeptFilter} onValueChange={setRoomDeptFilter}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Departments</SelectItem>
-                    {roomsDepartments.map((dept: Department) => (
-                      <SelectItem key={dept.id} value={dept.id.toString()}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CustomSelect
+                  value={roomDeptFilter}
+                  onChange={setRoomDeptFilter}
+                  options={[
+                    { value: "All", label: "All Departments" },
+                    ...roomsDepartments.map((dept: Department) => ({
+                      value: dept.id.toString(),
+                      label: dept.name,
+                    })),
+                  ]}
+                  placeholder="All Departments"
+                />
               </div>
 
               {/* Room Type Dropdown */}
               <div className="w-[120px]">
-                <Select value={roomTypeFilter} onValueChange={setRoomTypeFilter}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="All Types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Types</SelectItem>
-                    <SelectItem value="1">Theory</SelectItem>
-                    <SelectItem value="2">Lab</SelectItem>
-                  </SelectContent>
-                </Select>
+                <CustomSelect
+                  value={roomTypeFilter}
+                  onChange={setRoomTypeFilter}
+                  options={[
+                    { value: "All", label: "All Types" },
+                    { value: "1", label: "Theory" },
+                    { value: "2", label: "Lab" },
+                  ]}
+                  placeholder="All Types"
+                />
               </div>
 
               {/* Reset Button */}
@@ -1362,7 +1394,7 @@ export default function AcademicSettingsPage({
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
                 onClick={handleSaveDepartment}
-                disabled={isLoading}
+                disabled={isLoading || (editingDept ? !isDeptModified : false)}
                 className="w-full sm:w-auto"
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -1453,7 +1485,7 @@ export default function AcademicSettingsPage({
               </motion.div>
             </motion.div>
             <DialogFooter>
-              <Button onClick={handleSaveSemester} disabled={isLoading}>
+              <Button onClick={handleSaveSemester} disabled={isLoading || (editingSem ? !isSemModified : false)}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingSem ? "Update Changes" : "Save Changes"}
               </Button>
@@ -1553,7 +1585,7 @@ export default function AcademicSettingsPage({
               </span>
             </div>
             <DialogFooter>
-              <Button onClick={handleSaveTimeSlot} disabled={isLoading}>
+              <Button onClick={handleSaveTimeSlot} disabled={isLoading || (editingSlot ? !isSlotModified : false)}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingSlot ? "Update Changes" : "Save Changes"}
               </Button>
@@ -1648,36 +1680,37 @@ export default function AcademicSettingsPage({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <motion.div variants={formItemVariants} className="space-y-2">
                   <Label htmlFor="room-type">Room Type</Label>
-                  <Select value={newRoomType} onValueChange={setNewRoomType}>
-                    <SelectTrigger id="room-type" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Theory</SelectItem>
-                      <SelectItem value="2">Lab</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <CustomSelect
+                    value={newRoomType}
+                    onChange={setNewRoomType}
+                    options={[
+                      { value: "1", label: "Theory" },
+                      { value: "2", label: "Lab" },
+                    ]}
+                    placeholder="Select Room Type"
+                    id="room-type"
+                  />
                 </motion.div>
                 <motion.div variants={formItemVariants} className="space-y-2">
                   <Label htmlFor="room-dept">Department</Label>
-                  <Select value={newRoomDept} onValueChange={setNewRoomDept}>
-                    <SelectTrigger id="room-dept" className="w-full">
-                      <SelectValue placeholder="Select Department (Optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None / General</SelectItem>
-                      {departmentsList.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id.toString()}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <CustomSelect
+                    value={newRoomDept}
+                    onChange={setNewRoomDept}
+                    options={[
+                      { value: "none", label: "None / General" },
+                      ...departmentsList.map((dept) => ({
+                        value: dept.id.toString(),
+                        label: dept.name,
+                      })),
+                    ]}
+                    placeholder="Select Department (Optional)"
+                    id="room-dept"
+                  />
                 </motion.div>
               </div>
             </motion.div>
             <DialogFooter>
-              <Button onClick={handleSaveRoom} disabled={isLoading}>
+              <Button onClick={handleSaveRoom} disabled={isLoading || (editingRoom ? !isRoomModified : false)}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingRoom ? "Update Changes" : "Save Changes"}
               </Button>

@@ -716,18 +716,12 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
         <Calendar className="w-3 h-3" /> Day
       </span>
-      <Select value={day} onValueChange={setDay}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {days.map((d) => (
-            <SelectItem key={d} value={d}>
-              {d}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <CustomSelect
+        value={day}
+        onChange={setDay}
+        options={days.map((d) => ({ value: d, label: d }))}
+        placeholder="Select Day"
+      />
     </div>
   );
   const TypeSelect = () => (
@@ -735,16 +729,16 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
         <BookOpen className="w-3 h-3" /> Type
       </span>
-      <Select value={typeFilter} onValueChange={setTypeFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Types</SelectItem>
-          <SelectItem value="Theory">Theory</SelectItem>
-          <SelectItem value="Lab">Lab</SelectItem>
-        </SelectContent>
-      </Select>
+      <CustomSelect
+        value={typeFilter}
+        onChange={setTypeFilter}
+        options={[
+          { value: "All", label: "All Types" },
+          { value: "Theory", label: "Theory" },
+          { value: "Lab", label: "Lab" },
+        ]}
+        placeholder="All Types"
+      />
     </div>
   );
   const StatusSelect = () => (
@@ -752,16 +746,16 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
         <SlidersHorizontal className="w-3 h-3" /> Status
       </span>
-      <Select value={statusFilter} onValueChange={setStatusFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Status</SelectItem>
-          <SelectItem value="on">Active (On)</SelectItem>
-          <SelectItem value="off">Cancelled (Off)</SelectItem>
-        </SelectContent>
-      </Select>
+      <CustomSelect
+        value={statusFilter}
+        onChange={setStatusFilter}
+        options={[
+          { value: "All", label: "All Status" },
+          { value: "on", label: "Active (On)" },
+          { value: "off", label: "Cancelled (Off)" },
+        ]}
+        placeholder="All Status"
+      />
     </div>
   );
   const RoomSelect = () => (
@@ -769,19 +763,15 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
         <MapPin className="w-3 h-3" /> Room
       </span>
-      <Select value={roomFilter} onValueChange={setRoomFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Rooms</SelectItem>
-          {uniqueRooms.map((r) => (
-            <SelectItem key={r} value={r}>
-              {r}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <CustomSelect
+        value={roomFilter}
+        onChange={setRoomFilter}
+        options={[
+          { value: "All", label: "All Rooms" },
+          ...uniqueRooms.map((r) => ({ value: r, label: r })),
+        ]}
+        placeholder="All Rooms"
+      />
     </div>
   );
   const SemesterSelect = () => (
@@ -789,19 +779,15 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
         <GraduationCap className="w-3 h-3" /> Semester
       </span>
-      <Select value={semesterFilter} onValueChange={setSemesterFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Semesters</SelectItem>
-          {uniqueSemesters.map((s) => (
-            <SelectItem key={s} value={s}>
-              {s}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <CustomSelect
+        value={semesterFilter}
+        onChange={setSemesterFilter}
+        options={[
+          { value: "All", label: "All Semesters" },
+          ...uniqueSemesters.map((s) => ({ value: s, label: s })),
+        ]}
+        placeholder="All Semesters"
+      />
     </div>
   );
   const ColumnSelect = () => (

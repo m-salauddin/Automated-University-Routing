@@ -61,6 +61,7 @@ import {
 import { generateRoutine, getRoutine } from "@/services/routine";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CustomSelect } from "@/components/ui/custom-select";
 
 
 export type APIRoutineItem = {
@@ -1105,42 +1106,26 @@ export default function AdminRoutinePage({
               className="flex flex-wrap items-center gap-3 bg-card border rounded-xl p-1.5 shadow-sm w-full lg:w-fit"
             >
               {}
-              <div className="flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all flex-1 min-w-[220px]">
-                <Select value={selectedDept} onValueChange={setSelectedDept}>
-                  <SelectTrigger className="h-10 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
-                    <SelectValue placeholder="Select Department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex-1 min-w-[220px]">
+                <CustomSelect
+                  value={selectedDept}
+                  onChange={setSelectedDept}
+                  options={departments.map((dept) => ({ value: dept, label: dept }))}
+                  placeholder="Select Department"
+                />
               </div>
 
               {}
-              <div className="flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all flex-1 min-w-[150px]">
-                <Select
+              <div className="flex-1 min-w-[150px]">
+                <CustomSelect
                   value={selectedSemester}
-                  onValueChange={setSelectedSemester}
-                >
-                  <SelectTrigger className="h-10 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
-                    <SelectValue placeholder="Select Semester" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {semesters.map((sem) => (
-                      <SelectItem key={sem} value={sem}>
-                        {sem === "All Semesters" ? (
-                          <span>All Semesters</span>
-                        ) : (
-                          `${sem} Semester`
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={setSelectedSemester}
+                  options={semesters.map((sem) => ({
+                    value: sem,
+                    label: sem === "All Semesters" ? "All Semesters" : `${sem} Semester`
+                  }))}
+                  placeholder="Select Semester"
+                />
               </div>
 
               {}
@@ -1451,7 +1436,7 @@ export default function AdminRoutinePage({
           setGenerateModal((prev) => ({ ...prev, isOpen: open }))
         }
       >
-        <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-0 bg-transparent shadow-none">
+        <DialogContent className="sm:max-w-[480px] p-0 overflow-visible border-0 bg-transparent shadow-none">
           <AnimatePresence mode="wait">
             {generateModal.isOpen && (
               <motion.div
@@ -1460,11 +1445,11 @@ export default function AdminRoutinePage({
                 initial="hidden"
                 animate="visible"
                 exit="exit"
-                className="bg-background border rounded-lg shadow-xl w-full flex flex-col overflow-hidden border-primary/20"
+                className="bg-background border rounded-lg shadow-xl w-full flex flex-col overflow-visible border-primary/20"
               >
                 <motion.div
                   variants={modalItemVariants}
-                  className="p-6 pb-4 flex items-start gap-4 border-b bg-muted/20 border-border/65"
+                  className="p-6 pb-4 flex items-start gap-4 border-b bg-muted/20 border-border/65 rounded-t-lg"
                 >
                   <div className="p-3 rounded-full shrink-0 bg-primary/10 text-primary">
                     <Sparkles className="h-6 w-6" />
@@ -1480,61 +1465,49 @@ export default function AdminRoutinePage({
                 </motion.div>
 
                 <div className="p-6 space-y-5 bg-card">
+
+
                   <motion.div variants={modalItemVariants} className="space-y-2">
                     <label className="text-sm font-semibold text-foreground">
                       Target Department
                     </label>
-                    <div className="flex items-center gap-3 px-3 bg-muted/40 rounded-lg border border-border/60 focus-within:border-primary/20 focus-within:bg-background transition-all">
-                      <Select
-                        value={generateModal.departmentId?.toString() ?? ""}
-                        onValueChange={(val) =>
-                          setGenerateModal((prev) => ({
-                            ...prev,
-                            departmentId: val ? parseInt(val, 10) : undefined,
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="h-11 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
-                          <SelectValue placeholder="Select Department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {dbDepartments.map((dept) => (
-                            <SelectItem key={dept.id} value={dept.id.toString()}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <CustomSelect
+                      value={generateModal.departmentId?.toString() ?? ""}
+                      onChange={(val) =>
+                        setGenerateModal((prev) => ({
+                          ...prev,
+                          departmentId: val ? parseInt(val, 10) : undefined,
+                        }))
+                      }
+                      options={dbDepartments.map((dept) => ({
+                        value: dept.id.toString(),
+                        label: dept.name,
+                      }))}
+                      placeholder="Select Department"
+                    />
                   </motion.div>
 
                   <motion.div variants={modalItemVariants} className="space-y-2">
                     <label className="text-sm font-semibold text-foreground">
                       Target Semester
                     </label>
-                    <div className="flex items-center gap-3 px-3 bg-muted/40 rounded-lg border border-border/60 focus-within:border-primary/20 focus-within:bg-background transition-all">
-                      <Select
-                        value={generateModal.semesterId?.toString() ?? "all"}
-                        onValueChange={(val) =>
-                          setGenerateModal((prev) => ({
-                            ...prev,
-                            semesterId: val === "all" ? undefined : parseInt(val, 10),
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="h-11 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
-                          <SelectValue placeholder="All Semesters" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Semesters</SelectItem>
-                          {dbSemesters.map((sem) => (
-                            <SelectItem key={sem.id} value={sem.id.toString()}>
-                              {sem.name} Semester
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <CustomSelect
+                      value={generateModal.semesterId?.toString() ?? "all"}
+                      onChange={(val) =>
+                        setGenerateModal((prev) => ({
+                          ...prev,
+                          semesterId: val === "all" ? undefined : parseInt(val, 10),
+                        }))
+                      }
+                      options={[
+                        { value: "all", label: "All Semesters" },
+                        ...dbSemesters.map((sem) => ({
+                          value: sem.id.toString(),
+                          label: `${sem.name} Semester`,
+                        })),
+                      ]}
+                      placeholder="All Semesters"
+                    />
                   </motion.div>
 
                   <motion.div variants={modalItemVariants} className="flex items-center gap-2.5 pt-1">
@@ -1559,7 +1532,7 @@ export default function AdminRoutinePage({
 
                 <motion.div
                   variants={modalItemVariants}
-                  className="p-6 pt-2 bg-card flex justify-end gap-3 border-t border-border/50"
+                  className="p-6 pt-2 bg-card flex justify-end gap-3 border-t border-border/50 rounded-b-lg"
                 >
                   <Button
                     variant="ghost"

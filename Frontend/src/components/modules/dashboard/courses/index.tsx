@@ -76,6 +76,7 @@ import { cn } from "@/lib/utils";
 import { createCourse, updateCourse, deleteCourse } from "@/services/courses";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
+import { CustomSelect } from "@/components/ui/custom-select";
 
 
 export interface Course {
@@ -255,7 +256,7 @@ export default function AutomatedRoutineCourses({
     control,
     handleSubmit,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = form;
 
   
@@ -676,30 +677,23 @@ export default function AutomatedRoutineCourses({
                         <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider pl-0.5">
                           {filter.label}
                         </span>
-                        <Select
+                        <CustomSelect
                           value={filter.value}
-                          onValueChange={(val) => {
+                          onChange={(val) => {
                             filter.set(val);
                             setPage(1);
                           }}
-                        >
-                          <SelectTrigger className="w-full h-9 bg-background text-xs">
-                            <SelectValue placeholder="All" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="All">
-                              All {filter.label}
-                            </SelectItem>
-                            {filter.options.map((opt) => (
-                              <SelectItem key={opt} value={opt}>
-                                {filter.label === "Teacher" ||
-                                filter.label === "Dept"
-                                  ? getInitials(opt)
-                                  : opt}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          options={[
+                            { value: "All", label: `All ${filter.label}` },
+                            ...filter.options.map((opt) => ({
+                              value: opt,
+                              label: (filter.label === "Teacher" || filter.label === "Dept")
+                                ? getInitials(opt)
+                                : opt
+                            }))
+                          ]}
+                          placeholder={`All ${filter.label}`}
+                        />
                       </div>
                     ))}
                   </div>
@@ -1017,7 +1011,23 @@ export default function AutomatedRoutineCourses({
           </DialogHeader>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-            {}
+            {/* Course Name - Full Width */}
+            <div className="space-y-2 md:col-span-2">
+              <Label>
+                Course Name <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                {...form.register("course_name")}
+                placeholder="e.g. Operating System"
+              />
+              {errors.course_name && (
+                <p className="text-xs text-red-500">
+                  {errors.course_name.message}
+                </p>
+              )}
+            </div>
+
+            {/* Course Code */}
             <div className="space-y-2">
               <Label>
                 Course Code <span className="text-red-500">*</span>
@@ -1033,39 +1043,61 @@ export default function AutomatedRoutineCourses({
               )}
             </div>
 
-            {}
+            {/* Course Type */}
             <div className="space-y-2">
               <Label>
-                Course Name <span className="text-red-500">*</span>
+                Course Type <span className="text-red-500">*</span>
               </Label>
-              <Input
-                {...form.register("course_name")}
-                placeholder="e.g. Operating System"
+              <Controller
+                control={control}
+                name="course_type"
+                render={({ field }) => (
+                  <CustomSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={[
+                      { value: "Theory", label: "Theory" },
+                      { value: "Lab", label: "Lab" },
+                      { value: "Project", label: "Project" },
+                    ]}
+                    placeholder="Select Type"
+                    id="course_type"
+                  />
+                )}
               />
-              {errors.course_name && (
+              {errors.course_type && (
                 <p className="text-xs text-red-500">
-                  {errors.course_name.message}
+                  {errors.course_type.message}
                 </p>
               )}
             </div>
 
-            {}
+            {/* Semester */}
             <div className="space-y-2">
               <Label>
-                Room Number <span className="text-red-500">*</span>
+                Semester <span className="text-red-500">*</span>
               </Label>
-              <Input
-                {...form.register("room_number")}
-                placeholder="e.g. B319"
+              <Controller
+                control={control}
+                name="semester"
+                render={({ field }) => (
+                  <CustomSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={semesters.map((s) => ({ value: String(s.id), label: s.name }))}
+                    placeholder="Select Sem"
+                    id="semester"
+                  />
+                )}
               />
-              {errors.room_number && (
+              {errors.semester && (
                 <p className="text-xs text-red-500">
-                  {errors.room_number.message}
+                  {errors.semester.message}
                 </p>
               )}
             </div>
 
-            {}
+            {/* Credits */}
             <div className="space-y-2">
               <Label>
                 Credits <span className="text-red-500">*</span>
@@ -1081,7 +1113,7 @@ export default function AutomatedRoutineCourses({
               )}
             </div>
 
-            {}
+            {/* Department */}
             <div className="space-y-2">
               <Label>
                 Department <span className="text-red-500">*</span>
@@ -1090,18 +1122,13 @@ export default function AutomatedRoutineCourses({
                 control={control}
                 name="department"
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select Dept" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((d) => (
-                        <SelectItem key={d.id} value={String(d.id)}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <CustomSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={departments.map((d) => ({ value: String(d.id), label: d.name }))}
+                    placeholder="Select Dept"
+                    id="department"
+                  />
                 )}
               />
               {errors.department && (
@@ -1111,38 +1138,24 @@ export default function AutomatedRoutineCourses({
               )}
             </div>
 
-            {}
+            {/* Room Number */}
             <div className="space-y-2">
               <Label>
-                Semester <span className="text-red-500">*</span>
+                Room Number <span className="text-red-500">*</span>
               </Label>
-              <Controller
-                control={control}
-                name="semester"
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select Sem" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {semesters.map((s) => (
-                        <SelectItem key={s.id} value={String(s.id)}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
+              <Input
+                {...form.register("room_number")}
+                placeholder="e.g. B319"
               />
-              {errors.semester && (
+              {errors.room_number && (
                 <p className="text-xs text-red-500">
-                  {errors.semester.message}
+                  {errors.room_number.message}
                 </p>
               )}
             </div>
 
-            {}
-            <div className="space-y-2">
+            {/* Teacher - Full Width */}
+            <div className="space-y-2 md:col-span-2">
               <Label>
                 Teacher <span className="text-red-500">*</span>
               </Label>
@@ -1150,38 +1163,17 @@ export default function AutomatedRoutineCourses({
                 control={control}
                 name="teacher"
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select Teacher" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teachers.map((t) => (
-                        <SelectItem key={t.id} value={String(t.id)}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <CustomSelect
+                    value={field.value}
+                    onChange={field.onChange}
+                    options={teachers.map((t) => ({ value: String(t.id), label: t.name }))}
+                    placeholder="Select Teacher"
+                    id="teacher"
+                  />
                 )}
               />
               {errors.teacher && (
                 <p className="text-xs text-red-500">{errors.teacher.message}</p>
-              )}
-            </div>
-
-            {}
-            <div className="space-y-2">
-              <Label>
-                Course Type <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                {...form.register("course_type")}
-                placeholder="e.g. Theory"
-              />
-              {errors.course_type && (
-                <p className="text-xs text-red-500">
-                  {errors.course_type.message}
-                </p>
               )}
             </div>
           </div>
@@ -1196,7 +1188,7 @@ export default function AutomatedRoutineCourses({
             </Button>
             <Button
               onClick={handleSubmit(onSubmit)}
-              disabled={isSaving}
+              disabled={isSaving || (editingCourse ? !isDirty : false)}
               className="min-w-[100px]"
             >
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
