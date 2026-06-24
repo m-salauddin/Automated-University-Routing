@@ -875,7 +875,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                       </div>
                                       <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
                                         <span className="font-bold text-[11px]">
-                                          {session.course}{isLab ? " (Lab)" : " (Theory)"}, T-
+                                          {session.course}, T-
                                           {getTeacherInitials(session.teacher)}
                                         </span>
                                         <span className="font-bold text-[11px]">

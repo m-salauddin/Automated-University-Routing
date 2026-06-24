@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/dialog";
 import { generateRoutine, getRoutine } from "@/services/routine";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 export type APIRoutineItem = {
@@ -486,7 +487,7 @@ const MemoizedRoutineTable = React.memo(
                             </div>
                             <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
                               <span className="font-bold text-[11px]">
-                                {session.course}{isLab ? " (Lab)" : " (Theory)"}, T-
+                                {session.course}, T-
                                 {getTeacherInitials(session.teacher)}
                               </span>
                               <span className="font-bold text-[11px]">
@@ -579,6 +580,28 @@ export default function AdminRoutinePage({
     type: "lock",
   });
   const [lockConfirmInput, setLockConfirmInput] = useState("");
+
+  const [generateModal, setGenerateModal] = useState<{
+    isOpen: boolean;
+    departmentId: number | undefined;
+    semesterId: number | undefined;
+    ignoreWarnings: boolean;
+  }>({
+    isOpen: false,
+    departmentId: undefined,
+    semesterId: undefined,
+    ignoreWarnings: false,
+  });
+
+  const openGenerateModal = () => {
+    if (isRoutineLocked) return;
+    setGenerateModal({
+      isOpen: true,
+      departmentId: selectedDeptId,
+      semesterId: selectedSemesterId,
+      ignoreWarnings: false,
+    });
+  };
 
   const [inputValue, setInputValue] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
@@ -708,9 +731,9 @@ export default function AdminRoutinePage({
     fetchUpdatedRoutine();
   }, [selectedDeptId, selectedSemesterId]);
 
-  const handleGenerate = async () => {
+  const handleConfirmGenerate = async () => {
     if (isRoutineLocked) return;
-    if (selectedDeptId === undefined) {
+    if (generateModal.departmentId === undefined) {
       toast.error("Please select a valid department to generate routine.");
       return;
     }
@@ -718,25 +741,44 @@ export default function AdminRoutinePage({
     setIsGenerating(true);
     try {
       const result = await generateRoutine({
-        department_id: selectedDeptId,
-        semester_id: selectedSemesterId,
+        department_id: generateModal.departmentId,
+        semester_id: generateModal.semesterId,
+        ignore_warnings: generateModal.ignoreWarnings,
       });
+
       if (result.success) {
         dispatch(resetAll());
         toast.success("Routine generated successfully!");
         
+        const targetDept = dbDepartments.find((d) => d.id === generateModal.departmentId);
+        if (targetDept) {
+          setSelectedDept(targetDept.name);
+        }
+        
+        if (generateModal.semesterId === undefined) {
+          setSelectedSemester("All Semesters");
+        } else {
+          const targetSem = dbSemesters.find((s) => s.id === generateModal.semesterId);
+          if (targetSem) {
+            setSelectedSemester(targetSem.name);
+          }
+        }
+
         const res = await getRoutine({
-          department_id: selectedDeptId,
-          semester_id: selectedSemesterId,
+          department_id: generateModal.departmentId,
+          semester_id: generateModal.semesterId,
         });
         if (res.success && Array.isArray(res.data)) {
           setLocalRoutineList(res.data);
         }
+        
+        setGenerateModal((prev) => ({ ...prev, isOpen: false }));
         router.refresh();
       } else {
         toast.error(result.message || "Failed to generate routine");
       }
-    } catch {
+    } catch (err) {
+      console.error(err);
       toast.error("An unexpected error occurred");
     } finally {
       setIsGenerating(false);
@@ -1021,9 +1063,9 @@ export default function AdminRoutinePage({
 
               {!isRoutineLocked && (
                 <Button
-                  onClick={handleGenerate}
+                  onClick={openGenerateModal}
                   disabled={isGenerating}
-                  className="gap-2 bg-primary/90 hover:bg-primary"
+                  className="gap-2 bg-primary/90 hover:bg-primary w-fit"
                 >
                   {isGenerating ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1063,7 +1105,7 @@ export default function AdminRoutinePage({
               className="flex flex-wrap items-center gap-3 bg-card border rounded-xl p-1.5 shadow-sm w-full lg:w-fit"
             >
               {}
-              <div className="flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all flex-1 min-w-[150px]">
+              <div className="flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all flex-1 min-w-[220px]">
                 <Select value={selectedDept} onValueChange={setSelectedDept}>
                   <SelectTrigger className="h-10 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
                     <SelectValue placeholder="Select Department" />
@@ -1396,11 +1438,156 @@ export default function AdminRoutinePage({
                       : "Unlock Now"}
                   </Button>
                 </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </DialogContent>
+      </Dialog>
 
-                <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                  <X className="h-4 w-4" />
-                  <span className="sr-only">Close</span>
-                </DialogClose>
+      {/* Generate Routine Modal */}
+      <Dialog
+        open={generateModal.isOpen}
+        onOpenChange={(open) =>
+          setGenerateModal((prev) => ({ ...prev, isOpen: open }))
+        }
+      >
+        <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-0 bg-transparent shadow-none">
+          <AnimatePresence mode="wait">
+            {generateModal.isOpen && (
+              <motion.div
+                key="generate-routine-modal"
+                variants={modalContentVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="bg-background border rounded-lg shadow-xl w-full flex flex-col overflow-hidden border-primary/20"
+              >
+                <motion.div
+                  variants={modalItemVariants}
+                  className="p-6 pb-4 flex items-start gap-4 border-b bg-muted/20 border-border/65"
+                >
+                  <div className="p-3 rounded-full shrink-0 bg-primary/10 text-primary">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <DialogTitle className="text-xl">
+                      Generate Routine
+                    </DialogTitle>
+                    <DialogDescription className="text-sm leading-snug text-muted-foreground/90">
+                      Configure the parameters to generate a new class routine. Conflicting schedules will be resolved.
+                    </DialogDescription>
+                  </div>
+                </motion.div>
+
+                <div className="p-6 space-y-5 bg-card">
+                  <motion.div variants={modalItemVariants} className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground">
+                      Target Department
+                    </label>
+                    <div className="flex items-center gap-3 px-3 bg-muted/40 rounded-lg border border-border/60 focus-within:border-primary/20 focus-within:bg-background transition-all">
+                      <Select
+                        value={generateModal.departmentId?.toString() ?? ""}
+                        onValueChange={(val) =>
+                          setGenerateModal((prev) => ({
+                            ...prev,
+                            departmentId: val ? parseInt(val, 10) : undefined,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-11 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
+                          <SelectValue placeholder="Select Department" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {dbDepartments.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id.toString()}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </motion.div>
+
+                  <motion.div variants={modalItemVariants} className="space-y-2">
+                    <label className="text-sm font-semibold text-foreground">
+                      Target Semester
+                    </label>
+                    <div className="flex items-center gap-3 px-3 bg-muted/40 rounded-lg border border-border/60 focus-within:border-primary/20 focus-within:bg-background transition-all">
+                      <Select
+                        value={generateModal.semesterId?.toString() ?? "all"}
+                        onValueChange={(val) =>
+                          setGenerateModal((prev) => ({
+                            ...prev,
+                            semesterId: val === "all" ? undefined : parseInt(val, 10),
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="h-11 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
+                          <SelectValue placeholder="All Semesters" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Semesters</SelectItem>
+                          {dbSemesters.map((sem) => (
+                            <SelectItem key={sem.id} value={sem.id.toString()}>
+                              {sem.name} Semester
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </motion.div>
+
+                  <motion.div variants={modalItemVariants} className="flex items-center gap-2.5 pt-1">
+                    <Checkbox
+                      id="ignore-warnings-chk"
+                      checked={generateModal.ignoreWarnings}
+                      onCheckedChange={(checked) =>
+                        setGenerateModal((prev) => ({
+                          ...prev,
+                          ignoreWarnings: checked as boolean,
+                        }))
+                      }
+                    />
+                    <label
+                      htmlFor="ignore-warnings-chk"
+                      className="text-sm font-medium text-muted-foreground select-none cursor-pointer hover:text-foreground transition-colors"
+                    >
+                      Ignore conflicts & warnings (Force generate)
+                    </label>
+                  </motion.div>
+                </div>
+
+                <motion.div
+                  variants={modalItemVariants}
+                  className="p-6 pt-2 bg-card flex justify-end gap-3 border-t border-border/50"
+                >
+                  <Button
+                    variant="ghost"
+                    onClick={() =>
+                      setGenerateModal((prev) => ({ ...prev, isOpen: false }))
+                    }
+                    disabled={isGenerating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleConfirmGenerate}
+                    disabled={isGenerating || !generateModal.departmentId}
+                    className="gap-2 bg-primary/95 hover:bg-primary shadow-sm min-w-[110px]"
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Generate
+                      </>
+                    )}
+                  </Button>
+                </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
