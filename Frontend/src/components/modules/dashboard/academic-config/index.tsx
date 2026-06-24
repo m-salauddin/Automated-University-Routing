@@ -76,9 +76,8 @@ type TimeSlot = {
 
 const isSlotBreak = (slot: TimeSlot) => {
   if (!slot) return false;
-  const time = slot.start_time;
-  const isTimeMatch = time && (time.startsWith("01:15") || time.startsWith("13:15") || time.startsWith("1:15"));
-  return Boolean(isTimeMatch) || Boolean(slot.is_lunch_break) || Boolean(slot.is_launch_break) || Boolean(slot.islaunchbreak);
+  // Server field: is_lunch_break (from swagger definition)
+  return Boolean(slot.is_lunch_break);
 };
 
 const sortTimeSlotsHelper = (slots: TimeSlot[]): TimeSlot[] => {
@@ -551,7 +550,7 @@ export default function AcademicSettingsPage({
     setEditingSlot(slot);
     setNewSlotStart(slot.start_time);
     setNewSlotEnd(slot.end_time);
-    setNewSlotIsLaunchBreak(isSlotBreak(slot));
+    setNewSlotIsLaunchBreak(Boolean(slot.is_lunch_break));
     setIsSlotModalOpen(true);
   };
 
@@ -570,18 +569,13 @@ export default function AcademicSettingsPage({
 
     try {
       let res;
-      let finalStart = newSlotStart;
-      let finalEnd = newSlotEnd;
-      if (newSlotIsLaunchBreak) {
-        finalStart = "13:15:00";
-        finalEnd = "14:00:00";
-      }
+      const finalStart = newSlotStart;
+      const finalEnd = newSlotEnd;
 
       const payload = {
         start_time: finalStart,
         end_time: finalEnd,
-        is_launch_break: newSlotIsLaunchBreak,
-        islaunchbreak: newSlotIsLaunchBreak,
+        is_lunch_break: newSlotIsLaunchBreak,
       };
       if (editingSlot) {
         // Optimistic Update
@@ -593,8 +587,7 @@ export default function AcademicSettingsPage({
                     ...slot,
                     start_time: finalStart,
                     end_time: finalEnd,
-                    is_launch_break: newSlotIsLaunchBreak,
-                    islaunchbreak: newSlotIsLaunchBreak,
+                    is_lunch_break: newSlotIsLaunchBreak,
                   }
                 : slot
             )
