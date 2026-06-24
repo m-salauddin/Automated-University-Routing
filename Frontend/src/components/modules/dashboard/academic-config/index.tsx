@@ -74,10 +74,11 @@ type TimeSlot = {
   [key: string]: any;
 };
 
-const isSlotBreak = (slot: TimeSlot) =>
-  Boolean((slot as any).is_lunch_break) ||
-  Boolean((slot as any).is_launch_break) ||
-  Boolean((slot as any).islaunchbreak);
+const isSlotBreak = (slot: TimeSlot) => {
+  if (!slot) return false;
+  // Server field: is_lunch_break (from swagger definition)
+  return Boolean(slot.is_lunch_break);
+};
 
 const sortTimeSlotsHelper = (slots: TimeSlot[]): TimeSlot[] => {
   const getMinutes = (timeStr: string) => {
@@ -549,7 +550,7 @@ export default function AcademicSettingsPage({
     setEditingSlot(slot);
     setNewSlotStart(slot.start_time);
     setNewSlotEnd(slot.end_time);
-    setNewSlotIsLaunchBreak(isSlotBreak(slot));
+    setNewSlotIsLaunchBreak(Boolean(slot.is_lunch_break));
     setIsSlotModalOpen(true);
   };
 
@@ -568,11 +569,13 @@ export default function AcademicSettingsPage({
 
     try {
       let res;
+      const finalStart = newSlotStart;
+      const finalEnd = newSlotEnd;
+
       const payload = {
-        start_time: newSlotStart,
-        end_time: newSlotEnd,
-        is_launch_break: newSlotIsLaunchBreak,
-        islaunchbreak: newSlotIsLaunchBreak,
+        start_time: finalStart,
+        end_time: finalEnd,
+        is_lunch_break: newSlotIsLaunchBreak,
       };
       if (editingSlot) {
         // Optimistic Update
@@ -582,10 +585,9 @@ export default function AcademicSettingsPage({
               slot.id === editingSlot.id
                 ? {
                     ...slot,
-                    start_time: newSlotStart,
-                    end_time: newSlotEnd,
-                    is_launch_break: newSlotIsLaunchBreak,
-                    islaunchbreak: newSlotIsLaunchBreak,
+                    start_time: finalStart,
+                    end_time: finalEnd,
+                    is_lunch_break: newSlotIsLaunchBreak,
                   }
                 : slot
             )
@@ -607,7 +609,7 @@ export default function AcademicSettingsPage({
           router.refresh();
         });
       } else {
-        setTimeSlotsList(sortTimeSlotsHelper(initialTimeSlots)); // Revert
+        setTimeSlotsList(sortTimeSlotsHelper(initialTimeSlots));
         toast.error(res.message || "Operation failed");
       }
     } catch (err) {

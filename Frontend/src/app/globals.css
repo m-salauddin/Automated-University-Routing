@@ -129,6 +129,61 @@
   }
 }
 
+@layer utilities {
+  @keyframes skeleton-page-sweep {
+    0% {
+      background-position: -120vw -120vh;
+    }
+    100% {
+      background-position: 120vw 120vh;
+    }
+  }
+
+  .skeleton-shimmer {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--skeleton-base, rgb(229 231 235 / 0.96));
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.03);
+  }
+
+  .skeleton-sweep {
+    --skeleton-base: rgb(229 231 235 / 0.96);
+    --skeleton-sweep: rgb(255 255 255 / 0.78);
+  }
+
+  .skeleton-sweep .skeleton-shimmer {
+    background-color: var(--skeleton-base);
+    background-image: linear-gradient(
+      135deg,
+      transparent 42%,
+      var(--skeleton-sweep) 49%,
+      transparent 56%
+    );
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    background-size: 240vw 240vh;
+    animation: skeleton-page-sweep 1.8s linear infinite;
+    will-change: background-position;
+  }
+
+  .dark .skeleton-shimmer {
+    background-color: var(--skeleton-base, rgb(63 63 70 / 0.76));
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.035);
+  }
+
+  .dark .skeleton-sweep {
+    --skeleton-base: rgb(63 63 70 / 0.76);
+    --skeleton-sweep: rgb(255 255 255 / 0.32);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton-sweep .skeleton-shimmer {
+      animation: none;
+      background-image: none;
+    }
+  }
+}
+
 /* Print adjustments to ensure readable output in dark mode */
 @media print {
   :root,
