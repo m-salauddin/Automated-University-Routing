@@ -16,6 +16,7 @@ import {
   Edit2,
   Trash2,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ type Course = {
   department_name: string | null;
   semester: number;
   semester_name: string | null;
+  student_count?: number | null;
 };
 type User = {
   id: number;
@@ -78,109 +80,7 @@ type User = {
   semester?: number | string | null;
   semester_name: string | null;
 };
-
-interface SelectOption {
-  value: string;
-  label: string;
-}
-
-interface CustomSelectProps {
-  value: string;
-  onChange: (value: string) => void;
-  options: SelectOption[];
-  placeholder?: string;
-  id?: string;
-}
-
-function CustomSelect({ value, onChange, options, placeholder = "Select option", id }: CustomSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
-  const selectedOption = options.find((opt) => opt.value === value);
-
-  return (
-    <div className="relative w-full" ref={containerRef} id={id}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex h-10 w-full items-center justify-between rounded-lg border border-border/80 bg-background/50 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground hover:bg-muted/40 focus:outline-none focus:ring-1 focus:ring-ring transition-all cursor-pointer"
-      >
-        <span className={selectedOption ? "text-foreground font-medium" : "text-muted-foreground"}>
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={cn("h-4 w-4 opacity-50 shrink-0 transition-transform duration-200", isOpen && "rotate-180")}
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: -4, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ duration: 0.1 }}
-            className="absolute z-50 mt-1.5 max-h-60 w-full overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg focus:outline-none"
-          >
-            <div className="p-1">
-              {options.map((option) => (
-                <button
-                  type="button"
-                  key={option.value}
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                  }}
-                  className={cn(
-                    "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors",
-                    option.value === value && "bg-accent text-accent-foreground font-medium"
-                  )}
-                >
-                  <span>{option.label}</span>
-                  {option.value === value && (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4 text-primary shrink-0"
-                    >
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  )}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
+import { CustomSelect } from "@/components/ui/custom-select";
 
 interface DepartmentDetailPageProps {
   department: Department;
@@ -197,6 +97,8 @@ export default function DepartmentDetailPage({
 }: DepartmentDetailPageProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [semesterFilter, setSemesterFilter] = useState("All");
+  const [typeFilter, setTypeFilter] = useState("All");
 
   // Semester CRUD States
   const [isSemModalOpen, setIsSemModalOpen] = useState(false);
@@ -218,13 +120,64 @@ export default function DepartmentDetailPage({
   const [credits, setCredits] = useState("");
   const [selectedSemesterId, setSelectedSemesterId] = useState("");
   const [selectedTeacherId, setSelectedTeacherId] = useState("");
-  const [courseType, setCourseType] = useState("Theory");
+  const [courseType, setCourseType] = useState("1");
+  const [studentCount, setStudentCount] = useState("");
   const [isSavingCourse, setIsSavingCourse] = useState(false);
 
   // Helper Memo for Teachers List
   const teachers = useMemo(() => {
     return users.filter((u) => u.role?.toUpperCase() === "TEACHER");
   }, [users]);
+
+  // Hook to check if Semester fields have been modified during edit
+  const isSemModified = useMemo(() => {
+    if (!editingSem) return true; // Always enabled for Add New Semester
+    const isNameDiff = newSemName.trim() !== (editingSem.name || "").trim();
+    const isOrderDiff = newSemOrder.trim() !== (editingSem.order?.toString() || "").trim();
+    return isNameDiff || isOrderDiff;
+  }, [editingSem, newSemName, newSemOrder]);
+
+  // Hook to check if Course fields have been modified during edit
+  const isCourseModified = useMemo(() => {
+    if (!editingCourse) return true; // Always enabled for Add New Course
+
+    const isCodeDiff = courseCode.trim() !== (editingCourse.course_code || "").trim();
+    const isNameDiff = courseName.trim() !== (editingCourse.course_name || "").trim();
+    const isRoomDiff = roomNumber.trim() !== (editingCourse.room_number || "").trim();
+    
+    const originalStudentCount = editingCourse.student_count !== undefined && editingCourse.student_count !== null 
+      ? editingCourse.student_count.toString() 
+      : "";
+    const isStudentCountDiff = studentCount.trim() !== originalStudentCount;
+
+    const originalCredits = editingCourse.credits !== undefined && editingCourse.credits !== null
+      ? editingCourse.credits.toString()
+      : "";
+    const isCreditsDiff = credits.trim() !== originalCredits;
+
+    const originalSemester = editingCourse.semester ? String(editingCourse.semester) : "";
+    const isSemesterDiff = selectedSemesterId !== originalSemester;
+
+    const originalTeacher = editingCourse.teacher ? String(editingCourse.teacher) : "none";
+    const currentTeacherVal = selectedTeacherId || "none";
+    const isTeacherDiff = currentTeacherVal !== originalTeacher;
+
+    const originalCTRaw = String(editingCourse.course_type || editingCourse.course_type_name || "").toLowerCase().trim();
+    const originalCT = originalCTRaw === "lab" || originalCTRaw === "2" ? "2" : "1";
+    const isCTDiff = courseType !== originalCT;
+
+    return isCodeDiff || isNameDiff || isRoomDiff || isStudentCountDiff || isCreditsDiff || isSemesterDiff || isTeacherDiff || isCTDiff;
+  }, [
+    editingCourse,
+    courseCode,
+    courseName,
+    roomNumber,
+    studentCount,
+    credits,
+    selectedSemesterId,
+    selectedTeacherId,
+    courseType,
+  ]);
 
   // Semester Action Handlers
   const openAddSem = () => {
@@ -308,7 +261,8 @@ export default function DepartmentDetailPage({
     setCredits("");
     setSelectedSemesterId(semesters[0]?.id ? String(semesters[0].id) : "");
     setSelectedTeacherId(teachers[0]?.id ? String(teachers[0].id) : "");
-    setCourseType("Theory");
+    setCourseType("1");
+    setStudentCount("");
     setIsCourseModalOpen(true);
   };
 
@@ -321,7 +275,8 @@ export default function DepartmentDetailPage({
     setSelectedSemesterId(course.semester ? String(course.semester) : "");
     setSelectedTeacherId(course.teacher ? String(course.teacher) : "");
     const currentCT = String(course.course_type || course.course_type_name || "").toLowerCase().trim();
-    setCourseType(currentCT === "lab" || currentCT === "2" ? "Lab" : "Theory");
+    setCourseType(currentCT === "lab" || currentCT === "2" ? "2" : "1");
+    setStudentCount(course.student_count !== undefined && course.student_count !== null ? course.student_count.toString() : "");
     setIsCourseModalOpen(true);
   };
 
@@ -335,10 +290,19 @@ export default function DepartmentDetailPage({
       toast.error("Code, Name, Credits, and Semester are required");
       return;
     }
-    const creditsNum = parseFloat(credits);
+    const creditsNum = parseInt(credits);
     if (isNaN(creditsNum)) {
       toast.error("Credits must be a valid number");
       return;
+    }
+
+    let studentCountNum: number | null = null;
+    if (studentCount.trim()) {
+      studentCountNum = parseInt(studentCount);
+      if (isNaN(studentCountNum)) {
+        toast.error("Student count must be a valid number");
+        return;
+      }
     }
 
     setIsSavingCourse(true);
@@ -358,7 +322,8 @@ export default function DepartmentDetailPage({
         semester_name: semObj?.name || "",
         teacher: isNoTeacher ? null : parseInt(selectedTeacherId),
         teacher_name: teacherObj?.name || "",
-        course_type: courseType,
+        course_type: parseInt(courseType),
+        student_count: studentCountNum,
       };
 
       let res;
@@ -466,15 +431,32 @@ export default function DepartmentDetailPage({
   }, [department, courses]);
 
   const filteredCourses = useMemo(() => {
-    if (!searchQuery.trim()) return deptCourses;
-    const lowerQuery = searchQuery.toLowerCase().trim();
-    return deptCourses.filter(
-      (c) =>
-        c.course_name.toLowerCase().includes(lowerQuery) ||
-        c.course_code.toLowerCase().includes(lowerQuery) ||
-        (c.teacher_name && c.teacher_name.toLowerCase().includes(lowerQuery))
-    );
-  }, [deptCourses, searchQuery]);
+    return deptCourses.filter((c) => {
+      // 1. Search Query Filter
+      if (searchQuery.trim()) {
+        const lowerQuery = searchQuery.toLowerCase().trim();
+        const matchesSearch =
+          c.course_name.toLowerCase().includes(lowerQuery) ||
+          c.course_code.toLowerCase().includes(lowerQuery) ||
+          (c.teacher_name && c.teacher_name.toLowerCase().includes(lowerQuery));
+        if (!matchesSearch) return false;
+      }
+
+      // 2. Semester Filter
+      if (semesterFilter !== "All") {
+        if (String(c.semester) !== semesterFilter) return false;
+      }
+
+      // 3. Course Type Filter
+      if (typeFilter !== "All") {
+        const ct = String(c.course_type || c.course_type_name || "").toLowerCase().trim();
+        const mappedType = ct === "lab" || ct === "2" ? "2" : "1";
+        if (mappedType !== typeFilter) return false;
+      }
+
+      return true;
+    });
+  }, [deptCourses, searchQuery, semesterFilter, typeFilter]);
 
   const totalStudentsCount = useMemo(() => {
     return users.filter((u: User) => {
@@ -569,7 +551,7 @@ export default function DepartmentDetailPage({
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {batches.length === 0 ? (
               <div className="col-span-full flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed rounded-xl bg-muted/20">
                 <GraduationCap className="h-8 w-8 text-muted-foreground/60 mb-2 stroke-[1.5]" />
@@ -583,7 +565,7 @@ export default function DepartmentDetailPage({
                 return (
                   <div
                     key={batch.name}
-                    className="p-4 bg-muted/40 hover:bg-muted/65 dark:bg-muted/25 dark:hover:bg-muted/35 border border-border/50 rounded-xl flex flex-col gap-2 transition-all relative group"
+                    className="p-4 bg-muted/40 hover:bg-muted/65 dark:bg-muted/25 dark:hover:bg-muted/35 border border-border/50 rounded-xl flex flex-col gap-2 transition-all relative group min-w-0"
                   >
                     <div className="font-medium text-sm text-foreground flex items-center justify-between">
                       <span>{batch.name}</span>
@@ -642,20 +624,23 @@ export default function DepartmentDetailPage({
 
         {/* Department Courses Section (Now at the bottom) */}
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-3">
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b border-border/40 pb-3">
             <div className="flex items-center gap-2.5">
               <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               <h3 className="font-semibold text-foreground text-sm uppercase tracking-wider">
                 Department Courses
               </h3>
               <Badge variant="secondary" className="font-semibold text-xs py-0.5 px-2 bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                {deptCourses.length} {deptCourses.length === 1 ? "course" : "courses"}
+                {filteredCourses.length !== deptCourses.length 
+                  ? `${filteredCourses.length} of ${deptCourses.length} courses` 
+                  : `${deptCourses.length} ${deptCourses.length === 1 ? "course" : "courses"}`}
               </Badge>
             </div>
 
-            {/* Local Course Search & Add Course Button */}
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative w-full sm:w-[240px]">
+            {/* Local Course Search, Filters & Add Course Button */}
+            <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+              {/* Search input */}
+              <div className="relative flex-1 min-w-[160px] xl:flex-initial xl:w-[200px]">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search courses..."
@@ -664,10 +649,54 @@ export default function DepartmentDetailPage({
                   className="pl-9 h-9 text-xs"
                 />
               </div>
+
+              {/* Semester Dropdown Filter */}
+              <div className="w-[140px] shrink-0">
+                <CustomSelect
+                  value={semesterFilter}
+                  onChange={setSemesterFilter}
+                  options={[
+                    { value: "All", label: "All Semesters" },
+                    ...semesters.map((s) => ({ value: String(s.id), label: s.name })),
+                  ]}
+                  placeholder="All Semesters"
+                />
+              </div>
+
+              {/* Course Type Filter Dropdown */}
+              <div className="w-[110px] shrink-0">
+                <CustomSelect
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  options={[
+                    { value: "All", label: "All Types" },
+                    { value: "1", label: "Theory" },
+                    { value: "2", label: "Lab" },
+                  ]}
+                  placeholder="All Types"
+                />
+              </div>
+
+              {/* Reset Filter Button */}
+              {(semesterFilter !== "All" || typeFilter !== "All" || searchQuery.trim() !== "") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSemesterFilter("All");
+                    setTypeFilter("All");
+                    setSearchQuery("");
+                  }}
+                  className="gap-2 h-9 border-destructive/20 hover:border-destructive/40 text-destructive hover:bg-destructive/10 dark:text-red-400 dark:hover:bg-red-500/10 cursor-pointer font-semibold text-xs transition-all shrink-0"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset
+                </Button>
+              )}
+
               <Button
                 size="sm"
                 onClick={openAddCourse}
-                className="gap-1.5 h-9 text-xs font-semibold shrink-0 animate-none"
+                className="gap-1.5 h-9 text-xs font-semibold shrink-0 animate-none ml-auto xl:ml-0"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add Course
@@ -675,14 +704,14 @@ export default function DepartmentDetailPage({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredCourses.length === 0 ? (
               <div className="col-span-full flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed rounded-xl bg-muted/20">
                 <BookOpen className="h-10 w-10 text-muted-foreground/60 mb-2 stroke-[1.5]" />
                 <p className="text-sm text-muted-foreground font-medium">No courses found</p>
                 <p className="text-xs text-muted-foreground/75 mt-1 max-w-[240px]">
-                  {searchQuery.trim()
-                    ? "Try refining your search query."
+                  {searchQuery.trim() || semesterFilter !== "All" || typeFilter !== "All"
+                    ? "Try refining your search query or filters."
                     : "Add courses to this department from the course management dashboard."}
                 </p>
               </div>
@@ -705,10 +734,10 @@ export default function DepartmentDetailPage({
                   <motion.div
                     layout
                     key={course.id}
-                    className="p-4 bg-muted/30 border border-border/40 hover:border-border rounded-xl flex flex-col gap-3 transition-all relative group"
+                    className="p-4 bg-muted/30 border border-border/40 hover:border-border rounded-xl flex flex-col gap-3 transition-all relative group min-w-0"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-0.5">
+                    <div className="flex items-start justify-between gap-2 min-w-0">
+                      <div className="space-y-0.5 min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase bg-blue-500/10 px-2 py-0.5 rounded-md">
                             {course.course_code}
@@ -725,11 +754,11 @@ export default function DepartmentDetailPage({
                             {course.course_type_name || (String(course.course_type) === "2" ? "Lab" : String(course.course_type) === "1" ? "Theory" : course.course_type) || "Theory"}
                           </Badge>
                         </div>
-                        <h4 className="font-semibold text-sm sm:text-base text-foreground leading-snug pt-1">
+                        <h4 className="font-semibold text-sm sm:text-base text-foreground leading-snug pt-1 break-words">
                           {course.course_name}
                         </h4>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[10px] font-bold text-muted-foreground bg-muted-foreground/5 px-2 py-0.5 rounded-md">
                           {course.semester_name || "No Semester"}
                         </span>
@@ -761,16 +790,21 @@ export default function DepartmentDetailPage({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-y-2 gap-x-3 border-t border-border/30 pt-3 text-xs text-muted-foreground font-medium">
+                    <div className="grid grid-cols-2 gap-y-2 gap-x-3 border-t border-border/30 pt-3 text-xs text-muted-foreground font-medium min-w-0">
                       <div className="flex items-center gap-1.5">
                         <Users className="w-4 h-4 text-blue-500" />
-                        <span>{studentCount} Students</span>
+                        <span>
+                          {course.student_count !== undefined && course.student_count !== null
+                            ? course.student_count
+                            : studentCount}{" "}
+                          Students
+                        </span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <BookOpen className="w-4 h-4 text-purple-500" />
                         <span>{course.credits} Credits</span>
                       </div>
-                      <div className="flex items-center gap-1.5 col-span-2 border-t border-border/10 pt-2 mt-0.5">
+                      <div className="flex items-center gap-1.5 col-span-2 border-t border-border/10 pt-2 mt-0.5 min-w-0">
                         <div className="p-0.5 bg-muted-foreground/10 rounded-full shrink-0">
                           <div className="w-3 h-3 rounded-full bg-muted-foreground/40" />
                         </div>
@@ -831,7 +865,7 @@ export default function DepartmentDetailPage({
             </Button>
             <Button
               onClick={handleSaveSemester}
-              disabled={isSavingSem}
+              disabled={isSavingSem || !isSemModified}
               className="gap-2 min-w-[100px]"
             >
               {isSavingSem && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -884,6 +918,15 @@ export default function DepartmentDetailPage({
           </DialogHeader>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-3">
+            <div className="space-y-1.5 md:col-span-2">
+              <Label htmlFor="courseName">Course Name *</Label>
+              <Input
+                id="courseName"
+                value={courseName}
+                onChange={(e) => setCourseName(e.target.value)}
+                placeholder="e.g. Operating System"
+              />
+            </div>
             <div className="space-y-1.5">
               <Label htmlFor="courseCode">Course Code *</Label>
               <Input
@@ -894,21 +937,26 @@ export default function DepartmentDetailPage({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="courseName">Course Name *</Label>
-              <Input
-                id="courseName"
-                value={courseName}
-                onChange={(e) => setCourseName(e.target.value)}
-                placeholder="e.g. Operating System"
+              <Label htmlFor="courseType">Course Type *</Label>
+              <CustomSelect
+                value={courseType}
+                onChange={setCourseType}
+                options={[
+                  { value: "1", label: "Theory" },
+                  { value: "2", label: "Lab" },
+                ]}
+                placeholder="Select Course Type"
+                id="courseType"
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="roomNumber">Room Number</Label>
-              <Input
-                id="roomNumber"
-                value={roomNumber}
-                onChange={(e) => setRoomNumber(e.target.value)}
-                placeholder="e.g. B319"
+              <Label htmlFor="semester">Semester *</Label>
+              <CustomSelect
+                value={selectedSemesterId}
+                onChange={setSelectedSemesterId}
+                options={semesters.map((sem) => ({ value: String(sem.id), label: sem.name }))}
+                placeholder="Select Semester"
+                id="semester"
               />
             </div>
             <div className="space-y-1.5">
@@ -923,16 +971,25 @@ export default function DepartmentDetailPage({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="semester">Semester *</Label>
-              <CustomSelect
-                value={selectedSemesterId}
-                onChange={setSelectedSemesterId}
-                options={semesters.map((sem) => ({ value: String(sem.id), label: sem.name }))}
-                placeholder="Select Semester"
-                id="semester"
+              <Label htmlFor="roomNumber">Room Number</Label>
+              <Input
+                id="roomNumber"
+                value={roomNumber}
+                onChange={(e) => setRoomNumber(e.target.value)}
+                placeholder="e.g. B319"
               />
             </div>
             <div className="space-y-1.5">
+              <Label htmlFor="studentCount">Student Count</Label>
+              <Input
+                id="studentCount"
+                type="number"
+                value={studentCount}
+                onChange={(e) => setStudentCount(e.target.value)}
+                placeholder="e.g. 40"
+              />
+            </div>
+            <div className="space-y-1.5 md:col-span-2">
               <Label htmlFor="teacher">Teacher</Label>
               <CustomSelect
                 value={selectedTeacherId}
@@ -943,19 +1000,6 @@ export default function DepartmentDetailPage({
                 ]}
                 placeholder="No Teacher Assigned"
                 id="teacher"
-              />
-            </div>
-            <div className="space-y-1.5 md:col-span-2">
-              <Label htmlFor="courseType">Course Type *</Label>
-              <CustomSelect
-                value={courseType}
-                onChange={setCourseType}
-                options={[
-                  { value: "Theory", label: "Theory" },
-                  { value: "Lab", label: "Lab" },
-                ]}
-                placeholder="Select Course Type"
-                id="courseType"
               />
             </div>
           </div>
@@ -970,7 +1014,7 @@ export default function DepartmentDetailPage({
             </Button>
             <Button
               onClick={handleSaveCourse}
-              disabled={isSavingCourse}
+              disabled={isSavingCourse || !isCourseModified}
               className="gap-2 min-w-[100px]"
             >
               {isSavingCourse && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

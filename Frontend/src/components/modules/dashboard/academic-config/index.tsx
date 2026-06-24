@@ -967,7 +967,7 @@ export default function AcademicSettingsPage({
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <AnimatePresence>
               {departmentsList.map((dept) => (
                 <motion.div
@@ -978,7 +978,7 @@ export default function AcademicSettingsPage({
                   exit={{ opacity: 0, scale: 0.9 }}
                 >
                   <Card
-                    className="group hover:shadow-md transition-all h-full cursor-pointer hover:border-primary/50 hover:bg-muted/5 select-none"
+                    className="group hover:shadow-md transition-all h-full cursor-pointer hover:border-primary/50 hover:bg-muted/5 select-none min-w-0"
                     onClick={() => {
                       router.push(`/dashboard/admin/academic-config/${dept.id}`);
                     }}
@@ -1051,7 +1051,7 @@ export default function AcademicSettingsPage({
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4">
             <AnimatePresence>
               {semestersList.map((sem) => (
                 <motion.div
@@ -1061,7 +1061,7 @@ export default function AcademicSettingsPage({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                 >
-                  <Card className="flex flex-col items-center justify-center p-4 hover:bg-muted/50 transition-colors relative group h-full">
+                  <Card className="flex flex-col items-center justify-center p-4 hover:bg-muted/50 transition-colors relative group h-full min-w-0">
                     <div className="absolute top-2 right-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -1256,7 +1256,7 @@ export default function AcademicSettingsPage({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <AnimatePresence>
               {filteredRooms.map((room) => (
                 <motion.div
@@ -1266,7 +1266,7 @@ export default function AcademicSettingsPage({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                 >
-                  <Card className="group hover:shadow-md transition-all h-full">
+                  <Card className="group hover:shadow-md transition-all h-full min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         Capacity: {room.capacity}
