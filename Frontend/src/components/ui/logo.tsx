@@ -140,23 +140,23 @@ const Logo = ({ className, ...props }: LogoProps) => {
 
       <defs>
         <linearGradient id="grad-amber" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#FBBF24" /> {/* amber-400 */}
-          <stop offset="100%" stopColor="#F97316" /> {/* orange-500 */}
+          <stop offset="0%" stopColor="#FBBF24" /> {}
+          <stop offset="100%" stopColor="#F97316" /> {}
         </linearGradient>
 
         <linearGradient id="grad-teal" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#2DD4BF" /> {/* teal-400 */}
-          <stop offset="100%" stopColor="#10B981" /> {/* emerald-500 */}
+          <stop offset="0%" stopColor="#2DD4BF" /> {}
+          <stop offset="100%" stopColor="#10B981" /> {}
         </linearGradient>
 
         <linearGradient id="grad-berry" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#F472B6" /> {/* pink-400 */}
-          <stop offset="100%" stopColor="#A855F7" /> {/* purple-500 */}
+          <stop offset="0%" stopColor="#F472B6" /> {}
+          <stop offset="100%" stopColor="#A855F7" /> {}
         </linearGradient>
 
         <linearGradient id="grad-indigo" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#818CF8" /> {/* indigo-400 */}
-          <stop offset="100%" stopColor="#3B82F6" /> {/* blue-500 */}
+          <stop offset="0%" stopColor="#818CF8" /> {}
+          <stop offset="100%" stopColor="#3B82F6" /> {}
         </linearGradient>
 
         <filter id="clean-glow" x="-50%" y="-50%" width="200%" height="200%">

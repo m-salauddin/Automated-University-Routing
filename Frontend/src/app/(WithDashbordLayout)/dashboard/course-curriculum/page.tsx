@@ -53,7 +53,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Course, COURSE_DATA } from "./curriculam-data";
 
-// --- PAGE LOAD ANIMATION VARIANTS ---
+
 const pageVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
@@ -74,7 +74,7 @@ const pageItemVariants: Variants = {
   },
 };
 
-// --- TABLE ROW ANIMATION VARIANTS ---
+
 const tableContainerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
@@ -101,7 +101,7 @@ const rowVariants: Variants = {
   },
 };
 
-// --- EXTRACTED COMPONENTS ---
+
 
 const FilterItem = ({
   label,
@@ -257,7 +257,7 @@ const FilterPanel = ({
 );
 
 export default function AutomatedRoutineCourses() {
-  // -- State --
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [semesterFilter, setSemesterFilter] = useState("All");
   const [creditFilter, setCreditFilter] = useState("All");
@@ -279,7 +279,7 @@ export default function AutomatedRoutineCourses() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  // -- Handlers --
+  
   const handleSearchChange = (val: string) => {
     setSearchQuery(val);
     setCurrentPage(1);
@@ -391,14 +391,14 @@ export default function AutomatedRoutineCourses() {
         }
       `}</style>
 
-      {/* -- PAGE LOAD ANIMATION CONTAINER -- */}
+      {}
       <motion.div
         variants={pageVariants}
         initial="hidden"
         animate="visible"
         className="w-full min-w-0 max-w-full mx-auto p-4 md:p-6 space-y-6 font-lexend text-foreground overflow-x-hidden print:p-0 print:max-w-none"
       >
-        {/* -- Header Section -- */}
+        {}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden mb-8">
           <div className="space-y-2 w-full">
             <motion.div variants={pageItemVariants}>
@@ -448,7 +448,7 @@ export default function AutomatedRoutineCourses() {
                     </SheetDescription>
                   </SheetHeader>
 
-                  {/* -- Extracted Filter Panel for Mobile -- */}
+                  {}
                   <FilterPanel
                     searchQuery={searchQuery}
                     setSearchQuery={handleSearchChange}
@@ -482,7 +482,7 @@ export default function AutomatedRoutineCourses() {
           </motion.div>
         </div>
 
-        {/* -- Print Header -- */}
+        {}
         <div className="hidden print:block mb-6">
           <h1 className="text-2xl font-bold mb-2">Academic Course Curriculum</h1>
           <p className="text-sm text-muted-foreground">
@@ -490,14 +490,14 @@ export default function AutomatedRoutineCourses() {
           </p>
         </div>
 
-        {/* -- Main Content Card -- */}
+        {}
         <motion.div variants={pageItemVariants}>
           <Card className="w-full overflow-hidden dark:bg-[#111113] border shadow-sm print:border-none print:shadow-none print:overflow-visible">
             <CardHeader className="p-4 bg-muted/30 border-b hidden min-[1300px]:block print:hidden">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col xl:flex-row gap-4 justify-between items-end">
                   <div className="grid grid-cols-4 gap-3 w-full xl:w-auto flex-1">
-                    {/* -- Desktop Filters -- */}
+                    {}
                     <FilterItem label="Search">
                       <div className="relative">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -574,7 +574,7 @@ export default function AutomatedRoutineCourses() {
                     </FilterItem>
                   </div>
 
-                  {/* -- Desktop Right Controls -- */}
+                  {}
                   <div className="flex gap-3 items-end shrink-0 w-full xl:w-auto justify-end xl:justify-start">
                     <div className="min-w-[150px]">
                       <FilterItem label="Columns">
@@ -630,7 +630,7 @@ export default function AutomatedRoutineCourses() {
               </div>
             </CardHeader>
 
-            {/* -- Table Content -- */}
+            {}
             <CardContent className="p-0 grid grid-cols-1">
               <div className="w-full overflow-x-auto print:overflow-visible">
                 <Table className="min-w-[800px] overflow-hidden">
@@ -820,7 +820,7 @@ export default function AutomatedRoutineCourses() {
               </div>
             </CardContent>
 
-            {/* -- Pagination Footer -- */}
+            {}
             {paginatedData.length > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-background/50 print:hidden">
                 <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-2 text-sm text-muted-foreground">

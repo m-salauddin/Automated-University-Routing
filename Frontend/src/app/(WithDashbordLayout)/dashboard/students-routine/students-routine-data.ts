@@ -185,8 +185,8 @@ export const routineData: Record<string, SemesterData> = {
                 day: "Sun",
                 slots: [
                     null,
-                    null, // Moved to Tue 0 to avoid conflict with 8th Sem (MKN)
-                    null, // Moved to Tue 1 to avoid conflict with 8th Sem (MKN)
+                    null, 
+                    null, 
                     { course: "CSE 3602L", teacher: "FT", teacherId: "103", room: "B323L" },
                     { course: "CSE 3602L", teacher: "FT", teacherId: "103", room: "B323L" },
                     null,
@@ -212,23 +212,23 @@ export const routineData: Record<string, SemesterData> = {
             {
                 day: "Tue",
                 slots: [
-                    { course: "CSE 3603", teacher: "MKN", teacherId: "101", room: "B322" }, // Moved from Sun
-                    { course: "CSE 3603", teacher: "MKN", teacherId: "101", room: "B322" }, // Moved from Sun
+                    { course: "CSE 3603", teacher: "MKN", teacherId: "101", room: "B322" }, 
+                    { course: "CSE 3603", teacher: "MKN", teacherId: "101", room: "B322" }, 
                     { course: "CSE 3601", teacher: "UF", teacherId: "110", room: "B315" },
                     { course: "CSE 3605", teacher: "UF", teacherId: "110", room: "B315" },
-                    null, // Moved to Slot 7 to avoid conflict with 7th Sem (GN)
+                    null, 
                     null,
                     null,
-                    { course: "CSE 3607", teacher: "GN", teacherId: "111", room: "B315" }, // Moved from Slot 4
+                    { course: "CSE 3607", teacher: "GN", teacherId: "111", room: "B315" }, 
                     null,
                 ],
             },
             {
                 day: "Wed",
                 slots: [
-                    { course: "CSE 3601", teacher: "UF", teacherId: "110", room: "B315" }, // Moved from Slot 2 to avoid conflict
+                    { course: "CSE 3601", teacher: "UF", teacherId: "110", room: "B315" }, 
                     null,
-                    null, // Moved to Slot 0
+                    null, 
                     null,
                     { course: "CSE 3605", teacher: "UF", teacherId: "110", room: "B315" },
                     null,

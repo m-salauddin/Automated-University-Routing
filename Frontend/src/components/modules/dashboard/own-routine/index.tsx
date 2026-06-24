@@ -101,7 +101,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
-// --- TYPES ---
+
 export type APIRoutineItem = {
   id: number;
   day: number | string;
@@ -124,7 +124,7 @@ type TeacherInfo = {
   semesters_involved: string[];
 };
 
-// UPDATED: Added department to state
+
 type RoutineRowState = {
   id: number;
   day: string;
@@ -135,7 +135,7 @@ type RoutineRowState = {
   type: string;
   room: string;
   semester: string;
-  department: string; // Added this
+  department: string; 
   teacherId: string;
 };
 
@@ -143,7 +143,7 @@ interface OwnRoutinePageProps {
   routineList: APIRoutineItem[];
 }
 
-// --- HELPERS ---
+
 const formatTime12Hour = (timeStr: string) => {
   if (!timeStr) return "";
   const [hours, minutes] = timeStr.split(":");
@@ -164,7 +164,7 @@ const abbreviateDay = (day: string) => {
 const days = ["All", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const EMPTY_OBJ = {};
 
-// --- ANIMATIONS ---
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -202,7 +202,7 @@ const modalItemVariants = {
   },
 };
 
-// --- ISOLATED COMPONENT: CANCELLATION MODAL ---
+
 interface CancellationModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -221,7 +221,7 @@ function CancellationModal({
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
-      setReason(""); // Clear text on close
+      setReason(""); 
     }
     onOpenChange(open);
   };
@@ -313,7 +313,7 @@ function CancellationModal({
   );
 }
 
-// --- ISOLATED COMPONENT: DRAG HANDLE ---
+
 function DragHandle({
   attributes,
   listeners,
@@ -333,7 +333,7 @@ function DragHandle({
   );
 }
 
-// --- MAIN PAGE COMPONENT ---
+
 export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
   const dispatch = useDispatch();
   const {
@@ -350,22 +350,22 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     (s: RootState) => s.classOff.offMap || EMPTY_OBJ
   );
 
-  // State
+  
   const [rows, setRows] = useState<RoutineRowState[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [teacherInfo, setTeacherInfo] = useState<TeacherInfo | null>(null);
 
-  // Filters
+  
   const [day, setDay] = useState<string>("All");
   const [typeFilter, setTypeFilter] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
   const [roomFilter, setRoomFilter] = useState<string>("All");
   const [semesterFilter, setSemesterFilter] = useState<string>("All");
 
-  // Modal State
+  
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
 
-  // UPDATED: Added dept, sem, day to pendingCancellation
+  
   const [pendingCancellation, setPendingCancellation] = useState<{
     id: number;
     teacherId: string;
@@ -403,7 +403,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     useSensor(KeyboardSensor, {})
   );
 
-  // --- Effect: Process Data ---
+  
   useEffect(() => {
     if (!routineList) {
       setIsLoading(false);
@@ -461,7 +461,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     }
   }, [routineList]);
 
-  // --- Computations ---
+  
   const uniqueRooms = useMemo(() => {
     const rooms = new Set(rows.map((r) => r.room));
     return Array.from(rooms).sort();
@@ -579,11 +579,11 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     | "status"
   )[] = ["day", "time", "course", "type", "status", "room", "semester"];
 
-  // --- Handlers ---
+  
   const submitCancellation = (reason: string) => {
     if (!pendingCancellation) return;
 
-    // UPDATED: Dispatch includes new identifiers
+    
     dispatch(
       markOff({
         department: pendingCancellation.department,
@@ -600,8 +600,8 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     setPendingCancellation(null);
   };
 
-  // --- Filter Components ---
-  // ... (Filter components remain exactly the same as previous code, collapsed for brevity)
+  
+  
   const DaySelect = () => (
     <div className="space-y-1 w-full">
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
@@ -732,7 +732,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     </div>
   );
 
-  // --- Row Component ---
+  
   function DraggableRow({ row }: { row: RoutineRowState }) {
     const {
       setNodeRef,
@@ -895,7 +895,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     );
   }
 
-  // --- MOUNTED CHECK FOR HYDRATION FIX ---
+  
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -906,7 +906,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     return null;
   }
 
-  // --- ROLE CHECK & BEAUTIFUL ERROR UI ---
+  
   if (role !== "teacher") {
     return (
       <motion.div
@@ -1232,7 +1232,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
         <Printer className="h-4 w-4" /> Print Schedule
       </Button>
 
-      {/* --- ISOLATED MODAL COMPONENT --- */}
+      {}
       <CancellationModal
         isOpen={isReasonModalOpen}
         onOpenChange={setIsReasonModalOpen}

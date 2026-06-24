@@ -61,7 +61,7 @@ import {
 import { generateRoutine, getRoutine } from "@/services/routine";
 import { toast } from "sonner";
 
-// --- TYPES ---
+
 export type APIRoutineItem = {
   id: number;
   day: number | string;
@@ -96,7 +96,7 @@ type ClassSession = {
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
 const BREAK_INSERT_INDEX = 4;
 
-// --- HELPERS ---
+
 const getTeacherInitials = (name: string) => {
   if (!name) return "";
   const capitals = name.match(/[A-Z]/g);
@@ -156,7 +156,7 @@ const formatTimeSlotLabel = (timeStr: string) => {
   return `${h}:${mStr} ${ampm}`;
 };
 
-// --- ANIMATION VARIANTS ---
+
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
@@ -174,7 +174,7 @@ const itemVariants: Variants = {
   },
 };
 
-// Modal specific animations
+
 const modalContentVariants: Variants = {
   hidden: { opacity: 0, scale: 0.95 },
   visible: {
@@ -204,7 +204,7 @@ const modalItemVariants: Variants = {
 
 const EMPTY_OBJ = {};
 
-// --- MEMOIZED SUB-COMPONENT FOR TABLE ROWS ---
+
 interface RoutineTableProps {
   schedule: { day: string; semester: string; slots: (ClassSession | null)[] }[];
   timeSlots: TimeSlot[];
@@ -242,7 +242,7 @@ const MemoizedRoutineTable = React.memo(
         <Table className="w-full overflow-hidden min-w-[1000px] print:min-w-0 print:w-full border-collapse text-sm print:border-collapse !print:border-black">
         <TableHeader>
           <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b">
-            {/* Fixed Day Header */}
+            {}
             <TableCell className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40 print:bg-white !print:border-r !print:border-black print:w-16 print:min-w-0">
               <svg
                 className="absolute inset-0 w-full h-full pointer-events-none"
@@ -323,7 +323,7 @@ const MemoizedRoutineTable = React.memo(
         >
           <AnimatePresence mode="popLayout">
             {schedule.map((rowItem, rowIndex) => {
-              // --- ROWSPAN LOGIC ---
+              
               const isFirstRowOfDay =
                 rowIndex === 0 || rowItem.day !== schedule[rowIndex - 1].day;
 
@@ -344,7 +344,7 @@ const MemoizedRoutineTable = React.memo(
                   variants={itemVariants}
                   className="border-b border-border/60 hover:bg-muted/5 !print:border-black print:border-b print:h-auto"
                 >
-                  {/* Day Column */}
+                  {}
                   {isFirstRowOfDay && (
                     <TableCell
                       rowSpan={rowSpan}
@@ -358,14 +358,14 @@ const MemoizedRoutineTable = React.memo(
                     </TableCell>
                   )}
 
-                  {/* Semester Column */}
+                  {}
                   {isAllSemestersMode && (
                     <TableCell className="font-bold text-xs text-center border-r border-border/60 bg-muted/10 !print:border-r !print:border-black print:bg-white print:text-black">
                       {rowItem.semester}
                     </TableCell>
                   )}
 
-                  {/* Dynamic Columns */}
+                  {}
                   {rowItem.slots.map((session, index) => {
                     const slot = timeSlots[index];
                     if (isBreakSlot(slot) && !session) {
@@ -522,7 +522,7 @@ const MemoizedRoutineTable = React.memo(
 );
 MemoizedRoutineTable.displayName = "MemoizedRoutineTable";
 
-// --- MAIN COMPONENT ---
+
 interface Props {
   routineList: APIRoutineItem[];
   timeSlots: TimeSlot[];
@@ -561,7 +561,7 @@ export default function AdminRoutinePage({
     (s: RootState) => s.classOff.offMap || EMPTY_OBJ
   );
 
-  // --- HYDRATION FIX ---
+  
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -570,7 +570,7 @@ export default function AdminRoutinePage({
   const [isGenerating, setIsGenerating] = useState(false);
   const isRoutineLocked = useSelector((s: RootState) => s.routine.isLocked);
 
-  // --- LOCK CONFIRMATION STATE ---
+  
   const [lockConfirmModal, setLockConfirmModal] = useState<{
     isOpen: boolean;
     type: "lock" | "unlock";
@@ -613,7 +613,7 @@ export default function AdminRoutinePage({
     return () => clearTimeout(timer);
   }, [inputValue]);
 
-  // --- BUG FIX HERE: Added selectedDept and selectedSemester to dependency array ---
+  
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -724,7 +724,7 @@ export default function AdminRoutinePage({
       if (result.success) {
         dispatch(resetAll());
         toast.success("Routine generated successfully!");
-        // Refresh local list
+        
         const res = await getRoutine({
           department_id: selectedDeptId,
           semester_id: selectedSemesterId,
@@ -743,7 +743,7 @@ export default function AdminRoutinePage({
     }
   };
 
-  // --- LOCK/UNLOCK HANDLERS ---
+  
   const initiateLockAction = () => {
     if (isRoutineLocked) {
       setLockConfirmModal({ isOpen: true, type: "unlock" });
@@ -779,7 +779,7 @@ export default function AdminRoutinePage({
     []
   );
 
-  // --- DYNAMIC SCHEDULE GENERATION ---
+  
   const currentRoutineSchedule = useMemo(() => {
     const isAllSemesters = selectedSemester === "All Semesters";
 
@@ -967,7 +967,7 @@ export default function AdminRoutinePage({
         className="min-h-screen font-lexend w-full max-w-[1600px] mx-auto bg-background text-foreground p-5 overflow-x-hidden print:p-0 print:max-w-none print:bg-white print:text-black"
       >
         <div className="space-y-8 print:space-y-0 print:w-full">
-          {/* Header Controls */}
+          {}
           <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-6 print:hidden">
             <div className="space-y-2">
               <motion.div variants={itemVariants}>
@@ -1002,7 +1002,7 @@ export default function AdminRoutinePage({
               variants={itemVariants}
               className="flex items-center gap-3"
             >
-              {/* LOCK/UNLOCK TRIGGER BUTTON */}
+              {}
               <Button
                 onClick={initiateLockAction}
                 variant={isRoutineLocked ? "destructive" : "outline"}
@@ -1056,13 +1056,13 @@ export default function AdminRoutinePage({
             </motion.div>
           </div>
 
-          {/* Filters */}
+          {}
           <div className="flex flex-wrap items-center mb-5 gap-4 print:hidden">
             <motion.div
               variants={itemVariants}
               className="flex flex-wrap items-center gap-3 bg-card border rounded-xl p-1.5 shadow-sm w-full lg:w-fit"
             >
-              {/* Department Select */}
+              {}
               <div className="flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all flex-1 min-w-[150px]">
                 <Select value={selectedDept} onValueChange={setSelectedDept}>
                   <SelectTrigger className="h-10 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
@@ -1078,7 +1078,7 @@ export default function AdminRoutinePage({
                 </Select>
               </div>
 
-              {/* Semester Select */}
+              {}
               <div className="flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all flex-1 min-w-[150px]">
                 <Select
                   value={selectedSemester}
@@ -1101,7 +1101,7 @@ export default function AdminRoutinePage({
                 </Select>
               </div>
 
-              {/* Total Credits */}
+              {}
               <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 rounded-lg border border-transparent transition-all flex-1 min-w-[150px] justify-center sm:justify-start">
                 <div>
                   <BookOpen className="h-3.5 w-3.5 text-primary" />
@@ -1117,7 +1117,7 @@ export default function AdminRoutinePage({
               </div>
             </motion.div>
 
-            {/* Search Input */}
+            {}
             <motion.div
               variants={itemVariants}
               className="flex-1 min-w-[200px] bg-card border rounded-xl p-1.5 shadow-sm"
@@ -1134,7 +1134,7 @@ export default function AdminRoutinePage({
             </motion.div>
           </div>
 
-          {/* Print Header */}
+          {}
           <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-2 pt-0 text-center w-full font-serif text-black">
             <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
               Department of {currentRoutineSchedule.label}
@@ -1154,7 +1154,7 @@ export default function AdminRoutinePage({
             </div>
           </div>
 
-          {/* Main Content */}
+          {}
           {isLoadingRoutine ? (
             <div className="min-h-[400px] flex flex-col items-center justify-center">
               <Loader2 className="w-8 h-8 text-primary animate-spin" />
@@ -1186,7 +1186,7 @@ export default function AdminRoutinePage({
               className="rounded-xl font-lexend bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:shadow-none print:bg-transparent print:overflow-visible"
             >
               <div className="overflow-x-auto w-full print:overflow-visible">
-                {/* --- MEMOIZED TABLE RENDERED HERE --- */}
+                {}
                 <MemoizedRoutineTable
                   schedule={currentRoutineSchedule.schedule}
                   timeSlots={sortedTimeSlots}
@@ -1213,7 +1213,7 @@ export default function AdminRoutinePage({
         </div>
       </motion.div>
 
-      {/* --- CANCELLATION INFO MODAL --- */}
+      {}
       <Dialog
         open={viewReasonModal.isOpen}
         onOpenChange={(open) =>
@@ -1265,7 +1265,7 @@ export default function AdminRoutinePage({
         </DialogContent>
       </Dialog>
 
-      {/* --- LOCK CONFIRMATION MODAL --- */}
+      {}
       <Dialog
         open={lockConfirmModal.isOpen}
         onOpenChange={(open) =>
@@ -1288,7 +1288,7 @@ export default function AdminRoutinePage({
                     : "border-emerald-500/30"
                 )}
               >
-                {/* Custom Header Area */}
+                {}
                 <motion.div
                   variants={modalItemVariants}
                   className={cn(
@@ -1335,7 +1335,7 @@ export default function AdminRoutinePage({
                   </div>
                 </motion.div>
 
-                {/* Input Area */}
+                {}
                 <div className="p-6 space-y-4 bg-card">
                   <motion.div
                     variants={modalItemVariants}
@@ -1365,7 +1365,7 @@ export default function AdminRoutinePage({
                   </motion.div>
                 </div>
 
-                {/* Footer Area */}
+                {}
                 <motion.div
                   variants={modalItemVariants}
                   className="p-6 pt-2 bg-card flex justify-end gap-3"

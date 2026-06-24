@@ -28,7 +28,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import clsx from "clsx";
 
-// --- Animation Variants ---
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -238,7 +238,7 @@ export default function ProfilePage() {
             </Card>
           </motion.div>
 
-          {/* -- Right Column: Detailed Info Form -- */}
+          {}
           <motion.div variants={itemVariants} className="flex-1 h-full">
             <Card className="border-primary/20 bg-background shadow-lg h-full">
               <CardHeader>
@@ -251,7 +251,7 @@ export default function ProfilePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-8 pt-8">
-                {/* ROW 1: Full Name & ID */}
+                {}
                 <div className="grid gap-8 md:grid-cols-2">
                   <motion.div className="space-y-3" variants={itemVariants}>
                     <Label className="text-xs uppercase text-muted-foreground font-bold tracking-wider flex items-center gap-2">
@@ -284,7 +284,7 @@ export default function ProfilePage() {
                   </motion.div>
                 </div>
 
-                {/* ROW 2: Username & Email Address */}
+                {}
                 <div className="grid gap-8 md:grid-cols-2">
                   <motion.div className="space-y-3" variants={itemVariants}>
                     <Label className="text-xs uppercase text-muted-foreground font-bold tracking-wider flex items-center gap-2">
@@ -315,7 +315,7 @@ export default function ProfilePage() {
                   </motion.div>
                 </div>
 
-                {/* ROW 3: Department (Full Width) */}
+                {}
                 <div className="grid gap-8">
                   <motion.div className="space-y-3" variants={itemVariants}>
                     <Label className="text-xs uppercase text-muted-foreground font-bold tracking-wider flex items-center gap-2">
@@ -332,7 +332,7 @@ export default function ProfilePage() {
                   </motion.div>
                 </div>
 
-                {/* ROW 4: Role & Semester (Conditional) */}
+                {}
                 <div className="grid gap-8 md:grid-cols-2">
                   <motion.div
                     className={clsx("space-y-3")}

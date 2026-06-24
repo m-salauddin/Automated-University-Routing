@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 
 export type TeacherAvailabilityState = {
-  // teacherId -> true (On) | false (Off)
+  
   map: Record<string, boolean>;
 };
 
@@ -42,7 +42,7 @@ export const teacherAvailabilitySlice = createSlice({
       const { teacherId } = action.payload;
       if (!teacherId) return;
       const current = state.map[teacherId];
-      state.map[teacherId] = !(current === false ? false : true); // default true -> toggle to false
+      state.map[teacherId] = !(current === false ? false : true); 
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       } catch {}

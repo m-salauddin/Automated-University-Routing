@@ -77,7 +77,7 @@ import { createCourse, updateCourse, deleteCourse } from "@/services/courses";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
 
-// --- TYPES ---
+
 export interface Course {
   id: number;
   course_code: string;
@@ -110,7 +110,7 @@ export interface User {
   username: string;
 }
 
-// --- ZOD SCHEMA ---
+
 const courseSchema = z.object({
   course_code: z.string().min(1, "Course code is required"),
   course_name: z.string().min(1, "Course name is required"),
@@ -124,7 +124,7 @@ const courseSchema = z.object({
 
 type FormValues = z.infer<typeof courseSchema>;
 
-// --- ANIMATION VARIANTS ---
+
 const pageVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
@@ -141,7 +141,7 @@ const pageItemVariants: Variants = {
   },
 };
 
-// --- HELPERS ---
+
 const getInitials = (name: string) => {
   if (!name) return "";
   return name.match(/[A-Z]/g)?.join("") || name.substring(0, 3).toUpperCase();
@@ -154,7 +154,7 @@ interface AutomatedRoutineCoursesProps {
   teachers: User[];
 }
 
-// --- MAIN COMPONENT ---
+
 export default function AutomatedRoutineCourses({
   courses = [],
   departments = [],
@@ -167,14 +167,14 @@ export default function AutomatedRoutineCourses({
 
   const router = useRouter();
 
-  // --- LOCAL STATE ---
+  
   const [coursesList, setCoursesList] = useState<Course[]>(courses);
 
   useEffect(() => {
     setCoursesList(courses);
   }, [courses]);
 
-  // Filters
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [semesterFilter, setSemesterFilter] = useState("All");
   const [creditFilter, setCreditFilter] = useState("All");
@@ -182,7 +182,7 @@ export default function AutomatedRoutineCourses({
   const [deptFilter, setDeptFilter] = useState("All");
   const [typeFilter, setTypeFilter] = useState("All");
 
-  // Pagination & Sorting
+  
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [sortConfig, setSortConfig] = useState<{
@@ -190,7 +190,7 @@ export default function AutomatedRoutineCourses({
     direction: "asc" | "desc";
   } | null>(null);
 
-  // Modals & Action States
+  
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -199,7 +199,7 @@ export default function AutomatedRoutineCourses({
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [deletingCourse, setDeletingCourse] = useState<Course | null>(null);
 
-  // --- DERIVED LISTS FOR FILTER DROPDOWNS ---
+  
   const { uniqueTeachers, uniqueDepts, uniqueSemesters, availableCredits } =
     useMemo(() => {
       const teachersMap = new Map();
@@ -236,7 +236,7 @@ export default function AutomatedRoutineCourses({
       };
     }, [courses]);
 
-  // --- FORM HOOKS ---
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(courseSchema) as any,
     defaultValues: {
@@ -258,7 +258,7 @@ export default function AutomatedRoutineCourses({
     formState: { errors },
   } = form;
 
-  // --- MODAL HANDLERS ---
+  
   const openAddCourse = () => {
     setEditingCourse(null);
     setIsSaving(false);
@@ -307,7 +307,7 @@ export default function AutomatedRoutineCourses({
     setPage(1);
   };
 
-  // --- SUBMIT HANDLERS ---
+  
   const onSubmit = async (data: FormValues) => {
     setIsSaving(true);
 
@@ -317,7 +317,7 @@ export default function AutomatedRoutineCourses({
 
     try {
       if (editingCourse) {
-        // --- UPDATE ---
+        
         const payload = {
           course_type: data.course_type,
           course_code: data.course_code,
@@ -353,7 +353,7 @@ export default function AutomatedRoutineCourses({
           toast.error(result.message);
         }
       } else {
-        // --- CREATE ---
+        
         const payload = {
           course_code: data.course_code,
           course_name: data.course_name,
@@ -492,7 +492,7 @@ export default function AutomatedRoutineCourses({
     typeFilter,
   ]);
 
-  // --- MOUNTED CHECK FOR HYDRATION FIX ---
+  
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -555,7 +555,7 @@ export default function AutomatedRoutineCourses({
         animate="visible"
         className="w-full font-lexend min-w-0 max-w-full mx-auto p-4 md:p-6 space-y-6 overflow-x-hidden print:hidden"
       >
-        {/* -- Header Section -- */}
+        {}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6 print:hidden mb-6">
           <div className="space-y-2 w-full lg:w-auto">
             <motion.div variants={pageItemVariants}>
@@ -607,7 +607,7 @@ export default function AutomatedRoutineCourses({
           </motion.div>
         </div>
 
-        {/* -- Print Only Header -- */}
+        {}
         <div className="hidden print:block mb-4 text-center">
           <h1 className="text-2xl font-bold">Course Management</h1>
           <p className="text-sm text-muted-foreground">
@@ -615,15 +615,15 @@ export default function AutomatedRoutineCourses({
           </p>
         </div>
 
-        {/* -- Main Content Card -- */}
+        {}
         <motion.div variants={pageItemVariants}>
           <Card className="w-full overflow-hidden dark:bg-[#111113] border shadow-sm print:border-none print:shadow-none print:overflow-visible">
-            {/* -- Filters Header -- */}
+            {}
             <CardHeader className="p-4 bg-muted/30 border-b hidden min-[1300px]:block print:hidden">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col xl:flex-row gap-4 justify-between items-end">
                   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 w-full">
-                    {/* Search */}
+                    {}
                     <div className="flex flex-col gap-1.5 w-full">
                       <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider pl-0.5">
                         Search
@@ -639,7 +639,7 @@ export default function AutomatedRoutineCourses({
                       </div>
                     </div>
 
-                    {/* Filters */}
+                    {}
                     {[
                       {
                         label: "Semester",
@@ -727,7 +727,7 @@ export default function AutomatedRoutineCourses({
               </div>
             </CardHeader>
 
-            {/* -- Table Content -- */}
+            {}
             <CardContent className="p-0 grid grid-cols-1">
               <div className="w-full overflow-x-auto print:overflow-visible">
                 <Table className="min-w-[1000px] overflow-hidden print:min-w-0 print:w-full">
@@ -867,7 +867,7 @@ export default function AutomatedRoutineCourses({
                             </Badge>
                           </TableCell>
 
-                          {/* ACTION CELL */}
+                          {}
                           <TableCell className="p-3 text-right print:hidden">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
@@ -925,7 +925,7 @@ export default function AutomatedRoutineCourses({
               </div>
             </CardContent>
 
-            {/* -- Pagination Footer -- */}
+            {}
             {paginatedData.length > 0 && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-background/50 print:hidden">
                 <div className="text-sm text-muted-foreground order-2 sm:order-1">
@@ -1002,7 +1002,7 @@ export default function AutomatedRoutineCourses({
         </motion.div>
       </motion.div>
 
-      {/* --- ADD/EDIT MODAL --- */}
+      {}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="sm:max-w-[700px] w-full max-h-[85vh] overflow-y-auto overflow-x-hidden scrollbar-thin">
           <DialogHeader>
@@ -1017,7 +1017,7 @@ export default function AutomatedRoutineCourses({
           </DialogHeader>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
-            {/* Course Code */}
+            {}
             <div className="space-y-2">
               <Label>
                 Course Code <span className="text-red-500">*</span>
@@ -1033,7 +1033,7 @@ export default function AutomatedRoutineCourses({
               )}
             </div>
 
-            {/* Course Name */}
+            {}
             <div className="space-y-2">
               <Label>
                 Course Name <span className="text-red-500">*</span>
@@ -1049,7 +1049,7 @@ export default function AutomatedRoutineCourses({
               )}
             </div>
 
-            {/* Room Number */}
+            {}
             <div className="space-y-2">
               <Label>
                 Room Number <span className="text-red-500">*</span>
@@ -1065,7 +1065,7 @@ export default function AutomatedRoutineCourses({
               )}
             </div>
 
-            {/* Credits */}
+            {}
             <div className="space-y-2">
               <Label>
                 Credits <span className="text-red-500">*</span>
@@ -1081,7 +1081,7 @@ export default function AutomatedRoutineCourses({
               )}
             </div>
 
-            {/* Department - Populated via API */}
+            {}
             <div className="space-y-2">
               <Label>
                 Department <span className="text-red-500">*</span>
@@ -1111,7 +1111,7 @@ export default function AutomatedRoutineCourses({
               )}
             </div>
 
-            {/* Semester - Populated via API */}
+            {}
             <div className="space-y-2">
               <Label>
                 Semester <span className="text-red-500">*</span>
@@ -1141,7 +1141,7 @@ export default function AutomatedRoutineCourses({
               )}
             </div>
 
-            {/* Teacher - Populated via API */}
+            {}
             <div className="space-y-2">
               <Label>
                 Teacher <span className="text-red-500">*</span>
@@ -1169,7 +1169,7 @@ export default function AutomatedRoutineCourses({
               )}
             </div>
 
-            {/* Course Type */}
+            {}
             <div className="space-y-2">
               <Label>
                 Course Type <span className="text-red-500">*</span>
@@ -1206,7 +1206,7 @@ export default function AutomatedRoutineCourses({
         </DialogContent>
       </Dialog>
 
-      {/* --- DELETE CONFIRMATION MODAL --- */}
+      {}
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1241,9 +1241,9 @@ export default function AutomatedRoutineCourses({
         </DialogContent>
       </Dialog>
 
-      {/* -- PRINT VIEW (Visible only in print) -- */}
+      {}
       <div className="hidden print:block w-full font-lexend p-0">
-        {/* Print Header */}
+        {}
         <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -1281,7 +1281,7 @@ export default function AutomatedRoutineCourses({
           </div>
         </div>
 
-        {/* Print Table */}
+        {}
         <table className="w-full border-collapse text-[10px]">
           <thead>
             <tr className="bg-gray-100 border-b border-black">
@@ -1357,7 +1357,7 @@ export default function AutomatedRoutineCourses({
           </tbody>
         </table>
 
-        {/* Print Footer */}
+        {}
         <div className="mt-8 pt-4 border-t border-gray-300 flex justify-between text-[10px] text-gray-500">
           <p>Confidential Report • For Internal Use Only</p>
           <p>University Course Management System</p>
