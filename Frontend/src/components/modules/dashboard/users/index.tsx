@@ -724,9 +724,9 @@ export default function UsersPageClient({
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => openDeleteUser(user)}
-                              className="text-red-600"
+                              className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
                             >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              <Trash2 className="mr-2 h-4 w-4 text-red-500 dark:text-red-400" /> Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>

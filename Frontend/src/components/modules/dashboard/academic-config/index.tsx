@@ -87,7 +87,7 @@ type TimeSlot = {
 
 const isSlotBreak = (slot: TimeSlot) => {
   if (!slot) return false;
-  
+
   return Boolean(slot.is_lunch_break);
 };
 
@@ -119,6 +119,7 @@ type Course = {
   room_number: string;
   credits: number;
   course_type: string;
+  course_type_name?: string | null;
   teacher: number | null;
   teacher_name: string | null;
   department: number;
@@ -135,7 +136,9 @@ type User = {
   last_name?: string;
   name: string;
   role: string;
+  department?: number | string | null;
   department_name: string | null;
+  semester?: number | string | null;
   semester_name: string | null;
 };
 
@@ -329,7 +332,7 @@ export default function AcademicSettingsPage({
 
   const router = useRouter();
 
-  
+
   const [departmentsList, setDepartmentsList] =
     useState<Department[]>(initialDepartments);
 
@@ -342,7 +345,7 @@ export default function AcademicSettingsPage({
     setDepartmentsList(initialDepartments);
   }, [departmentsDependency, initialDepartments]);
 
-  
+
   const [semestersList, setSemestersList] =
     useState<Semester[]>(initialSemesters);
 
@@ -355,7 +358,7 @@ export default function AcademicSettingsPage({
     setSemestersList(initialSemesters);
   }, [semestersDependency, initialSemesters]);
 
-  
+
   const [timeSlotsList, setTimeSlotsList] =
     useState<TimeSlot[]>(() => sortTimeSlotsHelper(initialTimeSlots));
 
@@ -388,8 +391,7 @@ export default function AcademicSettingsPage({
   const [isDeleteSlotModalOpen, setIsDeleteSlotModalOpen] = useState(false);
   const [isDeleteRoomModalOpen, setIsDeleteRoomModalOpen] = useState(false);
 
-  const [selectedDeptForDetail, setSelectedDeptForDetail] = useState<Department | null>(null);
-  const [isDeptDetailModalOpen, setIsDeptDetailModalOpen] = useState(false);
+
 
   const [roomDeptFilter, setRoomDeptFilter] = useState("All");
   const [roomTypeFilter, setRoomTypeFilter] = useState("All");
@@ -406,7 +408,16 @@ export default function AcademicSettingsPage({
     });
   }, [roomsList, roomDeptFilter, roomTypeFilter]);
 
-  
+  const roomsDepartments = useMemo(() => {
+    const referencedDeptIds = new Set(
+      roomsList
+        .map((r: Room) => r.department)
+        .filter((deptId): deptId is number => deptId !== null)
+    );
+    return departmentsList.filter((dept: Department) => referencedDeptIds.has(dept.id));
+  }, [departmentsList, roomsList]);
+
+
   const [isLoading, setIsLoading] = useState(false);
 
   const [editingDept, setEditingDept] = useState<Department | null>(null);
@@ -441,52 +452,7 @@ export default function AcademicSettingsPage({
     return `${formattedHour}:${m} ${suffix}`;
   };
 
-  const batches = useMemo(() => {
-    if (!selectedDeptForDetail) return [];
-    const uniqueSems = new Set<string>();
-    
-    courses.forEach((c: Course) => {
-      if ((c.department === selectedDeptForDetail.id || c.department_name === selectedDeptForDetail.name) && c.semester_name) {
-        uniqueSems.add(c.semester_name);
-      }
-    });
 
-    users.forEach((u: User) => {
-      if (u.role === "STUDENT" && u.department_name === selectedDeptForDetail.name && u.semester_name) {
-        uniqueSems.add(u.semester_name);
-      }
-    });
-
-    return Array.from(uniqueSems).map((semName: string) => {
-      const studentCount = users.filter(
-        (u: User) =>
-          u.role === "STUDENT" &&
-          u.department_name === selectedDeptForDetail.name &&
-          u.semester_name === semName
-      ).length;
-
-      const courseCount = courses.filter(
-        (c: Course) =>
-          (c.department === selectedDeptForDetail.id || c.department_name === selectedDeptForDetail.name) &&
-          c.semester_name === semName
-      ).length;
-
-      return {
-        name: semName,
-        studentCount,
-        courseCount,
-      };
-    });
-  }, [selectedDeptForDetail, courses, users]);
-
-  const deptCourses = useMemo(() => {
-    if (!selectedDeptForDetail) return [];
-    return courses.filter(
-      (c: Course) => c.department === selectedDeptForDetail.id || c.department_name === selectedDeptForDetail.name
-    );
-  }, [selectedDeptForDetail, courses]);
-
-  
   const openAddDept = () => {
     setEditingDept(null);
     setNewDeptName("");
@@ -575,7 +541,7 @@ export default function AcademicSettingsPage({
     }
   };
 
-  
+
   const openAddSem = () => {
     setEditingSem(null);
     setNewSemName("");
@@ -680,7 +646,7 @@ export default function AcademicSettingsPage({
     }
   };
 
-  
+
   const openAddSlot = () => {
     setEditingSlot(null);
     setNewSlotStart("09:00:00");
@@ -721,17 +687,17 @@ export default function AcademicSettingsPage({
         is_lunch_break: newSlotIsLaunchBreak,
       };
       if (editingSlot) {
-        
+
         setTimeSlotsList((prev) =>
           sortTimeSlotsHelper(
             prev.map((slot) =>
               slot.id === editingSlot.id
                 ? {
-                    ...slot,
-                    start_time: finalStart,
-                    end_time: finalEnd,
-                    is_lunch_break: newSlotIsLaunchBreak,
-                  }
+                  ...slot,
+                  start_time: finalStart,
+                  end_time: finalEnd,
+                  is_lunch_break: newSlotIsLaunchBreak,
+                }
                 : slot
             )
           )
@@ -847,15 +813,15 @@ export default function AcademicSettingsPage({
           prev.map((r) =>
             r.id === editingRoom.id
               ? {
-                  ...r,
-                  room_number: newRoomNumber,
-                  capacity: capacityInt,
-                  room_type: parseInt(newRoomType),
-                  department: payload.department,
-                  department_name: payload.department
-                    ? departmentsList.find((d) => d.id === payload.department)?.name || null
-                    : null,
-                }
+                ...r,
+                room_number: newRoomNumber,
+                capacity: capacityInt,
+                room_type: parseInt(newRoomType),
+                department: payload.department,
+                department_name: payload.department
+                  ? departmentsList.find((d) => d.id === payload.department)?.name || null
+                  : null,
+              }
               : r
           )
         );
@@ -960,7 +926,7 @@ export default function AcademicSettingsPage({
         animate="visible"
         className="w-full max-w-5xl mx-auto p-4 sm:p-6 space-y-8 font-lexend text-foreground pb-20"
       >
-        {}
+        { }
         <div className="flex flex-col gap-2">
           <motion.div variants={itemVariants}>
             <Badge
@@ -982,7 +948,7 @@ export default function AcademicSettingsPage({
           </motion.p>
         </div>
 
-        {}
+        { }
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -1011,11 +977,10 @@ export default function AcademicSettingsPage({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                 >
-                  <Card 
+                  <Card
                     className="group hover:shadow-md transition-all h-full cursor-pointer hover:border-primary/50 hover:bg-muted/5 select-none"
                     onClick={() => {
-                      setSelectedDeptForDetail(dept);
-                      setIsDeptDetailModalOpen(true);
+                      router.push(`/dashboard/admin/academic-config/${dept.id}`);
                     }}
                   >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1033,7 +998,7 @@ export default function AcademicSettingsPage({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
                               openEditDept(dept);
@@ -1042,14 +1007,14 @@ export default function AcademicSettingsPage({
                             <Edit2 className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDeleteDept(dept.id);
-                            }}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
+                             className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               openDeleteDept(dept.id);
+                             }}
+                           >
+                             <Trash2 className="mr-2 h-4 w-4 text-red-500 dark:text-red-400" /> Delete
+                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </CardHeader>
@@ -1067,7 +1032,7 @@ export default function AcademicSettingsPage({
 
         <div className="w-full h-px bg-border/50" />
 
-        {}
+        { }
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -1111,12 +1076,12 @@ export default function AcademicSettingsPage({
                           <DropdownMenuItem onClick={() => openEditSem(sem)}>
                             <Edit2 className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={() => openDeleteSem(sem.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
+                           <DropdownMenuItem
+                             className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
+                             onClick={() => openDeleteSem(sem.id)}
+                           >
+                             <Trash2 className="mr-2 h-4 w-4 text-red-500 dark:text-red-400" /> Delete
+                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -1138,7 +1103,7 @@ export default function AcademicSettingsPage({
 
         <div className="w-full h-px bg-border/50" />
 
-        {}
+        { }
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -1206,12 +1171,12 @@ export default function AcademicSettingsPage({
                           <DropdownMenuItem onClick={() => openEditSlot(slot)}>
                             <Edit2 className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={() => openDeleteSlot(slot.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
+                           <DropdownMenuItem
+                             className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
+                             onClick={() => openDeleteSlot(slot.id)}
+                           >
+                             <Trash2 className="mr-2 h-4 w-4 text-red-500 dark:text-red-400" /> Delete
+                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -1225,40 +1190,24 @@ export default function AcademicSettingsPage({
         <div className="w-full h-px bg-border/50" />
 
         <motion.div variants={itemVariants}>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
                 <MapPin className="w-5 h-5" />
               </div>
               <h2 className="text-xl font-semibold">Rooms</h2>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-2 border-primary/20"
-              onClick={openAddRoom}
-            >
-              <Plus className="w-4 h-4" /> Add Room
-            </Button>
-          </div>
 
-          {/* Filtering Controls */}
-          <div className="flex flex-wrap items-center gap-3 mb-6 bg-muted/20 dark:bg-muted/10 p-3 sm:p-4 rounded-xl border border-border/40 font-lexend">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              <Filter className="w-3.5 h-3.5" />
-              <span>Filter Rooms:</span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 flex-1 sm:flex-initial">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto font-lexend">
               {/* Department Dropdown */}
-              <div className="w-[180px] min-w-[150px]">
+              <div className="w-[160px]">
                 <Select value={roomDeptFilter} onValueChange={setRoomDeptFilter}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="All Departments" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">All Departments</SelectItem>
-                    {departmentsList.map((dept) => (
+                    {roomsDepartments.map((dept: Department) => (
                       <SelectItem key={dept.id} value={dept.id.toString()}>
                         {dept.name}
                       </SelectItem>
@@ -1268,7 +1217,7 @@ export default function AcademicSettingsPage({
               </div>
 
               {/* Room Type Dropdown */}
-              <div className="w-[150px] min-w-[130px]">
+              <div className="w-[120px]">
                 <Select value={roomTypeFilter} onValueChange={setRoomTypeFilter}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="All Types" />
@@ -1284,17 +1233,26 @@ export default function AcademicSettingsPage({
               {/* Reset Button */}
               {(roomDeptFilter !== "All" || roomTypeFilter !== "All") && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={() => {
                     setRoomDeptFilter("All");
                     setRoomTypeFilter("All");
                   }}
-                  className="gap-2 h-9 text-xs font-bold text-muted-foreground hover:text-foreground cursor-pointer"
+                  className="gap-2 h-9 border-destructive/20 hover:border-destructive/40 text-destructive hover:bg-destructive/10 dark:text-red-400 dark:hover:bg-red-500/10 cursor-pointer font-semibold text-xs transition-all"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" /> Reset Filters
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset
                 </Button>
               )}
+
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 border-primary/20 h-9 shrink-0 ml-auto md:ml-0"
+                onClick={openAddRoom}
+              >
+                <Plus className="w-4 h-4" /> Add Room
+              </Button>
             </div>
           </div>
 
@@ -1327,10 +1285,10 @@ export default function AcademicSettingsPage({
                             <Edit2 className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                            className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
                             onClick={() => openDeleteRoom(room.id)}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            <Trash2 className="mr-2 h-4 w-4 text-red-500 dark:text-red-400" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1342,11 +1300,10 @@ export default function AcademicSettingsPage({
                       <div className="flex flex-wrap gap-2 pt-1">
                         <Badge
                           variant="outline"
-                          className={`text-[10px] uppercase font-bold tracking-wider border ${
-                            room.room_type === 2
-                              ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25"
-                              : "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25"
-                          }`}
+                          className={`text-[10px] uppercase font-bold tracking-wider border ${room.room_type === 2
+                            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25"
+                            : "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25"
+                            }`}
                         >
                           {room.room_type === 2 ? "Lab" : "Theory"}
                         </Badge>
@@ -1416,7 +1373,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent className="w-[95vw] sm:max-w-[425px]">
           <motion.div
@@ -1453,7 +1410,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog open={isSemModalOpen} onOpenChange={setIsSemModalOpen}>
         <DialogContent className="sm:max-w-[425px] w-[95vw]">
           <motion.div
@@ -1505,7 +1462,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog
         open={isDeleteSemModalOpen}
         onOpenChange={setIsDeleteSemModalOpen}
@@ -1545,7 +1502,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog open={isSlotModalOpen} onOpenChange={setIsSlotModalOpen}>
         <DialogContent className="sm:max-w-[425px] w-[95vw]">
           <motion.div
@@ -1605,7 +1562,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog
         open={isDeleteSlotModalOpen}
         onOpenChange={setIsDeleteSlotModalOpen}
@@ -1766,177 +1723,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {/* Department Details Dialog */}
-      <Dialog open={isDeptDetailModalOpen} onOpenChange={setIsDeptDetailModalOpen}>
-        <DialogContent className="compact-scrollbar max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto font-lexend p-6 md:p-8">
-          <motion.div
-            variants={modalContentVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="space-y-6"
-          >
-            <DialogHeader className="border-b border-border/50 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl">
-                  <Building2 className="w-6 h-6" />
-                </div>
-                <div>
-                  <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight">
-                    {selectedDeptForDetail?.name}
-                  </DialogTitle>
-                  <DialogDescription className="text-xs sm:text-sm mt-0.5 text-muted-foreground">
-                    Department details, active semesters (batches), and curriculum configuration.
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2">
-              {/* Left Column: Batches & Semesters */}
-              <div className="lg:col-span-4 space-y-4">
-                <div className="flex items-center gap-2 border-b border-border/40 pb-2">
-                  <GraduationCap className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                  <h3 className="font-semibold text-foreground text-sm uppercase tracking-wider">
-                    Batches / Semesters
-                  </h3>
-                </div>
-
-                <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-                  {batches.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 px-4 text-center border border-dashed rounded-xl bg-muted/20">
-                      <GraduationCap className="h-8 w-8 text-muted-foreground/60 mb-2 stroke-[1.5]" />
-                      <p className="text-xs text-muted-foreground font-medium">No active batches</p>
-                    </div>
-                  ) : (
-                    batches.map((batch) => (
-                      <div
-                        key={batch.name}
-                        className="p-3 bg-muted/40 hover:bg-muted/65 dark:bg-muted/25 dark:hover:bg-muted/35 border border-border/50 rounded-xl flex flex-col gap-2 transition-all"
-                      >
-                        <div className="font-medium text-sm text-foreground flex items-center justify-between">
-                          <span>{batch.name}</span>
-                          <Badge variant="outline" className="text-[10px] py-0.5 px-2 font-normal bg-card">
-                            Active
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between gap-3 mt-1 text-xs text-muted-foreground font-medium">
-                          <span className="flex items-center gap-1">
-                            <Users className="w-3.5 h-3.5 text-blue-500" />
-                            {batch.studentCount} {batch.studentCount === 1 ? "student" : "students"}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <BookOpen className="w-3.5 h-3.5 text-purple-500" />
-                            {batch.courseCount} {batch.courseCount === 1 ? "course" : "courses"}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Right Column: Courses */}
-              <div className="lg:col-span-8 space-y-4">
-                <div className="flex items-center justify-between border-b border-border/40 pb-2">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    <h3 className="font-semibold text-foreground text-sm uppercase tracking-wider">
-                      Department Courses
-                    </h3>
-                  </div>
-                  <Badge variant="secondary" className="font-semibold text-xs py-0.5 px-2 bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                    {deptCourses.length} {deptCourses.length === 1 ? "course" : "courses"}
-                  </Badge>
-                </div>
-
-                <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-                  {deptCourses.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed rounded-xl bg-muted/20">
-                      <BookOpen className="h-10 w-10 text-muted-foreground/60 mb-2 stroke-[1.5]" />
-                      <p className="text-sm text-muted-foreground font-medium">No courses registered</p>
-                      <p className="text-xs text-muted-foreground/75 mt-1 max-w-[240px]">
-                        Add courses to this department from the course management dashboard.
-                      </p>
-                    </div>
-                  ) : (
-                    deptCourses.map((course: Course) => {
-                      const studentCount = users.filter(
-                        (u: User) =>
-                          u.role === "STUDENT" &&
-                          u.department_name === selectedDeptForDetail?.name &&
-                          u.semester_name === course.semester_name
-                      ).length;
-
-                      return (
-                        <div
-                          key={course.id}
-                          className="p-4 bg-muted/30 border border-border/40 hover:border-border rounded-xl flex flex-col gap-3 transition-all"
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase bg-blue-500/10 px-2 py-0.5 rounded-md">
-                                  {course.course_code}
-                                </span>
-                                <Badge
-                                  className={cn(
-                                    "text-[10px] font-semibold py-0 px-2 rounded-md",
-                                    course.course_type.toLowerCase() === "lab"
-                                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                                      : "bg-indigo-500/15 text-indigo-600 dark:text-indigo-400"
-                                  )}
-                                >
-                                  {course.course_type}
-                                </Badge>
-                              </div>
-                              <h4 className="font-semibold text-sm sm:text-base text-foreground leading-snug">
-                                {course.course_name}
-                              </h4>
-                            </div>
-                            <span className="text-[11px] font-bold text-muted-foreground bg-muted-foreground/5 px-2.5 py-1 rounded-md sm:self-start">
-                              {course.semester_name || "No Semester"}
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-border/30 pt-3 text-xs text-muted-foreground font-medium">
-                            <div className="flex items-center gap-1.5">
-                              <Users className="w-4 h-4 text-blue-500" />
-                              <span>{studentCount} Students</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <BookOpen className="w-4 h-4 text-purple-500" />
-                              <span>{course.credits} Credits</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 col-span-2 sm:col-span-1">
-                              <div className="p-0.5 bg-muted-foreground/10 rounded-full">
-                                <div className="w-3 h-3 rounded-full bg-muted-foreground/40" />
-                              </div>
-                              <span className="truncate">
-                                {course.teacher_name || "No Teacher"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter className="border-t border-border/50 pt-4 flex justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setIsDeptDetailModalOpen(false)}
-                className="px-6"
-              >
-                Close Details
-              </Button>
-            </DialogFooter>
-          </motion.div>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }
