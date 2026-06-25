@@ -62,6 +62,7 @@ import { generateRoutine, getRoutine } from "@/services/routine";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CustomSelect } from "@/components/ui/custom-select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 export type APIRoutineItem = {
@@ -1183,9 +1184,143 @@ export default function AdminRoutinePage({
 
           {}
           {isLoadingRoutine ? (
-            <div className="min-h-[400px] flex flex-col items-center justify-center">
-              <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              <span className="text-sm text-muted-foreground mt-2 font-lexend">Loading routine...</span>
+            <div className="skeleton-sweep rounded-xl overflow-hidden border border-border/60 bg-card/35 font-lexend w-full grid grid-cols-1">
+              <div className="overflow-x-auto w-full">
+                <Table className="w-full min-w-[1000px] border-collapse text-sm">
+                  <TableHeader>
+                    <TableRow className="border-b border-border/60 hover:bg-transparent">
+                      {/* Time/Day corner cell */}
+                      <TableCell className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40">
+                        <svg
+                          className="absolute inset-0 w-full h-full pointer-events-none"
+                          preserveAspectRatio="none"
+                        >
+                          <line
+                            x1="0"
+                            y1="0"
+                            x2="100%"
+                            y2="100%"
+                            className="stroke-border/60"
+                            strokeWidth="1"
+                          />
+                        </svg>
+                        <span className="absolute top-2 right-2 text-[10px] font-bold text-muted-foreground/45">
+                          Time
+                        </span>
+                        <span className="absolute bottom-2 left-2 text-[10px] font-bold text-muted-foreground/45">
+                          Day
+                        </span>
+                      </TableCell>
+
+                      {currentRoutineSchedule.isAllSemestersMode && (
+                        <TableCell className="w-20 min-w-20 text-center font-bold bg-muted/40 border-r border-border/60 text-xs uppercase">
+                          <Skeleton className="w-10 h-3.5 mx-auto" />
+                        </TableCell>
+                      )}
+
+                      {sortedTimeSlots.map((slot) => {
+                        const isBreak = isBreakSlot(slot);
+                        if (isBreak) {
+                          return (
+                            <TableCell
+                              key={slot.id}
+                              className="w-10 min-w-10 bg-foreground/5 text-center align-middle p-0 border-r border-border/60"
+                            >
+                              <div className="h-full flex items-center justify-center">
+                                <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-muted-foreground/30">
+                                  Break
+                                </span>
+                              </div>
+                            </TableCell>
+                          );
+                        }
+                        return (
+                          <TableCell
+                            key={slot.id}
+                            className="text-center align-middle h-[60px] border-r border-border/60 last:border-r-0 p-0 min-w-[100px] bg-muted/10"
+                          >
+                            <div className="flex flex-col items-center justify-center gap-1.5 w-full px-1">
+                              <Skeleton className="w-16 h-3.5 mx-auto" />
+                              <Skeleton className="w-20 h-2.5 mx-auto" />
+                            </div>
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  </TableHeader>
+                  <tbody>
+                    {DAYS_ORDER.map((day, rowIndex) => (
+                      <TableRow
+                        key={day}
+                        className="border-b border-border/60 hover:bg-muted/5 h-[85px]"
+                      >
+                        {/* Day Label */}
+                        <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 w-[90px] min-w-[90px]">
+                          <div className="flex items-center justify-center h-full w-full py-4">
+                            <span className="writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0">
+                              {day.slice(0, 3).toUpperCase()}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        {currentRoutineSchedule.isAllSemestersMode && (
+                          <TableCell className="font-bold text-xs text-center border-r border-border/60 bg-muted/10">
+                            <Skeleton className="w-8 h-4 mx-auto" />
+                          </TableCell>
+                        )}
+
+                        {sortedTimeSlots.map((slot, cellIndex) => {
+                          const isBreak = isBreakSlot(slot);
+                          if (isBreak) {
+                            return (
+                              <TableCell
+                                key={slot.id}
+                                className="p-0 align-middle border-r border-border/60 relative overflow-hidden bg-muted/20"
+                              >
+                                <div className="h-full w-full flex items-center justify-center">
+                                  <Utensils className="w-3 h-3 text-muted-foreground/20" />
+                                </div>
+                              </TableCell>
+                            );
+                          }
+
+                          // Simulating random scheduled courses
+                          const hasClass = (rowIndex + cellIndex) % 3 === 0;
+                          return (
+                            <TableCell
+                              key={slot.id}
+                              className="p-1.5 align-middle border-r border-border/60 last:border-r-0 min-w-[100px]"
+                            >
+                              {hasClass ? (
+                                <div className="h-full w-full rounded-md border border-muted/20 bg-background/50 flex flex-col justify-between p-2 shadow-sm space-y-1.5">
+                                  <div className="flex justify-between items-start w-full">
+                                    <Skeleton className="h-3 w-14" />
+                                    <Skeleton className="h-3.5 w-8 rounded" />
+                                  </div>
+                                  <div className="flex flex-col gap-1 mt-0.5">
+                                    <div className="flex items-center gap-1">
+                                      <User className="w-2.5 h-2.5 text-muted-foreground/35" />
+                                      <Skeleton className="w-10 h-2.5" />
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <MapPin className="w-2.5 h-2.5 text-muted-foreground/35" />
+                                      <Skeleton className="w-8 h-2.5" />
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center">
+                                  <div className="w-1 h-1 rounded-full bg-border/40" />
+                                </div>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
             </div>
           ) : currentRoutineSchedule.isEmpty ? (
             <motion.div
