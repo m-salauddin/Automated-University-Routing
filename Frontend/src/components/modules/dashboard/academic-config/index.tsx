@@ -457,7 +457,7 @@ export default function AcademicSettingsPage({
     if (!editingSlot) return true;
     const isStartDiff = newSlotStart !== (editingSlot.start_time || "");
     const isEndDiff = newSlotEnd !== (editingSlot.end_time || "");
-    const isBreakDiff = newSlotIsLaunchBreak !== (editingSlot.is_launch_break || false);
+    const isBreakDiff = newSlotIsLaunchBreak !== (editingSlot.is_lunch_break || false);
     return isStartDiff || isEndDiff || isBreakDiff;
   }, [editingSlot, newSlotStart, newSlotEnd, newSlotIsLaunchBreak]);
 

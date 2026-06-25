@@ -116,9 +116,19 @@ const abbreviateDay = (day: string) => {
 
 const isBreakSlot = (slot: any) => {
   if (!slot) return false;
+
+  const hasBreakProp =
+    "is_lunch_break" in slot ||
+    "is_launch_break" in slot ||
+    "islaunchbreak" in slot;
+
+  if (hasBreakProp) {
+    return Boolean(slot.is_lunch_break || slot.is_launch_break || slot.islaunchbreak);
+  }
+
   const time = slot.start_time;
   const isTimeMatch = time && (time.startsWith("01:15") || time.startsWith("13:15") || time.startsWith("1:15"));
-  return Boolean(isTimeMatch) || Boolean(slot.is_lunch_break) || Boolean(slot.is_launch_break) || Boolean(slot.islaunchbreak);
+  return Boolean(isTimeMatch);
 };
 
 const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string) => {
@@ -276,21 +286,28 @@ const MemoizedRoutineTable = React.memo(
 
             {timeSlots.map((slot, idx) => {
               const hasClass = schedule.some(rowItem => rowItem.slots[idx] !== null);
-              if (isBreakSlot(slot) && !hasClass) {
-                return (
-                  <TableCell key={slot.id} className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border/60 !print:border-r !print:border-black">
-                    <div className="h-full flex items-center justify-center print:hidden">
-                      <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background">
-                        Break
-                      </span>
-                    </div>
-                    <div className="hidden print:flex h-full w-full items-center justify-center">
-                      <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-black">
-                        Break
-                      </span>
-                    </div>
-                  </TableCell>
-                );
+              if (isBreakSlot(slot)) {
+                if (!hasClass) {
+                  return (
+                    <TableCell key={slot.id} className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border/60 !print:border-r !print:border-black">
+                      <div className="h-full flex items-center justify-center">
+                        <span className="text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black">
+                          BREAK
+                        </span>
+                      </div>
+                    </TableCell>
+                  );
+                } else {
+                  return (
+                    <TableCell key={slot.id} className="bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black border-r border-border/60 !print:border-r !print:border-black min-w-[100px]">
+                      <div className="h-full flex items-center justify-center">
+                        <span className="text-xs font-black uppercase tracking-widest text-background whitespace-nowrap print:text-black">
+                          BREAK
+                        </span>
+                      </div>
+                    </TableCell>
+                  );
+                }
               }
               return (
                 <TableCell
@@ -306,11 +323,6 @@ const MemoizedRoutineTable = React.memo(
                       <span className="mx-1">-</span>
                       {formatTimeSlotLabel(slot.end_time)}
                     </span>
-                    {isBreakSlot(slot) && (
-                      <span className="text-[9px] uppercase font-black tracking-wider text-muted-foreground mt-0.5 px-1 py-0.2 bg-muted rounded border border-border/40">
-                        Break
-                      </span>
-                    )}
                   </div>
                 </TableCell>
               );
