@@ -479,48 +479,82 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             size: landscape;
             margin: 5mm;
           }
+          /* Hide sidebar, header, nav entirely */
+          [data-slot="sidebar"],
+          [data-slot="sidebar-container"],
+          [data-slot="sidebar-gap"],
+          [data-slot="sidebar-inner"],
+          header,
+          nav {
+            display: none !important;
+          }
+
+          /* Reset outer layout wrappers to plain block */
+          html,
+          body,
+          main,
+          [data-slot="sidebar-inset"],
+          [data-slot="sidebar-wrapper"] {
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: unset !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+          }
           body {
             background-color: white !important;
             background: white !important;
             color: black !important;
             width: 100% !important;
-            margin: 0 !important;
-            padding: 0 !important;
           }
+          /* Remove borders/outlines/shadows from ALL elements by default to remove layout frames */
           * {
-            border-color: transparent !important;
+            border: none !important;
+            border-width: 0 !important;
+            outline: none !important;
+            box-shadow: none !important;
           }
+
+          /* Restore borders ONLY for the table and its cells */
           table,
           th,
-          td,
-          tr {
-            border-color: black !important;
-            border-style: solid !important;
-          }
-          table {
+          td {
             border: 1px solid black !important;
+            border-color: black !important;
             border-collapse: collapse !important;
           }
-          td,
-          th {
+
+          .print-header-border {
+            border: 2px double black !important;
+            border-color: black !important;
+          }
+
+          .print-header-table {
             border: 1px solid black !important;
+            border-color: black !important;
           }
-          #print-container-wrapper {
-            border: none !important;
-            box-shadow: none !important;
-            background-color: transparent !important;
-          }
-          div,
-          span,
-          p {
+
+          /* Ensure clear text and transparent backgrounds for print */
+          table, th, td, tr, div, span, p {
             background-color: transparent !important;
             color: black !important;
           }
+
+          /* Keep print-specific background colors if defined, like the break column */
+          .print\\:bg-gray-200, .bg-gray-200 {
+            background-color: #e5e7eb !important;
+          }
+
           svg line {
             stroke: black !important;
           }
-          * {
+
+          #print-container-wrapper {
             box-shadow: none !important;
+            background-color: transparent !important;
           }
         }
       `}</style>
@@ -634,12 +668,12 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                 <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
                   Department of Computer Science & Engineering
                 </h1>
-                <div className="border-2 border-black! border-double px-8 py-0.5 mb-2">
+                <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
                   <h2 className="text-base font-bold uppercase text-black tracking-wide">
                     Class Routine – {currentRoutine.session}
                   </h2>
                 </div>
-                <div className="w-full flex border! border-black! font-bold text-xs mt-3">
+                <div className="w-full flex border! border-black! font-bold text-xs mt-3 print-header-table">
                   <div className="bg-gray-200 border-r! border-black! px-6 py-1">
                     Semester
                   </div>

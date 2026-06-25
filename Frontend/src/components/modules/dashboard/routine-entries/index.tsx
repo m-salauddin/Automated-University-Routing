@@ -980,24 +980,70 @@ export default function AdminRoutinePage({
             size: landscape;
             margin: 5mm;
           }
+
+          /* Hide sidebar, header, and all non-print UI */
+          [data-slot="sidebar"],
+          [data-slot="sidebar-container"],
+          [data-slot="sidebar-gap"],
+          [data-slot="sidebar-inner"],
+          header,
+          nav {
+            display: none !important;
+          }
+
+          /* Reset the outer layout wrappers so nothing wraps the table */
+          html,
+          body,
+          main,
+          [data-slot="sidebar-inset"],
+          [data-slot="sidebar-wrapper"] {
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: unset !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+          }
+
           body {
             background-color: white !important;
             color: black !important;
           }
+
+          /* Remove borders/outlines/shadows from ALL elements by default to remove layout frames */
           * {
-            border-color: transparent !important;
+            border: none !important;
+            border-width: 0 !important;
+            outline: none !important;
             box-shadow: none !important;
           }
+
+          /* Restore borders ONLY for the table and its cells */
           table,
           th,
           td {
             border: 1px solid black !important;
+            border-color: black !important;
             border-collapse: collapse !important;
           }
+
+          /* Ensure clear text and transparent backgrounds for print */
+          table, th, td, tr, div, span, p {
+            background-color: transparent !important;
+            color: black !important;
+          }
+
+          /* Keep print-specific background colors if defined, like the break column */
+          .print\\:bg-gray-200 {
+            background-color: #e5e7eb !important;
+          }
+
           #print-container-wrapper {
-            border: none !important;
             background: transparent !important;
           }
+
           .print\\:hidden {
             display: none !important;
           }
@@ -1011,7 +1057,6 @@ export default function AdminRoutinePage({
         className="min-h-screen font-lexend w-full max-w-[1600px] mx-auto bg-background text-foreground p-5 overflow-x-hidden print:p-0 print:max-w-none print:bg-white print:text-black"
       >
         <div className="space-y-8 print:space-y-0 print:w-full">
-          {}
           <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-6 print:hidden">
             <div className="space-y-2">
               <motion.div variants={itemVariants}>
