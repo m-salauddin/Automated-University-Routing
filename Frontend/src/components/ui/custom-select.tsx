@@ -66,7 +66,10 @@ export function CustomSelect({ value = "", onChange, options, placeholder = "Sel
           disabled && "opacity-50 cursor-not-allowed pointer-events-none bg-background/30 border-border/40"
         )}
       >
-        <span className={selectedOption ? "text-foreground font-medium" : "text-muted-foreground"}>
+        <span className={cn(
+          "text-left truncate mr-2",
+          selectedOption ? "text-foreground font-medium" : "text-muted-foreground"
+        )}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <svg
@@ -91,7 +94,7 @@ export function CustomSelect({ value = "", onChange, options, placeholder = "Sel
             exit={{ opacity: 0, y: openUpward ? 4 : -4, scale: 0.98 }}
             transition={{ duration: 0.1 }}
             className={cn(
-              "absolute z-50 max-h-60 w-full overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg focus:outline-none",
+              "absolute z-50 max-h-60 min-w-full w-max max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-lg focus:outline-none",
               openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
             )}
           >
@@ -105,11 +108,11 @@ export function CustomSelect({ value = "", onChange, options, placeholder = "Sel
                     setIsOpen(false);
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors",
+                    "flex w-full items-center justify-between rounded-md px-2.5 py-2 text-sm text-left hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors gap-4",
                     option.value === value && "bg-accent text-accent-foreground font-medium"
                   )}
                 >
-                  <span>{option.label}</span>
+                  <span className="whitespace-nowrap">{option.label}</span>
                   {option.value === value && (
                     <svg
                       xmlns="http://www.w3.org/2000/svg"

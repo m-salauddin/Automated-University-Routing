@@ -833,7 +833,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                               const slot = sortedTimeSlots[index];
                               if (isBreakSlot(slot) && !session) {
                                 return (
-                                  <TableCell key={index} className="p-0 align-middle border-r border-border/60 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black">
+                                  <TableCell key={index} className="p-0 h-px align-middle border-r border-border/60 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black">
                                     <div
                                       className="absolute inset-0 opacity-10 print:hidden"
                                       style={{
@@ -901,7 +901,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                     }
                                   }}
                                   className={cn(
-                                    "p-1.5 align-middle border-r border-border/60 transition-colors duration-200 !print:border-r !print:border-black print:p-0.5",
+                                    "p-2.5 h-px align-middle border-r border-border/60 transition-colors duration-200 !print:border-r !print:border-black print:p-0.5",
                                     isClassOffToday
                                       ? "cursor-pointer"
                                       : "cursor-default",
@@ -925,7 +925,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                             : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40 hover:shadow-md"
                                         )}
                                       >
-                                        <div className="flex justify-between items-start w-full">
+                                        <div className="flex justify-between items-start w-full gap-1">
                                           <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
                                             {session.course}
                                           </span>

@@ -104,7 +104,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { CustomSelect } from "@/components/ui/custom-select";
-import { cancelClass, requestSwap, respondSwap } from "@/services/routine";
+import { cancelClass, requestSwap, respondSwap, getRoutine } from "@/services/routine";
 import { getAllUsers } from "@/services/users";
 
 export type APIRoutineItem = {
@@ -348,6 +348,16 @@ function DragHandle({
 }
 
 
+const getTeacherInitials = (name: string) => {
+  if (!name) return "";
+  const capitals = name.match(/[A-Z]/g);
+  if (capitals && capitals.length > 0) return capitals.join("");
+  return name
+    .split(/[\s-_]+/)
+    .map((word) => word.charAt(0).toUpperCase())
+    .join("");
+};
+
 export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
   const dispatch = useDispatch();
   const {
@@ -412,6 +422,52 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
   const [swapReason, setSwapReason] = useState<string>("");
   const [isSubmittingSwap, setIsSubmittingSwap] = useState(false);
   const [teachersList, setTeachersList] = useState<any[]>([]);
+  const [targetTeacherClasses, setTargetTeacherClasses] = useState<APIRoutineItem[]>([]);
+  const [isLoadingTargetClasses, setIsLoadingTargetClasses] = useState(false);
+
+  useEffect(() => {
+    if (!targetTeacherId || swapType !== "MUTUAL") {
+      setTargetTeacherClasses([]);
+      return;
+    }
+
+    const fetchTargetClasses = async () => {
+      setIsLoadingTargetClasses(true);
+      try {
+        const targetTeacher = teachersList.find(t => String(t.id) === targetTeacherId);
+        if (targetTeacher && targetTeacher.department) {
+          const res = await getRoutine({
+            department_id: targetTeacher.department,
+          });
+          if (res.success && Array.isArray(res.data)) {
+            const targetName = (targetTeacher.name || targetTeacher.username).toLowerCase().trim();
+            // Try to match teacher name exactly, or match teacher initials
+            const filtered = res.data.filter((item: APIRoutineItem) => {
+              const itemTeacher = item.teacher_name.toLowerCase().trim();
+              if (itemTeacher === targetName) return true;
+              
+              // Fallback: match initials
+              const initials = getTeacherInitials(targetTeacher.name || targetTeacher.username).toLowerCase();
+              const itemInitials = getTeacherInitials(item.teacher_name).toLowerCase();
+              return initials === itemInitials;
+            });
+            setTargetTeacherClasses(filtered);
+          } else {
+            setTargetTeacherClasses([]);
+          }
+        } else {
+          setTargetTeacherClasses([]);
+        }
+      } catch (err) {
+        console.error("Failed to load target teacher routine:", err);
+        setTargetTeacherClasses([]);
+      } finally {
+        setIsLoadingTargetClasses(false);
+      }
+    };
+
+    fetchTargetClasses();
+  }, [targetTeacherId, swapType, teachersList]);
 
   // Respond to Swap States
   const [isRespondDialogOpen, setIsRespondDialogOpen] = useState(false);
@@ -1396,19 +1452,29 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
             {swapType === "MUTUAL" && (
               <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
                 <Label htmlFor="targetRoutineId" className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
-                  Target Routine Entry ID *
+                  Target Routine Entry *
                 </Label>
-                <Input
-                  id="targetRoutineId"
-                  type="number"
-                  placeholder="e.g. 1207"
-                  value={targetRoutineId}
-                  onChange={(e) => setTargetRoutineId(e.target.value)}
-                  className="h-10"
-                />
-                <p className="text-[10px] text-muted-foreground">
-                  Provide the ID of the routine slot you wish to exchange with (can be queried from the target teacher).
-                </p>
+                {isLoadingTargetClasses ? (
+                  <div className="flex items-center gap-2 h-10 px-3 border rounded-md text-muted-foreground text-xs bg-muted/20">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Fetching target teacher's schedule...</span>
+                  </div>
+                ) : targetTeacherClasses.length === 0 ? (
+                  <div className="flex items-center gap-2 h-10 px-3 border rounded-md text-muted-foreground text-xs bg-muted/20">
+                    <span>No scheduled classes found for this teacher.</span>
+                  </div>
+                ) : (
+                  <CustomSelect
+                    value={targetRoutineId}
+                    onChange={setTargetRoutineId}
+                    options={targetTeacherClasses.map((item) => ({
+                      value: String(item.id),
+                      label: `${item.course_code} - ${item.day_name} (${formatTimeRange(item.start_time, item.end_time)})`,
+                    }))}
+                    placeholder="Select Class Session"
+                    id="targetRoutineId"
+                  />
+                )}
               </div>
             )}
 
