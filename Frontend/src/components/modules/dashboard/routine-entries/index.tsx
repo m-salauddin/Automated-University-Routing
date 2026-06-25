@@ -79,6 +79,8 @@ export type APIRoutineItem = {
   department_name: string;
   semester_name: string;
   room_number: string;
+  is_cancelled?: boolean;
+  cancel_message?: string | null;
 };
 
 export type TimeSlot = {
@@ -98,6 +100,8 @@ type ClassSession = {
   department: string;
   semester: string;
   day: string;
+  is_cancelled?: boolean;
+  cancel_message?: string | null;
 };
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
@@ -137,11 +141,11 @@ const isBreakSlot = (slot: any) => {
 
 const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string) => {
   if (!courseCode) return false;
-  const codeLower = courseCode.toLowerCase();
+  const codeLower = courseCode.trim().toLowerCase();
   const nameLower = (courseName || "").toLowerCase();
   const roomLower = (roomNumber || "").toLowerCase();
   
-  if (codeLower.includes("lab") || codeLower.includes("sessional") || codeLower.includes("practical") || codeLower.includes("work")) {
+  if (codeLower.endsWith("l") || codeLower.includes("lab") || codeLower.includes("sessional") || codeLower.includes("practical") || codeLower.includes("work")) {
     return true;
   }
   if (nameLower.includes("lab") || nameLower.includes("laboratory") || nameLower.includes("sessional") || nameLower.includes("practical")) {
@@ -552,9 +556,9 @@ const MemoizedRoutineTable = React.memo(
                                 ? classOffMap[key]
                                 : undefined;
 
-                            const isClassOffToday = Boolean(classOffData?.status);
+                            const isClassOffToday = Boolean(classOffData?.status) || Boolean(session?.is_cancelled);
                             const cancellationReason =
-                              classOffData?.reason || "No reason provided.";
+                              classOffData?.reason || session?.cancel_message || "No reason provided.";
                             const isTeacherOff =
                               (!!teacherKey && availabilityMap[teacherKey] === false) ||
                               isClassOffToday;
@@ -692,15 +696,28 @@ const MemoizedRoutineTable = React.memo(
                                       )}
                                     >
                                       <div className="flex justify-between items-start w-full gap-1">
-                                        <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
+                                        <span className={cn(
+                                          "text-xs font-extrabold tracking-tight leading-tight text-foreground",
+                                          isClassOffToday && "opacity-70"
+                                        )}>
                                           {session.course}
                                         </span>
                                         {isLab ? (
-                                          <span className="text-[9px] font-black uppercase tracking-wider bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-1 py-0.2 rounded border border-violet-200/50 dark:border-violet-800/40">
+                                          <span className={cn(
+                                            "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                            isTeacherOff
+                                              ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                              : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                          )}>
                                             Lab
                                           </span>
                                         ) : (
-                                          <span className="text-[9px] font-black uppercase tracking-wider bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 px-1 py-0.2 rounded border border-teal-200/50 dark:border-teal-800/40">
+                                          <span className={cn(
+                                            "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                            isTeacherOff
+                                              ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                              : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                          )}>
                                             Theory
                                           </span>
                                         )}
@@ -726,6 +743,9 @@ const MemoizedRoutineTable = React.memo(
                                       <span className="font-bold text-[11px]">
                                         {session.room}
                                       </span>
+                                      {isClassOffToday && (
+                                        <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">(Cancelled)</span>
+                                      )}
                                     </div>
                                   </>
                                 ) : isBreakSlot(slot) ? (
@@ -1238,6 +1258,8 @@ export default function AdminRoutinePage({
               department: item.department_name,
               semester: item.semester_name,
               day: item.day_name,
+              is_cancelled: Boolean(item.is_cancelled),
+              cancel_message: item.cancel_message || null,
             };
             uniqueCourses.add(item.course_code);
             hasContent = true;
@@ -1477,6 +1499,10 @@ export default function AdminRoutinePage({
 
           .print\\:hidden {
             display: none !important;
+          }
+
+          .print-cancelled-label {
+            color: #dc2626 !important;
           }
         }
       `}</style>

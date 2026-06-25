@@ -87,9 +87,10 @@ import {
   ShieldBan,
   ArrowUpDown,
   Loader2,
+  Utensils,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { markOff, markOn, generateClassKey } from "@/store/classOffSlice";
+import { markOff, markOn, generateClassKey, normalizeTime } from "@/store/classOffSlice";
 import type { RootState } from "@/store";
 import DataLoader from "@/components/ui/data-loader";
 import {
@@ -104,7 +105,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { CustomSelect } from "@/components/ui/custom-select";
-import { cancelClass, requestSwap, respondSwap, getRoutine } from "@/services/routine";
+import { cancelClass, reactivateClass, requestSwap, respondSwap, getRoutine } from "@/services/routine";
 import { getAllUsers } from "@/services/users";
 
 export type APIRoutineItem = {
@@ -153,9 +154,17 @@ type RoutineRowState = {
   date?: string;
 };
 
+type TimeSlot = {
+  id: number;
+  start_time: string;
+  end_time: string;
+};
+
 interface OwnRoutinePageProps {
   routineList: APIRoutineItem[];
+  timeSlots: TimeSlot[];
 }
+
 
 
 const formatTime12Hour = (timeStr: string) => {
@@ -358,7 +367,7 @@ const getTeacherInitials = (name: string) => {
     .join("");
 };
 
-export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
+export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePageProps) {
   const dispatch = useDispatch();
   const {
     role,
@@ -376,6 +385,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
 
   
   const [rows, setRows] = useState<RoutineRowState[]>([]);
+  const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [teacherInfo, setTeacherInfo] = useState<TeacherInfo | null>(null);
 
@@ -424,6 +434,17 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
   const [teachersList, setTeachersList] = useState<any[]>([]);
   const [targetTeacherClasses, setTargetTeacherClasses] = useState<APIRoutineItem[]>([]);
   const [isLoadingTargetClasses, setIsLoadingTargetClasses] = useState(false);
+
+  const totalCredits = useMemo(() => {
+    if (!routineList) return 0;
+    const uniqueCourses = new Set<string>();
+    routineList.forEach((item) => {
+      if (item.course_code) {
+        uniqueCourses.add(item.course_code);
+      }
+    });
+    return uniqueCourses.size * 3;
+  }, [routineList]);
 
   useEffect(() => {
     if (!targetTeacherId || swapType !== "MUTUAL") {
@@ -667,6 +688,95 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     semesterFilter,
   ]);
 
+  const sortedTimeSlots = useMemo(() => {
+    let slotsToUse = timeSlots || [];
+    
+    if (slotsToUse.length === 0 && routineList && routineList.length > 0) {
+      const uniqueMap = new Map<string, { id: number; start_time: string; end_time: string }>();
+      routineList.forEach((item) => {
+        const key = `${item.start_time}-${item.end_time}`;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, {
+            id: uniqueMap.size + 1,
+            start_time: item.start_time,
+            end_time: item.end_time,
+          });
+        }
+      });
+      slotsToUse = Array.from(uniqueMap.values());
+    }
+
+    const getMinutes = (timeStr: string) => {
+      if (!timeStr) return 0;
+      const [hStr, mStr] = timeStr.split(":");
+      let h = parseInt(hStr, 10);
+      const m = parseInt(mStr, 10);
+      if (h >= 1 && h <= 5) h += 12;
+      return h * 60 + m;
+    };
+    return [...slotsToUse].sort((a, b) => getMinutes(a.start_time) - getMinutes(b.start_time));
+  }, [timeSlots, routineList]);
+
+
+  const isBreakSlot = (slot: any) => {
+    if (!slot) return false;
+    const hasBreakProp =
+      "is_lunch_break" in slot ||
+      "is_launch_break" in slot ||
+      "islaunchbreak" in slot;
+
+    if (hasBreakProp) {
+      return Boolean(slot.is_lunch_break || slot.is_launch_break || slot.islaunchbreak);
+    }
+
+    const time = slot.start_time;
+    const isTimeMatch = time && (time.startsWith("01:15") || time.startsWith("13:15") || time.startsWith("1:15"));
+    return Boolean(isTimeMatch);
+  };
+
+  const formatTimeSlotLabel = (timeStr: string) => {
+    if (!timeStr) return "";
+    const [hStr, mStr] = timeStr.split(":");
+    let h = parseInt(hStr, 10);
+    if (h >= 1 && h <= 5) {
+      h += 12;
+    }
+    h = h % 12;
+    h = h ? h : 12;
+    return `${h}:${mStr}`;
+  };
+
+  const DAYS_ORDER_ABBR = useMemo(() => {
+    const baseDays = ["Sun", "Mon", "Tue", "Wed", "Thu"];
+    const extraDays = ["Fri", "Sat"];
+    const hasClassOnExtra = extraDays.filter(d => rows.some(r => r.day === d));
+    return [...baseDays, ...hasClassOnExtra];
+  }, [rows]);
+
+  const gridSchedule = useMemo(() => {
+    if (!sortedTimeSlots.length) return [];
+    const slotStartTimes = sortedTimeSlots.map((ts) => normalizeTime(ts.start_time));
+
+    return DAYS_ORDER_ABBR.map((dayName) => {
+      const daySlots = Array(sortedTimeSlots.length).fill(null) as (RoutineRowState | null)[];
+      const dayRows = processedRows.filter((r) => r.day === dayName);
+
+      dayRows.forEach((r) => {
+        const normalizedStartTime = normalizeTime(r.startTimeRaw);
+        const slotIdx = slotStartTimes.indexOf(normalizedStartTime);
+        if (slotIdx !== -1) {
+          daySlots[slotIdx] = r;
+        }
+      });
+
+      return {
+        day: dayName,
+        slots: daySlots,
+      };
+    });
+  }, [processedRows, sortedTimeSlots, DAYS_ORDER_ABBR]);
+
+
   const pageSizeOptions = [5, 10, 20, 50] as const;
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -884,6 +994,191 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
   );
 
   
+  function GridCellCard({ row }: { row: RoutineRowState }) {
+    const key = generateClassKey(
+      row.department,
+      row.semester,
+      row.day,
+      row.teacherId,
+      row.startTimeRaw
+    );
+    const offRecord = classOffMap[key];
+    const isOffSlot = Boolean(offRecord?.status);
+    const isTeacherOff = availabilityMap[row.teacherId] === false;
+    const currentStatus = isOffSlot || isTeacherOff || row.is_cancelled ? "off" : "on";
+
+    const handleStatusChange = () => {
+      if (currentStatus === "on") {
+        setPendingCancellation({
+          id: row.id,
+          teacherId: row.teacherId,
+          startTimeRaw: row.startTimeRaw,
+          courseName: row.course,
+          department: row.department,
+          semester: row.semester,
+          day: row.day,
+        });
+        setIsReasonModalOpen(true);
+      } else {
+        dispatch(
+          markOn({
+            department: row.department,
+            semester: row.semester,
+            day: row.day,
+            teacherId: row.teacherId,
+            startTime: row.startTimeRaw,
+          })
+        );
+        toast.success(`${row.course} is now ON`);
+      }
+    };
+
+    const handleReactivate = async () => {
+      const res = await reactivateClass(row.id);
+      if (res.success) {
+        toast.success(`${row.course} is now active (ON)`);
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === row.id
+              ? { ...r, is_cancelled: false, cancel_message: null }
+              : r
+          )
+        );
+        dispatch(
+          markOn({
+            department: row.department,
+            semester: row.semester,
+            day: row.day,
+            teacherId: row.teacherId,
+            startTime: row.startTimeRaw,
+          })
+        );
+      } else {
+        toast.error(res.message || "Failed to activate class");
+      }
+    };
+
+    const isLab = row.type === "Lab";
+
+    return (
+      <>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <div
+              className={cn(
+                "w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group text-left relative min-h-[75px] print:hidden cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.01]",
+                currentStatus === "off"
+                  ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                  : isLab
+                  ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40"
+                  : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40"
+              )}
+            >
+              <div className="flex justify-between items-start w-full gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={cn(
+                        "text-xs font-extrabold tracking-tight leading-tight text-foreground border-dotted border-muted-foreground/30",
+                        currentStatus === "off" && "opacity-70"
+                      )}>
+                        {row.course}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-medium text-xs">{row.fullCourseName}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <div className="flex items-center gap-1">
+                  {isLab ? (
+                    <span className={cn(
+                      "text-[8px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                      currentStatus === "off"
+                        ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                        : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                    )}>
+                      Lab
+                    </span>
+                  ) : (
+                    <span className={cn(
+                      "text-[8px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                      currentStatus === "off"
+                        ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                        : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                    )}>
+                      Theory
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex flex-col gap-0.5 mt-1 text-[10px] text-muted-foreground font-lexend">
+                <div className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3 opacity-70" />
+                  <span>Room {row.room}</span>
+                </div>
+                <div className="flex items-center gap-1 font-semibold text-foreground/80">
+                  <GraduationCap className="w-3 h-3 opacity-70" />
+                  <span>{row.semester} Sem</span>
+                </div>
+              </div>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {currentStatus === "on" ? (
+              <>
+                <DropdownMenuItem
+                  className="text-red-500 focus:text-red-500 cursor-pointer"
+                  onClick={handleStatusChange}
+                >
+                  <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => openSwapRequestModal(row)}
+                >
+                  <ArrowUpDown className="size-4 mr-2" /> Request Class Swap
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                {row.is_cancelled ? (
+                  <DropdownMenuItem
+                    className="text-emerald-500 focus:text-emerald-500 cursor-pointer"
+                    onClick={handleReactivate}
+                  >
+                    <CheckCheck className="size-4 mr-2 text-emerald-500" /> Activate Class
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    className="opacity-50 cursor-not-allowed"
+                    disabled
+                  >
+                    <PowerOff className="size-4 mr-2" /> Class Cancelled
+                  </DropdownMenuItem>
+                )}
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Print View Card */}
+        <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
+          <span className="font-extrabold text-[11px] text-black">{row.course}</span>
+          <span className="text-[10px] font-bold text-black">Room {row.room}</span>
+          <span className="text-[9px] font-semibold text-gray-800">{row.semester} Sem</span>
+          {currentStatus === "off" && (
+            <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">(Cancelled)</span>
+          )}
+        </div>
+      </>
+    );
+  }
+
   function DraggableRow({ row }: { row: RoutineRowState }) {
     const {
       setNodeRef,
@@ -910,7 +1205,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     const offRecord = classOffMap[key];
     const isOffSlot = Boolean(offRecord?.status);
     const isTeacherOff = availabilityMap[row.teacherId] === false;
-    const currentStatus = isOffSlot || isTeacherOff ? "off" : "on";
+    const currentStatus = isOffSlot || isTeacherOff || row.is_cancelled ? "off" : "on";
 
     const handleStatusChange = () => {
       if (currentStatus === "on") {
@@ -935,6 +1230,31 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
           })
         );
         toast.success(`${row.course} is now ON`);
+      }
+    };
+
+    const handleReactivate = async () => {
+      const res = await reactivateClass(row.id);
+      if (res.success) {
+        toast.success(`${row.course} is now active (ON)`);
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === row.id
+              ? { ...r, is_cancelled: false, cancel_message: null }
+              : r
+          )
+        );
+        dispatch(
+          markOn({
+            department: row.department,
+            semester: row.semester,
+            day: row.day,
+            teacherId: row.teacherId,
+            startTime: row.startTimeRaw,
+          })
+        );
+      } else {
+        toast.error(res.message || "Failed to activate class");
       }
     };
 
@@ -1035,12 +1355,23 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
                   </DropdownMenuItem>
                 </>
               ) : (
-                <DropdownMenuItem
-                  className="opacity-50 cursor-not-allowed"
-                  disabled
-                >
-                  <PowerOff className="size-4 mr-2" /> Class Cancelled
-                </DropdownMenuItem>
+                <>
+                  {row.is_cancelled ? (
+                    <DropdownMenuItem
+                      className="text-emerald-500 focus:text-emerald-500 cursor-pointer"
+                      onClick={handleReactivate}
+                    >
+                      <CheckCheck className="size-4 mr-2 text-emerald-500" /> Activate Class
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      className="opacity-50 cursor-not-allowed"
+                      disabled
+                    >
+                      <PowerOff className="size-4 mr-2" /> Class Cancelled
+                    </DropdownMenuItem>
+                  )}
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1099,11 +1430,135 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     );
 
   return (
-    <motion.div
+    <>
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: landscape;
+            margin: 5mm;
+          }
+
+          /* Hide sidebar, header, and all non-print UI */
+          [data-slot="sidebar"],
+          [data-slot="sidebar-container"],
+          [data-slot="sidebar-gap"],
+          [data-slot="sidebar-inner"],
+          header,
+          nav {
+            display: none !important;
+          }
+
+          /* Reset the outer layout wrappers so nothing wraps the table */
+          html,
+          body,
+          main,
+          [data-slot="sidebar-inset"],
+          [data-slot="sidebar-wrapper"] {
+            display: block !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: unset !important;
+            overflow: visible !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+          }
+
+          body {
+            background-color: white !important;
+            color: black !important;
+          }
+
+          /* Remove borders/outlines/shadows from ALL elements by default to remove layout frames */
+          * {
+            border: none !important;
+            border-width: 0 !important;
+            outline: none !important;
+            box-shadow: none !important;
+          }
+
+          /* Restore borders ONLY for the table and its cells */
+          table,
+          th,
+          td {
+            border: 1px solid black !important;
+            border-color: black !important;
+            border-collapse: collapse !important;
+          }
+          table {
+            table-layout: fixed !important;
+            width: 100% !important;
+          }
+          tbody {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .print-page-container {
+            display: block !important;
+            width: 100% !important;
+          }
+          @media print {
+            .print-page-container {
+              display: flex !important;
+              flex-direction: column !important;
+              justify-content: center !important;
+              align-items: center !important;
+              height: 95vh !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              page-break-after: avoid !important;
+              break-after: avoid !important;
+              box-sizing: border-box !important;
+              padding: 5mm !important;
+            }
+
+            [data-radix-portal],
+            [role="dialog"],
+            .radix-portal {
+              display: none !important;
+            }
+          }
+          th, td {
+            padding: 2px 2px !important;
+            height: auto !important;
+          }
+          thead td, thead th {
+            height: 40px !important;
+          }
+          th span, td span, td div, th div {
+            font-size: 9.5px !important;
+            line-height: 1.2 !important;
+          }
+
+          /* Ensure clear text and transparent backgrounds for print */
+          table, th, td, tr, div, span, p {
+            background-color: transparent !important;
+            color: black !important;
+          }
+
+          /* Keep print-specific background colors if defined, like the break column */
+          .print\\:bg-gray-200 {
+            background-color: #e5e7eb !important;
+          }
+
+          #print-container-wrapper {
+            background: transparent !important;
+          }
+
+          .print\\:hidden {
+            display: none !important;
+          }
+
+          .print-cancelled-label {
+            color: #dc2626 !important;
+          }
+        }
+      `}</style>
+      <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="w-full font-lexend max-w-full overflow-x-hidden mx-auto p-5 space-y-4 print:overflow-visible"
+      className="w-full font-lexend max-w-full overflow-x-hidden mx-auto p-5 space-y-4 print:overflow-visible print:p-0 print:m-0"
     >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 print:hidden mb-8">
         <div className="space-y-2">
@@ -1131,6 +1586,13 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
                 {teacherInfo ? teacherInfo.name : username}
               </span>
             </p>
+            <Badge
+              variant="secondary"
+              className="h-6 text-[11px] font-semibold px-2.5 bg-muted/50 hover:bg-muted/50 text-muted-foreground border border-border/60 flex items-center gap-1.5 rounded-md"
+            >
+              <BookOpen className="h-3.5 w-3.5 text-primary/80" />
+              Total Credits: <span className="text-foreground font-bold">{totalCredits}</span>
+            </Badge>
             <Sheet>
               <SheetTrigger asChild>
                 <Button
@@ -1178,7 +1640,31 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
             </Sheet>
         </motion.div>
       </div>
-      <motion.div variants={itemVariants} className="flex gap-2">
+      <motion.div variants={itemVariants} className="flex gap-2 items-center flex-wrap">
+        <div className="flex bg-muted/50 p-1 rounded-lg border border-border/60 print:hidden h-10 items-center mr-2">
+          <Button
+            variant={viewMode === "table" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("table")}
+            className={cn(
+              "h-8 gap-1.5 px-3 text-xs font-semibold rounded-md transition-all",
+              viewMode === "table" ? "shadow-sm bg-background text-foreground" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <LayoutList className="h-3.5 w-3.5" /> Table View
+          </Button>
+          <Button
+            variant={viewMode === "grid" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("grid")}
+            className={cn(
+              "h-8 gap-1.5 px-3 text-xs font-semibold rounded-md transition-all",
+              viewMode === "grid" ? "shadow-sm bg-background text-foreground" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Calendar className="h-3.5 w-3.5" /> Routine Grid
+          </Button>
+        </div>
         <Button
           onClick={() => {
             setRespondRequestId("");
@@ -1200,18 +1686,22 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       </motion.div>
     </div>
 
+      <div className="print-page-container w-full">
       <div className="hidden print:flex flex-col items-center justify-center mb-6 pt-2 text-center w-full font-serif text-black">
         <h1 className="text-2xl font-bold text-black mb-3 font-lexend tracking-tight">
           Department of Computer Science & Engineering
         </h1>
-        <div className="px-8 py-1">
+        <div className="px-8 py-1 flex items-center justify-center gap-2">
           <h2 className="font-lexend text-black tracking-wide">
             {teacherInfo ? teacherInfo.name : username}&apos;s Class Routine
           </h2>
+          <span className="text-black font-lexend font-medium text-sm">•</span>
+          <span className="font-lexend text-black text-sm">
+            Total Credits: <span className="font-bold">{totalCredits}</span>
+          </span>
         </div>
       </div>
-
-      <motion.div variants={itemVariants}>
+      <motion.div variants={itemVariants} className="print:hidden">
         <Card className="w-full overflow-hidden dark:bg-[#111113] border shadow-sm print:border-none print:shadow-none print:overflow-visible">
           <CardHeader className="p-4 min-[1300px]:block bg-muted/30 border-b hidden print:hidden">
             <div className="flex flex-col gap-4">
@@ -1224,9 +1714,11 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
                   <SemesterSelect />
                 </div>
                 <div className="flex gap-3 items-end shrink-0 w-full xl:w-auto justify-end xl:justify-start">
-                  <div className="min-w-[150px]">
-                    <ColumnSelect />
-                  </div>
+                  {viewMode === "table" && (
+                    <div className="min-w-[150px]">
+                      <ColumnSelect />
+                    </div>
+                  )}
                   {(day !== "All" ||
                     typeFilter !== "All" ||
                     statusFilter !== "All" ||
@@ -1246,80 +1738,185 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="grid grid-cols-1 print:block">
-              <div className="w-full overflow-x-auto print:overflow-visible">
-                <div className="min-w-[800px] print:min-w-0 print:w-full">
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <Table>
-                      <TableHeader className="bg-muted/40">
-                        <TableRow className="hover:bg-transparent">
-                          <TableHead className="w-10 print:hidden"></TableHead>
-                          {columnsOrder.map((key) =>
-                            visibleCols[key] ? (
-                              <TableHead
-                                key={key}
-                                className="capitalize select-none h-10"
-                              >
-                                <span className="flex items-center gap-1">
-                                  {key}
-                                </span>
-                              </TableHead>
-                            ) : null
-                          )}
-                          <TableHead className="w-12 print:hidden text-right">
-                            Actions
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {processedRows.length === 0 ? (
-                          <TableRow>
-                            <TableCell
-                              colSpan={10}
-                              className="h-64 text-center"
-                            >
-                              <div className="flex flex-col items-center justify-center text-muted-foreground h-full">
-                                <div className="h-12 w-12 bg-muted/30 rounded-full flex items-center justify-center mb-4">
-                                  <FolderOpen className="h-6 w-6 opacity-50" />
-                                </div>
-                                <h3 className="text-lg font-medium text-foreground mb-1">
-                                  No courses found
-                                </h3>
-                                <p className="text-sm opacity-60 max-w-xs mx-auto mb-4">
-                                  We couldn&apos;t find any courses matching
-                                  your current filters.
-                                </p>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={resetFilters}
+            {viewMode === "table" ? (
+              <div className="grid grid-cols-1 print:block">
+                <div className="w-full overflow-x-auto print:overflow-visible">
+                  <div className="min-w-[800px] print:min-w-0 print:w-full">
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <Table>
+                        <TableHeader className="bg-muted/40">
+                          <TableRow className="hover:bg-transparent">
+                            <TableHead className="w-10 print:hidden"></TableHead>
+                            {columnsOrder.map((key) =>
+                              visibleCols[key] ? (
+                                <TableHead
+                                  key={key}
+                                  className="capitalize select-none h-10"
                                 >
-                                  Clear Filters
-                                </Button>
-                              </div>
-                            </TableCell>
+                                  <span className="flex items-center gap-1">
+                                    {key}
+                                  </span>
+                                </TableHead>
+                              ) : null
+                            )}
+                            <TableHead className="w-12 print:hidden text-right">
+                              Actions
+                            </TableHead>
                           </TableRow>
-                        ) : (
-                          <SortableContext
-                            items={paged.map((r) => r.id)}
-                            strategy={verticalListSortingStrategy}
-                          >
-                            {paged.map((row) => (
-                              <DraggableRow key={row.id} row={row} />
-                            ))}
-                          </SortableContext>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </DndContext>
+                        </TableHeader>
+                        <TableBody>
+                          {processedRows.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={10}
+                                className="h-64 text-center"
+                              >
+                                <div className="flex flex-col items-center justify-center text-muted-foreground h-full">
+                                  <div className="h-12 w-12 bg-muted/30 rounded-full flex items-center justify-center mb-4">
+                                    <FolderOpen className="h-6 w-6 opacity-50" />
+                                  </div>
+                                  <h3 className="text-lg font-medium text-foreground mb-1">
+                                    No courses found
+                                  </h3>
+                                  <p className="text-sm opacity-60 max-w-xs mx-auto mb-4">
+                                    We couldn&apos;t find any courses matching
+                                    your current filters.
+                                  </p>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={resetFilters}
+                                  >
+                                    Clear Filters
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            <SortableContext
+                              items={paged.map((r) => r.id)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {paged.map((row) => (
+                                <DraggableRow key={row.id} row={row} />
+                              ))}
+                            </SortableContext>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </DndContext>
+                  </div>
                 </div>
               </div>
-            </div>
-            {processedRows.length > 0 && !showAllForPrint && (
+            ) : (
+              <div className="grid grid-cols-1 print:block">
+                <div className="w-full overflow-x-auto print:overflow-visible">
+                  <Table className="w-full overflow-hidden min-w-[1000px] border border-border/60 border-collapse text-sm print:border-collapse !print:border-black">
+                    <TableHeader>
+                      <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b bg-muted/40">
+                        <TableCell className="p-0 w-[90px] min-w-[90px] h-[50px] border-r border-border/60 relative bg-muted/40 print:bg-white !print:border-r !print:border-black print:w-20 print:min-w-0">
+                          <svg
+                            className="absolute inset-0 w-full h-full pointer-events-none"
+                            preserveAspectRatio="none"
+                          >
+                            <line
+                              x1="0"
+                              y1="0"
+                              x2="100%"
+                              y2="100%"
+                              className="stroke-border/60 print:stroke-black"
+                              strokeWidth="1"
+                            />
+                          </svg>
+                          <span className="absolute top-2 right-2 text-[10px] font-bold print:text-black print:text-[10px] print:top-[2px] print:right-[2px]">
+                            Time
+                          </span>
+                          <span className="absolute bottom-2 left-2 text-[10px] font-bold print:text-black print:text-[10px] print:bottom-[2px] print:left-[2px]">
+                            Day
+                          </span>
+                        </TableCell>
+                        {sortedTimeSlots.map((slot) => (
+                          <TableCell
+                            key={slot.id}
+                            className="text-center align-middle h-[50px] border-r border-border/60 last:border-r-0 p-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto min-w-[100px] bg-muted/10 print:bg-white print:min-w-0"
+                          >
+                            <div className="flex flex-col items-center justify-center h-full w-full px-1">
+                              <span className="font-bold text-xs whitespace-nowrap print:text-[11px] print:font-bold print:text-black">
+                                {formatTimeSlotLabel(slot.start_time)}
+                                <span className="mx-1">-</span>
+                                {formatTimeSlotLabel(slot.end_time)}
+                              </span>
+                            </div>
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {gridSchedule.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={sortedTimeSlots.length + 1}
+                            className="h-64 text-center"
+                          >
+                            <div className="flex flex-col items-center justify-center text-muted-foreground h-full">
+                              <div className="h-12 w-12 bg-muted/30 rounded-full flex items-center justify-center mb-4">
+                                <FolderOpen className="h-6 w-6 opacity-50" />
+                              </div>
+                              <h3 className="text-lg font-medium text-foreground mb-1">
+                                No courses scheduled
+                              </h3>
+                              <p className="text-sm opacity-60 max-w-xs mx-auto mb-4">
+                                We couldn&apos;t find any scheduled class sessions.
+                              </p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        gridSchedule.map((rowItem) => (
+                          <TableRow
+                            key={rowItem.day}
+                            className="border-b border-border/60 hover:bg-muted/5 h-[95px] print:h-auto animate-in fade-in duration-200"
+                          >
+                            <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 print:bg-white print:text-black print:font-bold">
+                              {rowItem.day}
+                            </TableCell>
+                            {rowItem.slots.map((session, index) => {
+                              const slot = sortedTimeSlots[index];
+                              return (
+                                <TableCell
+                                  key={index}
+                                  className={cn(
+                                    "align-middle border-r border-border/60 last:border-r-0 transition-all duration-200 relative p-2 print:p-1 print:border-black",
+                                    (!session && isBreakSlot(slot)) ? "bg-muted/20" : "bg-transparent print:bg-white"
+                                  )}
+                                >
+                                  {session ? (
+                                    <GridCellCard row={session} />
+                                  ) : isBreakSlot(slot) ? (
+                                    <div className="h-full w-full min-h-[50px] flex items-center justify-center relative z-10 print:hidden text-muted-foreground/35">
+                                      <Utensils className="w-3.5 h-3.5" />
+                                    </div>
+                                  ) : (
+                                    <div className="h-full w-full flex items-center justify-center min-h-[50px]">
+                                      <div className="w-1 h-1 rounded-full bg-border print:hidden" />
+                                    </div>
+                                  )}
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+            {viewMode === "table" && processedRows.length > 0 && !showAllForPrint && (
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-background/50 print:hidden">
                 <div className="flex items-center justify-between sm:justify-start w-full sm:w-auto gap-2 text-sm text-muted-foreground">
                   <span>Rows:</span>
@@ -1388,6 +1985,99 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Print-Only Grid View */}
+      <div className="hidden print:block w-full print:w-full print:mx-auto">
+        <Table className="w-full border-t border-l border-black border-collapse text-sm print:border-collapse print:border-black">
+          <TableHeader>
+            <TableRow className="border-b border-black hover:bg-transparent print:border-black bg-gray-100">
+              <TableCell className="p-0 w-[90px] min-w-[90px] h-[45px] border-r border-b border-black relative bg-white print:border-black">
+                <svg
+                  className="absolute inset-0 w-full h-full pointer-events-none"
+                  preserveAspectRatio="none"
+                >
+                  <line
+                    x1="0"
+                    y1="0"
+                    x2="100%"
+                    y2="100%"
+                    className="stroke-black"
+                    strokeWidth="1"
+                  />
+                </svg>
+                <span className="absolute top-1.5 right-1.5 text-[9px] font-bold text-black">
+                  Time
+                </span>
+                <span className="absolute bottom-1.5 left-1.5 text-[9px] font-bold text-black">
+                  Day
+                </span>
+              </TableCell>
+              {sortedTimeSlots.map((slot) => (
+                <TableCell
+                  key={slot.id}
+                  className="text-center align-middle h-[45px] border-r border-b border-black p-0 print:border-black bg-white"
+                >
+                  <div className="flex flex-col items-center justify-center h-full w-full px-1">
+                    <span className="font-bold text-[10px] text-black whitespace-nowrap">
+                      {formatTimeSlotLabel(slot.start_time)}
+                      <span className="mx-0.5">-</span>
+                      {formatTimeSlotLabel(slot.end_time)}
+                    </span>
+                  </div>
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {gridSchedule.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={sortedTimeSlots.length + 1}
+                  className="h-64 text-center border-r border-b border-black text-black"
+                >
+                  No courses scheduled.
+                </TableCell>
+              </TableRow>
+            ) : (
+              gridSchedule.map((rowItem) => (
+                <TableRow
+                  key={rowItem.day}
+                  className="hover:bg-transparent print:border-black"
+                >
+                  <TableCell className="font-bold text-[11px] uppercase p-0 align-middle text-center bg-white border-r border-b border-black print:border-black text-black">
+                    {rowItem.day}
+                  </TableCell>
+                  {rowItem.slots.map((session, index) => {
+                    const slot = sortedTimeSlots[index];
+                    return (
+                      <TableCell
+                        key={index}
+                        className={cn(
+                          "align-middle border-r border-b border-black p-1 bg-white print:border-black text-center h-[70px]",
+                          (!session && isBreakSlot(slot)) ? "bg-gray-100" : ""
+                        )}
+                      >
+                        {session ? (
+                          <GridCellCard row={session} />
+                        ) : isBreakSlot(slot) ? (
+                          <div className="h-full w-full flex items-center justify-center">
+                            <Utensils className="w-3.5 h-3.5 text-black opacity-80" />
+                          </div>
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center">
+                            <div className="w-0.5 h-0.5 rounded-full bg-gray-400" />
+                          </div>
+                        )}
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      </div>
 
       <Button
         variant="outline"
@@ -1505,7 +2195,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="mt-4">
             <Button
               variant="outline"
               onClick={() => setIsSwapModalOpen(false)}
@@ -1571,7 +2261,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="mt-4">
             <Button
               variant="outline"
               onClick={() => setIsRespondDialogOpen(false)}
@@ -1595,5 +2285,6 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
         </DialogContent>
       </Dialog>
     </motion.div>
+    </>
   );
 }

@@ -127,11 +127,11 @@ const isBreakSlot = (slot: any) => {
 
 const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string) => {
   if (!courseCode) return false;
-  const codeLower = courseCode.toLowerCase();
+  const codeLower = courseCode.trim().toLowerCase();
   const nameLower = (courseName || "").toLowerCase();
   const roomLower = (roomNumber || "").toLowerCase();
   
-  if (codeLower.includes("lab") || codeLower.includes("sessional") || codeLower.includes("practical") || codeLower.includes("work")) {
+  if (codeLower.endsWith("l") || codeLower.includes("lab") || codeLower.includes("sessional") || codeLower.includes("practical") || codeLower.includes("work")) {
     return true;
   }
   if (nameLower.includes("lab") || nameLower.includes("laboratory") || nameLower.includes("sessional") || nameLower.includes("practical")) {

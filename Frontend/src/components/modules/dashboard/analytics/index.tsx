@@ -43,7 +43,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export type APIRoutineItem = {
   id: number;
-  day: string;
+  day: string | number;
+  day_name?: string;
   start_time: string;
   end_time: string;
   course_name: string;
@@ -487,8 +488,9 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
     daysOrder.forEach((day) => (dayGroups[day] = []));
 
     filteredData.forEach((item) => {
-      if (dayGroups[item.day]) {
-        dayGroups[item.day].push(item);
+      const dayKey = item.day_name || (typeof item.day === "string" ? item.day : "");
+      if (dayKey && dayGroups[dayKey]) {
+        dayGroups[dayKey].push(item);
       }
     });
 

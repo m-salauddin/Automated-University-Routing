@@ -213,6 +213,44 @@ const cancelClass = async (routineId: number, cancelMessage: string) => {
     }
 };
 
+const reactivateClass = async (routineId: number) => {
+    try {
+        const ACTIVATE_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/activate-class/`;
+        const cookieStore = await cookies();
+        const token = cookieStore.get("accessToken")?.value;
+
+        if (!token) {
+            return { success: false, message: "No access token found" };
+        }
+
+        const res = await fetch(ACTIVATE_CLASS_URL, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ routine_id: routineId }),
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            let errorMessage = `Reactivation failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
+            } catch {}
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+        return { success: true, data: rawResult };
+    } catch (error) {
+        console.error("[Routine] Failed to activate class:", error);
+        return { success: false, message: "Failed to activate class" };
+    }
+};
+
 const swapRoutineEntries = async (entry1Id: number, entry2Id: number) => {
     try {
         const SWAP_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/routine/swap/`;
@@ -401,6 +439,7 @@ export {
     generateRoutine, 
     rollbackRoutine, 
     cancelClass, 
+    reactivateClass,
     swapRoutineEntries, 
     updateRoutineEntry,
     requestSwap,
