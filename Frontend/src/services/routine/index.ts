@@ -302,4 +302,107 @@ const updateRoutineEntry = async (
     }
 };
 
-export { getRoutine, generateRoutine, rollbackRoutine, cancelClass, swapRoutineEntries, updateRoutineEntry };
+export interface RequestSwapParams {
+    swap_type: "PROXY" | "MUTUAL";
+    target_teacher_id: number;
+    requester_routine_id: number;
+    target_routine_id?: number | null;
+    swap_date: string;
+    reason?: string;
+}
+
+const requestSwap = async (params: RequestSwapParams) => {
+    try {
+        const SWAP_REQUEST_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/swap-request/`;
+        const cookieStore = await cookies();
+        const token = cookieStore.get("accessToken")?.value;
+
+        if (!token) {
+            return { success: false, message: "No access token found" };
+        }
+
+        const res = await fetch(SWAP_REQUEST_URL, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(params),
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            let errorMessage = `Swap request failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.non_field_errors?.[0]) {
+                    errorMessage = errorJson.non_field_errors[0];
+                } else {
+                    errorMessage = errorJson.detail || errorJson.message || errorMessage;
+                }
+            } catch {}
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+        return { success: true, data: rawResult };
+    } catch (error) {
+        console.error("[Routine] Failed to request swap:", error);
+        return { success: false, message: "Failed to request class swap" };
+    }
+};
+
+export interface RespondSwapParams {
+    request_id: number;
+    action: "ACCEPT" | "REJECT";
+}
+
+const respondSwap = async (params: RespondSwapParams) => {
+    try {
+        const SWAP_REQUEST_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/swap-request/`;
+        const cookieStore = await cookies();
+        const token = cookieStore.get("accessToken")?.value;
+
+        if (!token) {
+            return { success: false, message: "No access token found" };
+        }
+
+        const res = await fetch(SWAP_REQUEST_URL, {
+            method: "PUT",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(params),
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            let errorMessage = `Swap update failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
+            } catch {}
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+        return { success: true, data: rawResult };
+    } catch (error) {
+        console.error("[Routine] Failed to update swap request:", error);
+        return { success: false, message: "Failed to respond to swap request" };
+    }
+};
+
+export { 
+    getRoutine, 
+    generateRoutine, 
+    rollbackRoutine, 
+    cancelClass, 
+    swapRoutineEntries, 
+    updateRoutineEntry,
+    requestSwap,
+    respondSwap
+};

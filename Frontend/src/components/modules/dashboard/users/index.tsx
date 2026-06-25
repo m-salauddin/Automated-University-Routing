@@ -80,6 +80,7 @@ import { createUser, updateUser, deleteUser } from "@/services/users";
 import { cn } from "@/lib/utils";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
+import { CustomSelect } from "@/components/ui/custom-select";
 
 
 export type Department = {
@@ -299,7 +300,7 @@ export default function UsersPageClient({
     handleSubmit,
     setValue,
     reset,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = form;
 
   const watchedFirstName = useWatch({ control, name: "first_name" });
@@ -724,9 +725,9 @@ export default function UsersPageClient({
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => openDeleteUser(user)}
-                              className="text-red-600"
+                              className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
                             >
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              <Trash2 className="mr-2 h-4 w-4 text-red-500 dark:text-red-400" /> Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -877,50 +878,38 @@ export default function UsersPageClient({
                   <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                     Role
                   </span>
-                  <Select
+                  <CustomSelect
                     value={roleFilter}
-                    onValueChange={(val) => {
+                    onChange={(val) => {
                       setRoleFilter(val);
-                      
                       setDeptFilter("All");
                       setPage(1);
                     }}
-                  >
-                    <SelectTrigger className="w-full bg-background h-10">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="TEACHER">Teachers</SelectItem>
-                      <SelectItem value="STUDENT">Students</SelectItem>
-                      <SelectItem value="ADMIN">Admins</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    options={[
+                      { value: "TEACHER", label: "Teachers" },
+                      { value: "STUDENT", label: "Students" },
+                      { value: "ADMIN", label: "Admins" },
+                    ]}
+                    placeholder="Select Role"
+                  />
                 </div>
                 {(roleFilter === "TEACHER" || roleFilter === "STUDENT") && (
                   <div className="flex-1 min-w-[200px] space-y-2">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                       Department
                     </span>
-                    <Select
+                    <CustomSelect
                       value={deptFilter}
-                      onValueChange={(val) => {
+                      onChange={(val) => {
                         setDeptFilter(val);
-                        
                         setPage(1);
                       }}
-                    >
-                      <SelectTrigger className="w-full bg-background h-10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="All">All Departments</SelectItem>
-                        {uniqueDepartmentNames.map((name) => (
-                          <SelectItem key={`dept-filter-${name}`} value={name}>
-                            {name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "All", label: "All Departments" },
+                        ...uniqueDepartmentNames.map((name) => ({ value: name, label: name })),
+                      ]}
+                      placeholder="All Departments"
+                    />
                   </div>
                 )}
                 {roleFilter === "STUDENT" && (
@@ -928,26 +917,18 @@ export default function UsersPageClient({
                     <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
                       Semester
                     </span>
-                    <Select
+                    <CustomSelect
                       value={semFilter}
-                      onValueChange={(val) => {
+                      onChange={(val) => {
                         setSemFilter(val);
-                        
                         setPage(1);
                       }}
-                    >
-                      <SelectTrigger className="w-full bg-background h-10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="All">All Semesters</SelectItem>
-                        {uniqueSemesterNames.map((name) => (
-                          <SelectItem key={`sem-filter-${name}`} value={name}>
-                            {name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      options={[
+                        { value: "All", label: "All Semesters" },
+                        ...uniqueSemesterNames.map((name) => ({ value: name, label: name })),
+                      ]}
+                      placeholder="All Semesters"
+                    />
                   </div>
                 )}
                 <AnimatePresence>
@@ -1205,19 +1186,17 @@ export default function UsersPageClient({
                     control={control}
                     name="role"
                     render={({ field }) => (
-                      <Select
-                        onValueChange={field.onChange}
+                      <CustomSelect
                         value={field.value}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="STUDENT">Student</SelectItem>
-                          <SelectItem value="TEACHER">Teacher</SelectItem>
-                          <SelectItem value="ADMIN">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        onChange={field.onChange}
+                        options={[
+                          { value: "STUDENT", label: "Student" },
+                          { value: "TEACHER", label: "Teacher" },
+                          { value: "ADMIN", label: "Admin" },
+                        ]}
+                        placeholder="Select role"
+                        id="role"
+                      />
                     )}
                   />
                   {errors.role && (
@@ -1242,26 +1221,14 @@ export default function UsersPageClient({
                     control={control}
                     name="department_id"
                     render={({ field }) => (
-                      <Select
-                        onValueChange={field.onChange}
+                      <CustomSelect
                         value={field.value}
+                        onChange={field.onChange}
+                        options={departments.map((dept) => ({ value: String(dept.id), label: dept.name }))}
+                        placeholder={watchedRole === "ADMIN" ? "N/A" : "Select Dept"}
+                        id="department_id"
                         disabled={watchedRole === "ADMIN"}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue
-                            placeholder={
-                              watchedRole === "ADMIN" ? "N/A" : "Select Dept"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departments.map((dept) => (
-                            <SelectItem key={dept.id} value={String(dept.id)}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                     )}
                   />
                   {errors.department_id && (
@@ -1286,26 +1253,14 @@ export default function UsersPageClient({
                     control={control}
                     name="semester_id"
                     render={({ field }) => (
-                      <Select
-                        onValueChange={field.onChange}
+                      <CustomSelect
                         value={field.value}
+                        onChange={field.onChange}
+                        options={semesters.map((sem) => ({ value: String(sem.id), label: sem.name }))}
+                        placeholder={watchedRole !== "STUDENT" ? "N/A" : "Select Sem"}
+                        id="semester_id"
                         disabled={watchedRole !== "STUDENT"}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue
-                            placeholder={
-                              watchedRole !== "STUDENT" ? "N/A" : "Select Sem"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {semesters.map((sem) => (
-                            <SelectItem key={sem.id} value={String(sem.id)}>
-                              {sem.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                     )}
                   />
                   {errors.semester_id && (
@@ -1327,7 +1282,7 @@ export default function UsersPageClient({
               </Button>
               <Button
                 onClick={handleSubmit(onSubmit)}
-                disabled={isSaving}
+                disabled={isSaving || (editingUser ? !isDirty : false)}
                 className="min-w-[100px] h-8"
               >
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

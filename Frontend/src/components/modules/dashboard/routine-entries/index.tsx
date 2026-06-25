@@ -61,6 +61,8 @@ import {
 import { generateRoutine, getRoutine } from "@/services/routine";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CustomSelect } from "@/components/ui/custom-select";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 export type APIRoutineItem = {
@@ -1105,42 +1107,26 @@ export default function AdminRoutinePage({
               className="flex flex-wrap items-center gap-3 bg-card border rounded-xl p-1.5 shadow-sm w-full lg:w-fit"
             >
               {}
-              <div className="flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all flex-1 min-w-[220px]">
-                <Select value={selectedDept} onValueChange={setSelectedDept}>
-                  <SelectTrigger className="h-10 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
-                    <SelectValue placeholder="Select Department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.map((dept) => (
-                      <SelectItem key={dept} value={dept}>
-                        {dept}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex-1 min-w-[220px]">
+                <CustomSelect
+                  value={selectedDept}
+                  onChange={setSelectedDept}
+                  options={departments.map((dept) => ({ value: dept, label: dept }))}
+                  placeholder="Select Department"
+                />
               </div>
 
               {}
-              <div className="flex items-center gap-3 px-3 bg-muted/30 rounded-lg border border-transparent focus-within:border-primary/20 focus-within:bg-background transition-all flex-1 min-w-[150px]">
-                <Select
+              <div className="flex-1 min-w-[150px]">
+                <CustomSelect
                   value={selectedSemester}
-                  onValueChange={setSelectedSemester}
-                >
-                  <SelectTrigger className="h-10 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
-                    <SelectValue placeholder="Select Semester" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {semesters.map((sem) => (
-                      <SelectItem key={sem} value={sem}>
-                        {sem === "All Semesters" ? (
-                          <span>All Semesters</span>
-                        ) : (
-                          `${sem} Semester`
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={setSelectedSemester}
+                  options={semesters.map((sem) => ({
+                    value: sem,
+                    label: sem === "All Semesters" ? "All Semesters" : `${sem} Semester`
+                  }))}
+                  placeholder="Select Semester"
+                />
               </div>
 
               {}
@@ -1198,9 +1184,143 @@ export default function AdminRoutinePage({
 
           {}
           {isLoadingRoutine ? (
-            <div className="min-h-[400px] flex flex-col items-center justify-center">
-              <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              <span className="text-sm text-muted-foreground mt-2 font-lexend">Loading routine...</span>
+            <div className="skeleton-sweep rounded-xl overflow-hidden border border-border/60 bg-card/35 font-lexend w-full grid grid-cols-1">
+              <div className="overflow-x-auto w-full">
+                <Table className="w-full min-w-[1000px] border-collapse text-sm">
+                  <TableHeader>
+                    <TableRow className="border-b border-border/60 hover:bg-transparent">
+                      {/* Time/Day corner cell */}
+                      <TableCell className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40">
+                        <svg
+                          className="absolute inset-0 w-full h-full pointer-events-none"
+                          preserveAspectRatio="none"
+                        >
+                          <line
+                            x1="0"
+                            y1="0"
+                            x2="100%"
+                            y2="100%"
+                            className="stroke-border/60"
+                            strokeWidth="1"
+                          />
+                        </svg>
+                        <span className="absolute top-2 right-2 text-[10px] font-bold text-muted-foreground/45">
+                          Time
+                        </span>
+                        <span className="absolute bottom-2 left-2 text-[10px] font-bold text-muted-foreground/45">
+                          Day
+                        </span>
+                      </TableCell>
+
+                      {currentRoutineSchedule.isAllSemestersMode && (
+                        <TableCell className="w-20 min-w-20 text-center font-bold bg-muted/40 border-r border-border/60 text-xs uppercase">
+                          <Skeleton className="w-10 h-3.5 mx-auto" />
+                        </TableCell>
+                      )}
+
+                      {sortedTimeSlots.map((slot) => {
+                        const isBreak = isBreakSlot(slot);
+                        if (isBreak) {
+                          return (
+                            <TableCell
+                              key={slot.id}
+                              className="w-10 min-w-10 bg-foreground/5 text-center align-middle p-0 border-r border-border/60"
+                            >
+                              <div className="h-full flex items-center justify-center">
+                                <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-muted-foreground/30">
+                                  Break
+                                </span>
+                              </div>
+                            </TableCell>
+                          );
+                        }
+                        return (
+                          <TableCell
+                            key={slot.id}
+                            className="text-center align-middle h-[60px] border-r border-border/60 last:border-r-0 p-0 min-w-[100px] bg-muted/10"
+                          >
+                            <div className="flex flex-col items-center justify-center gap-1.5 w-full px-1">
+                              <Skeleton className="w-16 h-3.5 mx-auto" />
+                              <Skeleton className="w-20 h-2.5 mx-auto" />
+                            </div>
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  </TableHeader>
+                  <tbody>
+                    {DAYS_ORDER.map((day, rowIndex) => (
+                      <TableRow
+                        key={day}
+                        className="border-b border-border/60 hover:bg-muted/5 h-[85px]"
+                      >
+                        {/* Day Label */}
+                        <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 w-[90px] min-w-[90px]">
+                          <div className="flex items-center justify-center h-full w-full py-4">
+                            <span className="writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0">
+                              {day.slice(0, 3).toUpperCase()}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        {currentRoutineSchedule.isAllSemestersMode && (
+                          <TableCell className="font-bold text-xs text-center border-r border-border/60 bg-muted/10">
+                            <Skeleton className="w-8 h-4 mx-auto" />
+                          </TableCell>
+                        )}
+
+                        {sortedTimeSlots.map((slot, cellIndex) => {
+                          const isBreak = isBreakSlot(slot);
+                          if (isBreak) {
+                            return (
+                              <TableCell
+                                key={slot.id}
+                                className="p-0 align-middle border-r border-border/60 relative overflow-hidden bg-muted/20"
+                              >
+                                <div className="h-full w-full flex items-center justify-center">
+                                  <Utensils className="w-3 h-3 text-muted-foreground/20" />
+                                </div>
+                              </TableCell>
+                            );
+                          }
+
+                          // Simulating random scheduled courses
+                          const hasClass = (rowIndex + cellIndex) % 3 === 0;
+                          return (
+                            <TableCell
+                              key={slot.id}
+                              className="p-1.5 align-middle border-r border-border/60 last:border-r-0 min-w-[100px]"
+                            >
+                              {hasClass ? (
+                                <div className="h-full w-full rounded-md border border-muted/20 bg-background/50 flex flex-col justify-between p-2 shadow-sm space-y-1.5">
+                                  <div className="flex justify-between items-start w-full">
+                                    <Skeleton className="h-3 w-14" />
+                                    <Skeleton className="h-3.5 w-8 rounded" />
+                                  </div>
+                                  <div className="flex flex-col gap-1 mt-0.5">
+                                    <div className="flex items-center gap-1">
+                                      <User className="w-2.5 h-2.5 text-muted-foreground/35" />
+                                      <Skeleton className="w-10 h-2.5" />
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <MapPin className="w-2.5 h-2.5 text-muted-foreground/35" />
+                                      <Skeleton className="w-8 h-2.5" />
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center">
+                                  <div className="w-1 h-1 rounded-full bg-border/40" />
+                                </div>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
             </div>
           ) : currentRoutineSchedule.isEmpty ? (
             <motion.div
@@ -1451,7 +1571,7 @@ export default function AdminRoutinePage({
           setGenerateModal((prev) => ({ ...prev, isOpen: open }))
         }
       >
-        <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden border-0 bg-transparent shadow-none">
+        <DialogContent className="sm:max-w-[480px] p-0 overflow-visible border-0 bg-transparent shadow-none">
           <AnimatePresence mode="wait">
             {generateModal.isOpen && (
               <motion.div
@@ -1460,11 +1580,11 @@ export default function AdminRoutinePage({
                 initial="hidden"
                 animate="visible"
                 exit="exit"
-                className="bg-background border rounded-lg shadow-xl w-full flex flex-col overflow-hidden border-primary/20"
+                className="bg-background border rounded-lg shadow-xl w-full flex flex-col overflow-visible border-primary/20"
               >
                 <motion.div
                   variants={modalItemVariants}
-                  className="p-6 pb-4 flex items-start gap-4 border-b bg-muted/20 border-border/65"
+                  className="p-6 pb-4 flex items-start gap-4 border-b bg-muted/20 border-border/65 rounded-t-lg"
                 >
                   <div className="p-3 rounded-full shrink-0 bg-primary/10 text-primary">
                     <Sparkles className="h-6 w-6" />
@@ -1480,61 +1600,49 @@ export default function AdminRoutinePage({
                 </motion.div>
 
                 <div className="p-6 space-y-5 bg-card">
+
+
                   <motion.div variants={modalItemVariants} className="space-y-2">
                     <label className="text-sm font-semibold text-foreground">
                       Target Department
                     </label>
-                    <div className="flex items-center gap-3 px-3 bg-muted/40 rounded-lg border border-border/60 focus-within:border-primary/20 focus-within:bg-background transition-all">
-                      <Select
-                        value={generateModal.departmentId?.toString() ?? ""}
-                        onValueChange={(val) =>
-                          setGenerateModal((prev) => ({
-                            ...prev,
-                            departmentId: val ? parseInt(val, 10) : undefined,
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="h-11 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
-                          <SelectValue placeholder="Select Department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {dbDepartments.map((dept) => (
-                            <SelectItem key={dept.id} value={dept.id.toString()}>
-                              {dept.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <CustomSelect
+                      value={generateModal.departmentId?.toString() ?? ""}
+                      onChange={(val) =>
+                        setGenerateModal((prev) => ({
+                          ...prev,
+                          departmentId: val ? parseInt(val, 10) : undefined,
+                        }))
+                      }
+                      options={dbDepartments.map((dept) => ({
+                        value: dept.id.toString(),
+                        label: dept.name,
+                      }))}
+                      placeholder="Select Department"
+                    />
                   </motion.div>
 
                   <motion.div variants={modalItemVariants} className="space-y-2">
                     <label className="text-sm font-semibold text-foreground">
                       Target Semester
                     </label>
-                    <div className="flex items-center gap-3 px-3 bg-muted/40 rounded-lg border border-border/60 focus-within:border-primary/20 focus-within:bg-background transition-all">
-                      <Select
-                        value={generateModal.semesterId?.toString() ?? "all"}
-                        onValueChange={(val) =>
-                          setGenerateModal((prev) => ({
-                            ...prev,
-                            semesterId: val === "all" ? undefined : parseInt(val, 10),
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="h-11 border-none shadow-none bg-transparent! focus-visible:ring-0 focus:ring-0 px-0 font-medium w-full">
-                          <SelectValue placeholder="All Semesters" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Semesters</SelectItem>
-                          {dbSemesters.map((sem) => (
-                            <SelectItem key={sem.id} value={sem.id.toString()}>
-                              {sem.name} Semester
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    <CustomSelect
+                      value={generateModal.semesterId?.toString() ?? "all"}
+                      onChange={(val) =>
+                        setGenerateModal((prev) => ({
+                          ...prev,
+                          semesterId: val === "all" ? undefined : parseInt(val, 10),
+                        }))
+                      }
+                      options={[
+                        { value: "all", label: "All Semesters" },
+                        ...dbSemesters.map((sem) => ({
+                          value: sem.id.toString(),
+                          label: `${sem.name} Semester`,
+                        })),
+                      ]}
+                      placeholder="All Semesters"
+                    />
                   </motion.div>
 
                   <motion.div variants={modalItemVariants} className="flex items-center gap-2.5 pt-1">
@@ -1559,7 +1667,7 @@ export default function AdminRoutinePage({
 
                 <motion.div
                   variants={modalItemVariants}
-                  className="p-6 pt-2 bg-card flex justify-end gap-3 border-t border-border/50"
+                  className="p-6 pt-2 bg-card flex justify-end gap-3 border-t border-border/50 rounded-b-lg"
                 >
                   <Button
                     variant="ghost"

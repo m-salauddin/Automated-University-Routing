@@ -85,6 +85,8 @@ import {
   FolderOpen,
   CheckCheck,
   ShieldBan,
+  ArrowUpDown,
+  Loader2,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { markOff, markOn, generateClassKey } from "@/store/classOffSlice";
@@ -100,7 +102,10 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-
+import { Input } from "@/components/ui/input";
+import { CustomSelect } from "@/components/ui/custom-select";
+import { cancelClass, requestSwap, respondSwap } from "@/services/routine";
+import { getAllUsers } from "@/services/users";
 
 export type APIRoutineItem = {
   id: number;
@@ -114,6 +119,11 @@ export type APIRoutineItem = {
   department_name: string;
   semester_name: string;
   room_number: string;
+  is_cancelled?: boolean;
+  cancel_message?: string | null;
+  is_temporary_proxy?: boolean;
+  is_temporary_mutual?: boolean;
+  date?: string;
 };
 
 type TeacherInfo = {
@@ -123,7 +133,6 @@ type TeacherInfo = {
   total_sessions: number;
   semesters_involved: string[];
 };
-
 
 type RoutineRowState = {
   id: number;
@@ -137,6 +146,11 @@ type RoutineRowState = {
   semester: string;
   department: string; 
   teacherId: string;
+  is_cancelled: boolean;
+  cancel_message: string | null;
+  is_temporary_proxy?: boolean;
+  is_temporary_mutual?: boolean;
+  date?: string;
 };
 
 interface OwnRoutinePageProps {
@@ -377,14 +391,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
   } | null>(null);
 
   const [visibleCols, setVisibleCols] = useState<
-    Record<
-      | keyof Omit<
-          RoutineRowState,
-          "id" | "teacherId" | "fullCourseName" | "startTimeRaw" | "department"
-        >
-      | "status",
-      boolean
-    >
+    Record<string, boolean>
   >({
     day: true,
     time: true,
@@ -394,6 +401,110 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     room: true,
     semester: true,
   });
+
+  // Swap Request States
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [selectedRowForSwap, setSelectedRowForSwap] = useState<RoutineRowState | null>(null);
+  const [swapType, setSwapType] = useState<"PROXY" | "MUTUAL">("PROXY");
+  const [targetTeacherId, setTargetTeacherId] = useState<string>("");
+  const [targetRoutineId, setTargetRoutineId] = useState<string>("");
+  const [swapDate, setSwapDate] = useState<string>("");
+  const [swapReason, setSwapReason] = useState<string>("");
+  const [isSubmittingSwap, setIsSubmittingSwap] = useState(false);
+  const [teachersList, setTeachersList] = useState<any[]>([]);
+
+  // Respond to Swap States
+  const [isRespondDialogOpen, setIsRespondDialogOpen] = useState(false);
+  const [respondRequestId, setRespondRequestId] = useState<string>("");
+  const [respondAction, setRespondAction] = useState<"ACCEPT" | "REJECT">("ACCEPT");
+  const [isSubmittingResponse, setIsSubmittingResponse] = useState(false);
+
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      try {
+        const res = await getAllUsers();
+        if (res.success && Array.isArray(res.data)) {
+          const filtered = res.data.filter((u: any) => u.role?.toUpperCase() === "TEACHER");
+          setTeachersList(filtered);
+        }
+      } catch (err) {
+        console.error("Failed to load teachers for swap:", err);
+      }
+    };
+    fetchTeachers();
+  }, []);
+
+  const openSwapRequestModal = (row: RoutineRowState) => {
+    setSelectedRowForSwap(row);
+    setSwapType("PROXY");
+    setTargetTeacherId("");
+    setTargetRoutineId("");
+    setSwapDate(new Date().toISOString().split("T")[0]);
+    setSwapReason("");
+    setIsSwapModalOpen(true);
+  };
+
+  const handleSendSwapRequest = async () => {
+    if (!selectedRowForSwap || !targetTeacherId || !swapDate) {
+      toast.error("Teacher and Swap Date are required");
+      return;
+    }
+    if (swapType === "MUTUAL" && !targetRoutineId.trim()) {
+      toast.error("Target Routine ID is required for MUTUAL swaps");
+      return;
+    }
+
+    setIsSubmittingSwap(true);
+    try {
+      const res = await requestSwap({
+        swap_type: swapType,
+        target_teacher_id: parseInt(targetTeacherId),
+        requester_routine_id: selectedRowForSwap.id,
+        target_routine_id: swapType === "MUTUAL" ? parseInt(targetRoutineId) : null,
+        swap_date: swapDate,
+        reason: swapReason,
+      });
+
+      if (res.success) {
+        toast.success("Swap request sent successfully!");
+        setIsSwapModalOpen(false);
+      } else {
+        toast.error(res.message || "Failed to submit swap request");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An unexpected error occurred");
+    } finally {
+      setIsSubmittingSwap(false);
+    }
+  };
+
+  const handleRespondToSwap = async () => {
+    if (!respondRequestId.trim()) {
+      toast.error("Request ID is required");
+      return;
+    }
+
+    setIsSubmittingResponse(true);
+    try {
+      const res = await respondSwap({
+        request_id: parseInt(respondRequestId),
+        action: respondAction,
+      });
+
+      if (res.success) {
+        toast.success(`Swap request ${respondAction.toLowerCase()}ed successfully!`);
+        setIsRespondDialogOpen(false);
+        setRespondRequestId("");
+        window.location.reload();
+      } else {
+        toast.error(res.message || "Failed to respond to swap request");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An unexpected error occurred");
+    } finally {
+      setIsSubmittingResponse(false);
+    }
+  };
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -449,6 +560,11 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
           semester: item.semester_name,
           department: item.department_name,
           teacherId: item.teacher_name,
+          is_cancelled: Boolean(item.is_cancelled),
+          cancel_message: item.cancel_message || null,
+          is_temporary_proxy: Boolean(item.is_temporary_proxy),
+          is_temporary_mutual: Boolean(item.is_temporary_mutual),
+          date: item.date || "",
         };
       });
 
@@ -474,17 +590,7 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
 
   const processedRows = useMemo(() => {
     return rows.filter((r) => {
-      const key = generateClassKey(
-        r.department,
-        r.semester,
-        r.day,
-        r.teacherId,
-        r.startTimeRaw
-      );
-      const offRecord = classOffMap[key];
-      const isOffSlot = Boolean(offRecord?.status);
-      const isTeacherOff = availabilityMap[r.teacherId] === false;
-      const currentStatus = isOffSlot || isTeacherOff ? "off" : "on";
+      const currentStatus = r.is_cancelled ? "off" : "on";
 
       const matchDay = day === "All" || r.day === day;
       const matchType = typeFilter === "All" || r.type === typeFilter;
@@ -503,8 +609,6 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
     statusFilter,
     roomFilter,
     semesterFilter,
-    classOffMap,
-    availabilityMap,
   ]);
 
   const pageSizeOptions = [5, 10, 20, 50] as const;
@@ -580,24 +684,29 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
   )[] = ["day", "time", "course", "type", "status", "room", "semester"];
 
   
-  const submitCancellation = (reason: string) => {
+  const submitCancellation = async (reason: string) => {
     if (!pendingCancellation) return;
 
-    
-    dispatch(
-      markOff({
-        department: pendingCancellation.department,
-        semester: pendingCancellation.semester,
-        day: pendingCancellation.day,
-        teacherId: pendingCancellation.teacherId,
-        startTime: pendingCancellation.startTimeRaw,
-        reason: reason,
-      })
-    );
-
-    toast.warning(`${pendingCancellation.courseName} marked as OFF`);
-    setIsReasonModalOpen(false);
-    setPendingCancellation(null);
+    try {
+      const res = await cancelClass(pendingCancellation.id, reason);
+      if (res.success) {
+        toast.warning(`${pendingCancellation.courseName} class has been cancelled`);
+        setRows((prev) =>
+          prev.map((r) =>
+            r.id === pendingCancellation.id
+              ? { ...r, is_cancelled: true, cancel_message: reason }
+              : r
+          )
+        );
+      } else {
+        toast.error(res.message || "Failed to cancel class");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An error occurred while cancelling class");
+    } finally {
+      setIsReasonModalOpen(false);
+      setPendingCancellation(null);
+    }
   };
 
   
@@ -607,18 +716,12 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
         <Calendar className="w-3 h-3" /> Day
       </span>
-      <Select value={day} onValueChange={setDay}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {days.map((d) => (
-            <SelectItem key={d} value={d}>
-              {d}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <CustomSelect
+        value={day}
+        onChange={setDay}
+        options={days.map((d) => ({ value: d, label: d }))}
+        placeholder="Select Day"
+      />
     </div>
   );
   const TypeSelect = () => (
@@ -626,16 +729,16 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
         <BookOpen className="w-3 h-3" /> Type
       </span>
-      <Select value={typeFilter} onValueChange={setTypeFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Types</SelectItem>
-          <SelectItem value="Theory">Theory</SelectItem>
-          <SelectItem value="Lab">Lab</SelectItem>
-        </SelectContent>
-      </Select>
+      <CustomSelect
+        value={typeFilter}
+        onChange={setTypeFilter}
+        options={[
+          { value: "All", label: "All Types" },
+          { value: "Theory", label: "Theory" },
+          { value: "Lab", label: "Lab" },
+        ]}
+        placeholder="All Types"
+      />
     </div>
   );
   const StatusSelect = () => (
@@ -643,16 +746,16 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
         <SlidersHorizontal className="w-3 h-3" /> Status
       </span>
-      <Select value={statusFilter} onValueChange={setStatusFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Status</SelectItem>
-          <SelectItem value="on">Active (On)</SelectItem>
-          <SelectItem value="off">Cancelled (Off)</SelectItem>
-        </SelectContent>
-      </Select>
+      <CustomSelect
+        value={statusFilter}
+        onChange={setStatusFilter}
+        options={[
+          { value: "All", label: "All Status" },
+          { value: "on", label: "Active (On)" },
+          { value: "off", label: "Cancelled (Off)" },
+        ]}
+        placeholder="All Status"
+      />
     </div>
   );
   const RoomSelect = () => (
@@ -660,19 +763,15 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
         <MapPin className="w-3 h-3" /> Room
       </span>
-      <Select value={roomFilter} onValueChange={setRoomFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Rooms</SelectItem>
-          {uniqueRooms.map((r) => (
-            <SelectItem key={r} value={r}>
-              {r}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <CustomSelect
+        value={roomFilter}
+        onChange={setRoomFilter}
+        options={[
+          { value: "All", label: "All Rooms" },
+          ...uniqueRooms.map((r) => ({ value: r, label: r })),
+        ]}
+        placeholder="All Rooms"
+      />
     </div>
   );
   const SemesterSelect = () => (
@@ -680,19 +779,15 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
       <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider flex items-center gap-1">
         <GraduationCap className="w-3 h-3" /> Semester
       </span>
-      <Select value={semesterFilter} onValueChange={setSemesterFilter}>
-        <SelectTrigger className="w-full h-9 bg-background">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All">All Semesters</SelectItem>
-          {uniqueSemesters.map((s) => (
-            <SelectItem key={s} value={s}>
-              {s}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <CustomSelect
+        value={semesterFilter}
+        onChange={setSemesterFilter}
+        options={[
+          { value: "All", label: "All Semesters" },
+          ...uniqueSemesters.map((s) => ({ value: s, label: s })),
+        ]}
+        placeholder="All Semesters"
+      />
     </div>
   );
   const ColumnSelect = () => (
@@ -865,29 +960,32 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
                 <MoreVertical className="size-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className={cn(
-                  currentStatus === "on"
-                    ? "text-red-500 focus:text-red-500"
-                    : "text-emerald-500 focus:text-emerald-500"
-                )}
-                onClick={handleStatusChange}
-              >
-                {currentStatus === "on" ? (
-                  <>
-                    <PowerOff className="size-4 mr-2 text-red-500" /> Mark as
-                    Off
-                  </>
-                ) : (
-                  <>
-                    <CheckCheck className="size-4 mr-2 text-emerald-500" /> Mark
-                    as On
-                  </>
-                )}
-              </DropdownMenuItem>
+              {currentStatus === "on" ? (
+                <>
+                  <DropdownMenuItem
+                    className="text-red-500 focus:text-red-500 cursor-pointer"
+                    onClick={handleStatusChange}
+                  >
+                    <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer"
+                    onClick={() => openSwapRequestModal(row)}
+                  >
+                    <ArrowUpDown className="size-4 mr-2" /> Request Class Swap
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem
+                  className="opacity-50 cursor-not-allowed"
+                  disabled
+                >
+                  <PowerOff className="size-4 mr-2" /> Class Cancelled
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </TableCell>
@@ -1022,18 +1120,29 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
                 </SheetFooter>
               </SheetContent>
             </Sheet>
-          </motion.div>
-        </div>
-        <motion.div variants={itemVariants}>
-          <Button
-            onClick={() => window.print()}
-            variant="outline"
-            className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex"
-          >
-            <Printer className="h-4 w-4" /> Print View
-          </Button>
         </motion.div>
       </div>
+      <motion.div variants={itemVariants} className="flex gap-2">
+        <Button
+          onClick={() => {
+            setRespondRequestId("");
+            setRespondAction("ACCEPT");
+            setIsRespondDialogOpen(true);
+          }}
+          variant="outline"
+          className="gap-2 border-border/80 hover:bg-muted text-muted-foreground hover:text-foreground print:hidden h-10"
+        >
+          <ArrowUpDown className="h-4 w-4 text-purple-500" /> Respond to Swap
+        </Button>
+        <Button
+          onClick={() => window.print()}
+          variant="outline"
+          className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex h-10"
+        >
+          <Printer className="h-4 w-4" /> Print View
+        </Button>
+      </motion.div>
+    </div>
 
       <div className="hidden print:flex flex-col items-center justify-center mb-6 pt-2 text-center w-full font-serif text-black">
         <h1 className="text-2xl font-bold text-black mb-3 font-lexend tracking-tight">
@@ -1239,6 +1348,186 @@ export default function OwnRoutinePage({ routineList }: OwnRoutinePageProps) {
         courseName={pendingCancellation?.courseName}
         onConfirm={submitCancellation}
       />
+
+      {/* Swap Request Modal */}
+      <Dialog open={isSwapModalOpen} onOpenChange={setIsSwapModalOpen}>
+        <DialogContent className="sm:max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <ArrowUpDown className="w-5 h-5 text-purple-500" />
+              Request Class Swap
+            </DialogTitle>
+            <DialogDescription>
+              Submit a temporary PROXY or MUTUAL swap request for{" "}
+              <strong>{selectedRowForSwap?.course}</strong> (Day: {selectedRowForSwap?.day}, Time: {selectedRowForSwap?.time}).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3 text-sm">
+            <div className="space-y-1.5">
+              <Label htmlFor="swapType" className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                Swap Type *
+              </Label>
+              <CustomSelect
+                value={swapType}
+                onChange={(val) => setSwapType(val as "PROXY" | "MUTUAL")}
+                options={[
+                  { value: "PROXY", label: "PROXY (Another teacher takes your class)" },
+                  { value: "MUTUAL", label: "MUTUAL (Exchange classes with another teacher)" },
+                ]}
+                placeholder="Select Swap Type"
+                id="swapType"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="targetTeacher" className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                Target Teacher *
+              </Label>
+              <CustomSelect
+                value={targetTeacherId}
+                onChange={setTargetTeacherId}
+                options={teachersList.map((t) => ({ value: String(t.id), label: t.name || t.username }))}
+                placeholder="Select Teacher"
+                id="targetTeacher"
+              />
+            </div>
+
+            {swapType === "MUTUAL" && (
+              <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                <Label htmlFor="targetRoutineId" className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                  Target Routine Entry ID *
+                </Label>
+                <Input
+                  id="targetRoutineId"
+                  type="number"
+                  placeholder="e.g. 1207"
+                  value={targetRoutineId}
+                  onChange={(e) => setTargetRoutineId(e.target.value)}
+                  className="h-10"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Provide the ID of the routine slot you wish to exchange with (can be queried from the target teacher).
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="swapDate" className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                Swap Date *
+              </Label>
+              <Input
+                id="swapDate"
+                type="date"
+                value={swapDate}
+                onChange={(e) => setSwapDate(e.target.value)}
+                className="h-10 cursor-pointer"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="swapReason" className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                Reason
+              </Label>
+              <Textarea
+                id="swapReason"
+                placeholder="e.g. Medical Emergency, Official Meeting..."
+                value={swapReason}
+                onChange={(e) => setSwapReason(e.target.value)}
+                className="h-20 resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsSwapModalOpen(false)}
+              disabled={isSubmittingSwap}
+              className="h-10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendSwapRequest}
+              disabled={isSubmittingSwap}
+              className="bg-purple-600 hover:bg-purple-500 text-white min-w-[120px] h-10 gap-1.5 font-semibold"
+            >
+              {isSubmittingSwap && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Submit Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Respond to Swap Dialog */}
+      <Dialog open={isRespondDialogOpen} onOpenChange={setIsRespondDialogOpen}>
+        <DialogContent className="sm:max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <ArrowUpDown className="w-5 h-5 text-blue-500" />
+              Respond to Swap Request
+            </DialogTitle>
+            <DialogDescription>
+              Accept or Reject a pending temporary class swap request received from another faculty member.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3 text-sm">
+            <div className="space-y-1.5">
+              <Label htmlFor="respondRequestId" className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                Swap Request ID *
+              </Label>
+              <Input
+                id="respondRequestId"
+                type="number"
+                placeholder="Enter Swap Request ID (e.g. 1)"
+                value={respondRequestId}
+                onChange={(e) => setRespondRequestId(e.target.value)}
+                className="h-10"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="respondAction" className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">
+                Action *
+              </Label>
+              <CustomSelect
+                value={respondAction}
+                onChange={(val) => setRespondAction(val as "ACCEPT" | "REJECT")}
+                options={[
+                  { value: "ACCEPT", label: "ACCEPT (Approve the class swap)" },
+                  { value: "REJECT", label: "REJECT (Decline the class swap)" },
+                ]}
+                placeholder="Select Action"
+                id="respondAction"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsRespondDialogOpen(false)}
+              disabled={isSubmittingResponse}
+              className="h-10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRespondToSwap}
+              disabled={isSubmittingResponse}
+              className={cn(
+                "min-w-[120px] h-10 gap-1.5 font-semibold text-white",
+                respondAction === "ACCEPT" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-red-600 hover:bg-red-500"
+              )}
+            >
+              {isSubmittingResponse && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {respondAction === "ACCEPT" ? "Accept Request" : "Reject Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

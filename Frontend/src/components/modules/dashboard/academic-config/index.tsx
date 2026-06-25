@@ -18,6 +18,10 @@ import {
   ShieldBan,
   ChevronLeft,
   MapPin,
+  BookOpen,
+  Users,
+  Filter,
+  RotateCcw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +49,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CustomSelect } from "@/components/ui/custom-select";
 import { toast } from "sonner";
 import {
   addNewDepartment,
@@ -69,6 +74,7 @@ import {
 } from "@/services/rooms";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store";
+import { cn } from "@/lib/utils";
 
 type Department = { id: number; name: string };
 type Semester = { id: number; name: string; order: number };
@@ -82,7 +88,7 @@ type TimeSlot = {
 
 const isSlotBreak = (slot: TimeSlot) => {
   if (!slot) return false;
-  
+
   return Boolean(slot.is_lunch_break);
 };
 
@@ -107,11 +113,43 @@ type Room = {
   department_name: string | null;
 };
 
+type Course = {
+  id: number;
+  course_code: string;
+  course_name: string;
+  room_number: string;
+  credits: number;
+  course_type: string;
+  course_type_name?: string | null;
+  teacher: number | null;
+  teacher_name: string | null;
+  department: number;
+  department_name: string | null;
+  semester: number;
+  semester_name: string | null;
+};
+
+type User = {
+  id: number;
+  username: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  name: string;
+  role: string;
+  department?: number | string | null;
+  department_name: string | null;
+  semester?: number | string | null;
+  semester_name: string | null;
+};
+
 interface AcademicSettingsPageProps {
   departments: Department[];
   semesters: Semester[];
   timeSlots: TimeSlot[];
   rooms: Room[];
+  courses: Course[];
+  users: User[];
 }
 
 const containerVariants: Variants = {
@@ -286,6 +324,8 @@ export default function AcademicSettingsPage({
   semesters: initialSemesters,
   timeSlots: initialTimeSlots,
   rooms: initialRooms,
+  courses = [],
+  users = [],
 }: AcademicSettingsPageProps) {
   const user = useSelector((state: RootState) => state.auth);
 
@@ -293,7 +333,7 @@ export default function AcademicSettingsPage({
 
   const router = useRouter();
 
-  
+
   const [departmentsList, setDepartmentsList] =
     useState<Department[]>(initialDepartments);
 
@@ -306,7 +346,7 @@ export default function AcademicSettingsPage({
     setDepartmentsList(initialDepartments);
   }, [departmentsDependency, initialDepartments]);
 
-  
+
   const [semestersList, setSemestersList] =
     useState<Semester[]>(initialSemesters);
 
@@ -319,7 +359,7 @@ export default function AcademicSettingsPage({
     setSemestersList(initialSemesters);
   }, [semestersDependency, initialSemesters]);
 
-  
+
   const [timeSlotsList, setTimeSlotsList] =
     useState<TimeSlot[]>(() => sortTimeSlotsHelper(initialTimeSlots));
 
@@ -352,7 +392,33 @@ export default function AcademicSettingsPage({
   const [isDeleteSlotModalOpen, setIsDeleteSlotModalOpen] = useState(false);
   const [isDeleteRoomModalOpen, setIsDeleteRoomModalOpen] = useState(false);
 
-  
+
+
+  const [roomDeptFilter, setRoomDeptFilter] = useState("All");
+  const [roomTypeFilter, setRoomTypeFilter] = useState("All");
+
+  const filteredRooms = useMemo(() => {
+    return roomsList.filter((room: Room) => {
+      const matchDept =
+        roomDeptFilter === "All" ||
+        (room.department !== null && String(room.department) === roomDeptFilter);
+      const matchType =
+        roomTypeFilter === "All" ||
+        String(room.room_type) === roomTypeFilter;
+      return matchDept && matchType;
+    });
+  }, [roomsList, roomDeptFilter, roomTypeFilter]);
+
+  const roomsDepartments = useMemo(() => {
+    const referencedDeptIds = new Set(
+      roomsList
+        .map((r: Room) => r.department)
+        .filter((deptId): deptId is number => deptId !== null)
+    );
+    return departmentsList.filter((dept: Department) => referencedDeptIds.has(dept.id));
+  }, [departmentsList, roomsList]);
+
+
   const [isLoading, setIsLoading] = useState(false);
 
   const [editingDept, setEditingDept] = useState<Department | null>(null);
@@ -375,6 +441,38 @@ export default function AcademicSettingsPage({
   const [newRoomType, setNewRoomType] = useState("1");
   const [newRoomDept, setNewRoomDept] = useState("");
 
+  const isDeptModified = useMemo(() => {
+    if (!editingDept) return true;
+    return newDeptName.trim() !== (editingDept.name || "").trim();
+  }, [editingDept, newDeptName]);
+
+  const isSemModified = useMemo(() => {
+    if (!editingSem) return true;
+    const isNameDiff = newSemName.trim() !== (editingSem.name || "").trim();
+    const isOrderDiff = newSemOrder.trim() !== (editingSem.order?.toString() || "").trim();
+    return isNameDiff || isOrderDiff;
+  }, [editingSem, newSemName, newSemOrder]);
+
+  const isSlotModified = useMemo(() => {
+    if (!editingSlot) return true;
+    const isStartDiff = newSlotStart !== (editingSlot.start_time || "");
+    const isEndDiff = newSlotEnd !== (editingSlot.end_time || "");
+    const isBreakDiff = newSlotIsLaunchBreak !== (editingSlot.is_launch_break || false);
+    return isStartDiff || isEndDiff || isBreakDiff;
+  }, [editingSlot, newSlotStart, newSlotEnd, newSlotIsLaunchBreak]);
+
+  const isRoomModified = useMemo(() => {
+    if (!editingRoom) return true;
+    const isNumberDiff = newRoomNumber.trim() !== (editingRoom.room_number || "").trim();
+    const isCapacityDiff = newRoomCapacity.trim() !== (editingRoom.capacity?.toString() || "").trim();
+    const originalType = editingRoom.room_type?.toString() || "1";
+    const isTypeDiff = newRoomType !== originalType;
+    const originalDept = editingRoom.department ? editingRoom.department.toString() : "none";
+    const currentDept = newRoomDept || "none";
+    const isDeptDiff = currentDept !== originalDept;
+    return isNumberDiff || isCapacityDiff || isTypeDiff || isDeptDiff;
+  }, [editingRoom, newRoomNumber, newRoomCapacity, newRoomType, newRoomDept]);
+
   const formatDisplayTime = (timeStr: string) => {
     if (!timeStr) return "";
     const [h, m] = timeStr.split(":");
@@ -387,7 +485,7 @@ export default function AcademicSettingsPage({
     return `${formattedHour}:${m} ${suffix}`;
   };
 
-  
+
   const openAddDept = () => {
     setEditingDept(null);
     setNewDeptName("");
@@ -476,7 +574,7 @@ export default function AcademicSettingsPage({
     }
   };
 
-  
+
   const openAddSem = () => {
     setEditingSem(null);
     setNewSemName("");
@@ -581,7 +679,7 @@ export default function AcademicSettingsPage({
     }
   };
 
-  
+
   const openAddSlot = () => {
     setEditingSlot(null);
     setNewSlotStart("09:00:00");
@@ -622,17 +720,17 @@ export default function AcademicSettingsPage({
         is_lunch_break: newSlotIsLaunchBreak,
       };
       if (editingSlot) {
-        
+
         setTimeSlotsList((prev) =>
           sortTimeSlotsHelper(
             prev.map((slot) =>
               slot.id === editingSlot.id
                 ? {
-                    ...slot,
-                    start_time: finalStart,
-                    end_time: finalEnd,
-                    is_lunch_break: newSlotIsLaunchBreak,
-                  }
+                  ...slot,
+                  start_time: finalStart,
+                  end_time: finalEnd,
+                  is_lunch_break: newSlotIsLaunchBreak,
+                }
                 : slot
             )
           )
@@ -748,15 +846,15 @@ export default function AcademicSettingsPage({
           prev.map((r) =>
             r.id === editingRoom.id
               ? {
-                  ...r,
-                  room_number: newRoomNumber,
-                  capacity: capacityInt,
-                  room_type: parseInt(newRoomType),
-                  department: payload.department,
-                  department_name: payload.department
-                    ? departmentsList.find((d) => d.id === payload.department)?.name || null
-                    : null,
-                }
+                ...r,
+                room_number: newRoomNumber,
+                capacity: capacityInt,
+                room_type: parseInt(newRoomType),
+                department: payload.department,
+                department_name: payload.department
+                  ? departmentsList.find((d) => d.id === payload.department)?.name || null
+                  : null,
+              }
               : r
           )
         );
@@ -861,7 +959,7 @@ export default function AcademicSettingsPage({
         animate="visible"
         className="w-full max-w-5xl mx-auto p-4 sm:p-6 space-y-8 font-lexend text-foreground pb-20"
       >
-        {}
+        { }
         <div className="flex flex-col gap-2">
           <motion.div variants={itemVariants}>
             <Badge
@@ -883,7 +981,7 @@ export default function AcademicSettingsPage({
           </motion.p>
         </div>
 
-        {}
+        { }
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -902,7 +1000,7 @@ export default function AcademicSettingsPage({
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <AnimatePresence>
               {departmentsList.map((dept) => (
                 <motion.div
@@ -912,7 +1010,12 @@ export default function AcademicSettingsPage({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                 >
-                  <Card className="group hover:shadow-md transition-all h-full">
+                  <Card
+                    className="group hover:shadow-md transition-all h-full cursor-pointer hover:border-primary/50 hover:bg-muted/5 select-none min-w-0"
+                    onClick={() => {
+                      router.push(`/dashboard/admin/academic-config/${dept.id}`);
+                    }}
+                  >
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         ID: {dept.id}
@@ -922,20 +1025,29 @@ export default function AcademicSettingsPage({
                           <Button
                             variant="outline"
                             className="h-8 w-8 p-0 border border-border/60 bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditDept(dept)}>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditDept(dept);
+                            }}
+                          >
                             <Edit2 className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
-                            onClick={() => openDeleteDept(dept.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
+                             className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               openDeleteDept(dept.id);
+                             }}
+                           >
+                             <Trash2 className="mr-2 h-4 w-4 text-red-500 dark:text-red-400" /> Delete
+                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </CardHeader>
@@ -953,7 +1065,7 @@ export default function AcademicSettingsPage({
 
         <div className="w-full h-px bg-border/50" />
 
-        {}
+        { }
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -972,7 +1084,7 @@ export default function AcademicSettingsPage({
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-4">
             <AnimatePresence>
               {semestersList.map((sem) => (
                 <motion.div
@@ -982,7 +1094,7 @@ export default function AcademicSettingsPage({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                 >
-                  <Card className="flex flex-col items-center justify-center p-4 hover:bg-muted/50 transition-colors relative group h-full">
+                  <Card className="flex flex-col items-center justify-center p-4 hover:bg-muted/50 transition-colors relative group h-full min-w-0">
                     <div className="absolute top-2 right-2">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -997,12 +1109,12 @@ export default function AcademicSettingsPage({
                           <DropdownMenuItem onClick={() => openEditSem(sem)}>
                             <Edit2 className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={() => openDeleteSem(sem.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
+                           <DropdownMenuItem
+                             className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
+                             onClick={() => openDeleteSem(sem.id)}
+                           >
+                             <Trash2 className="mr-2 h-4 w-4 text-red-500 dark:text-red-400" /> Delete
+                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -1024,7 +1136,7 @@ export default function AcademicSettingsPage({
 
         <div className="w-full h-px bg-border/50" />
 
-        {}
+        { }
         <motion.div variants={itemVariants}>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -1092,12 +1204,12 @@ export default function AcademicSettingsPage({
                           <DropdownMenuItem onClick={() => openEditSlot(slot)}>
                             <Edit2 className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-red-600"
-                            onClick={() => openDeleteSlot(slot.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                          </DropdownMenuItem>
+                           <DropdownMenuItem
+                             className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
+                             onClick={() => openDeleteSlot(slot.id)}
+                           >
+                             <Trash2 className="mr-2 h-4 w-4 text-red-500 dark:text-red-400" /> Delete
+                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -1111,26 +1223,74 @@ export default function AcademicSettingsPage({
         <div className="w-full h-px bg-border/50" />
 
         <motion.div variants={itemVariants}>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
                 <MapPin className="w-5 h-5" />
               </div>
               <h2 className="text-xl font-semibold">Rooms</h2>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-2 border-primary/20"
-              onClick={openAddRoom}
-            >
-              <Plus className="w-4 h-4" /> Add Room
-            </Button>
+
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto font-lexend">
+              {/* Department Dropdown */}
+              <div className="w-[160px]">
+                <CustomSelect
+                  value={roomDeptFilter}
+                  onChange={setRoomDeptFilter}
+                  options={[
+                    { value: "All", label: "All Departments" },
+                    ...roomsDepartments.map((dept: Department) => ({
+                      value: dept.id.toString(),
+                      label: dept.name,
+                    })),
+                  ]}
+                  placeholder="All Departments"
+                />
+              </div>
+
+              {/* Room Type Dropdown */}
+              <div className="w-[120px]">
+                <CustomSelect
+                  value={roomTypeFilter}
+                  onChange={setRoomTypeFilter}
+                  options={[
+                    { value: "All", label: "All Types" },
+                    { value: "1", label: "Theory" },
+                    { value: "2", label: "Lab" },
+                  ]}
+                  placeholder="All Types"
+                />
+              </div>
+
+              {/* Reset Button */}
+              {(roomDeptFilter !== "All" || roomTypeFilter !== "All") && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setRoomDeptFilter("All");
+                    setRoomTypeFilter("All");
+                  }}
+                  className="gap-2 h-9 border-destructive/20 hover:border-destructive/40 text-destructive hover:bg-destructive/10 dark:text-red-400 dark:hover:bg-red-500/10 cursor-pointer font-semibold text-xs transition-all"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" /> Reset
+                </Button>
+              )}
+
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-2 border-primary/20 h-9 shrink-0 ml-auto md:ml-0"
+                onClick={openAddRoom}
+              >
+                <Plus className="w-4 h-4" /> Add Room
+              </Button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <AnimatePresence>
-              {roomsList.map((room) => (
+              {filteredRooms.map((room) => (
                 <motion.div
                   key={room.id}
                   layout
@@ -1138,7 +1298,7 @@ export default function AcademicSettingsPage({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                 >
-                  <Card className="group hover:shadow-md transition-all h-full">
+                  <Card className="group hover:shadow-md transition-all h-full min-w-0">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         Capacity: {room.capacity}
@@ -1157,10 +1317,10 @@ export default function AcademicSettingsPage({
                             <Edit2 className="mr-2 h-4 w-4" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                            className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/30 cursor-pointer"
                             onClick={() => openDeleteRoom(room.id)}
                           >
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            <Trash2 className="mr-2 h-4 w-4 text-red-500 dark:text-red-400" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1172,11 +1332,10 @@ export default function AcademicSettingsPage({
                       <div className="flex flex-wrap gap-2 pt-1">
                         <Badge
                           variant="outline"
-                          className={`text-[10px] uppercase font-bold tracking-wider border ${
-                            room.room_type === 2
-                              ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25"
-                              : "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25"
-                          }`}
+                          className={`text-[10px] uppercase font-bold tracking-wider border ${room.room_type === 2
+                            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/25"
+                            : "bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/25"
+                            }`}
                         >
                           {room.room_type === 2 ? "Lab" : "Theory"}
                         </Badge>
@@ -1235,7 +1394,7 @@ export default function AcademicSettingsPage({
             <DialogFooter className="gap-2 sm:gap-0">
               <Button
                 onClick={handleSaveDepartment}
-                disabled={isLoading}
+                disabled={isLoading || (editingDept ? !isDeptModified : false)}
                 className="w-full sm:w-auto"
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -1246,7 +1405,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent className="w-[95vw] sm:max-w-[425px]">
           <motion.div
@@ -1283,7 +1442,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog open={isSemModalOpen} onOpenChange={setIsSemModalOpen}>
         <DialogContent className="sm:max-w-[425px] w-[95vw]">
           <motion.div
@@ -1326,7 +1485,7 @@ export default function AcademicSettingsPage({
               </motion.div>
             </motion.div>
             <DialogFooter>
-              <Button onClick={handleSaveSemester} disabled={isLoading}>
+              <Button onClick={handleSaveSemester} disabled={isLoading || (editingSem ? !isSemModified : false)}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingSem ? "Update Changes" : "Save Changes"}
               </Button>
@@ -1335,7 +1494,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog
         open={isDeleteSemModalOpen}
         onOpenChange={setIsDeleteSemModalOpen}
@@ -1375,7 +1534,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog open={isSlotModalOpen} onOpenChange={setIsSlotModalOpen}>
         <DialogContent className="sm:max-w-[425px] w-[95vw]">
           <motion.div
@@ -1426,7 +1585,7 @@ export default function AcademicSettingsPage({
               </span>
             </div>
             <DialogFooter>
-              <Button onClick={handleSaveTimeSlot} disabled={isLoading}>
+              <Button onClick={handleSaveTimeSlot} disabled={isLoading || (editingSlot ? !isSlotModified : false)}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingSlot ? "Update Changes" : "Save Changes"}
               </Button>
@@ -1435,7 +1594,7 @@ export default function AcademicSettingsPage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog
         open={isDeleteSlotModalOpen}
         onOpenChange={setIsDeleteSlotModalOpen}
@@ -1521,36 +1680,37 @@ export default function AcademicSettingsPage({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <motion.div variants={formItemVariants} className="space-y-2">
                   <Label htmlFor="room-type">Room Type</Label>
-                  <Select value={newRoomType} onValueChange={setNewRoomType}>
-                    <SelectTrigger id="room-type" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">Theory</SelectItem>
-                      <SelectItem value="2">Lab</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <CustomSelect
+                    value={newRoomType}
+                    onChange={setNewRoomType}
+                    options={[
+                      { value: "1", label: "Theory" },
+                      { value: "2", label: "Lab" },
+                    ]}
+                    placeholder="Select Room Type"
+                    id="room-type"
+                  />
                 </motion.div>
                 <motion.div variants={formItemVariants} className="space-y-2">
                   <Label htmlFor="room-dept">Department</Label>
-                  <Select value={newRoomDept} onValueChange={setNewRoomDept}>
-                    <SelectTrigger id="room-dept" className="w-full">
-                      <SelectValue placeholder="Select Department (Optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None / General</SelectItem>
-                      {departmentsList.map((dept) => (
-                        <SelectItem key={dept.id} value={dept.id.toString()}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <CustomSelect
+                    value={newRoomDept}
+                    onChange={setNewRoomDept}
+                    options={[
+                      { value: "none", label: "None / General" },
+                      ...departmentsList.map((dept) => ({
+                        value: dept.id.toString(),
+                        label: dept.name,
+                      })),
+                    ]}
+                    placeholder="Select Department (Optional)"
+                    id="room-dept"
+                  />
                 </motion.div>
               </div>
             </motion.div>
             <DialogFooter>
-              <Button onClick={handleSaveRoom} disabled={isLoading}>
+              <Button onClick={handleSaveRoom} disabled={isLoading || (editingRoom ? !isRoomModified : false)}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editingRoom ? "Update Changes" : "Save Changes"}
               </Button>
@@ -1595,6 +1755,8 @@ export default function AcademicSettingsPage({
           </motion.div>
         </DialogContent>
       </Dialog>
+
+
     </>
   );
 }
