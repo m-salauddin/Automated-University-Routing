@@ -86,10 +86,9 @@ const formatTimeSlotLabel = (timeStr: string) => {
   if (h >= 1 && h <= 5) {
     h += 12;
   }
-  const ampm = h >= 12 ? "PM" : "AM";
   h = h % 12;
   h = h ? h : 12;
-  return `${h}:${mStr} ${ampm}`;
+  return `${h}:${mStr}`;
 };
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
@@ -536,6 +535,42 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             border-color: black !important;
             border-collapse: collapse !important;
           }
+          table {
+            table-layout: fixed !important;
+            width: 100% !important;
+          }
+          tbody {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .print-page-container {
+            display: block !important;
+            width: 100% !important;
+          }
+          @media print {
+            .print-page-container {
+              display: flex !important;
+              flex-direction: column !important;
+              justify-content: center !important;
+              align-items: center !important;
+              height: 100vh !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              box-sizing: border-box !important;
+              padding: 5mm !important;
+            }
+          }
+          th, td {
+            padding: 2px 2px !important;
+            height: auto !important;
+          }
+          thead td, thead th {
+            height: 40px !important;
+          }
+          th span, td span, td div, th div {
+            font-size: 9.5px !important;
+            line-height: 1.2 !important;
+          }
 
           .print-header-border {
             border: 2px double black !important;
@@ -672,9 +707,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                 your assigned semester (<strong>{studentSemester}</strong>).
               </p>
             </motion.div>
-          ) : (
-            <>
-              <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-2 pt-0 text-center w-full font-serif text-black">
+          ) : (            <div className="print-page-container w-full">
+              <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-3 pt-0 text-center w-full font-serif text-black">
                 <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
                   Department of Computer Science & Engineering
                 </h1>
@@ -705,7 +739,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                 className="rounded-xl font-lexend bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:shadow-none print:bg-transparent print:overflow-visible"
               >
                 <div className="overflow-x-auto w-full print:overflow-visible">
-                  <Table className="w-full overflow-hidden min-w-[1000px] print:min-w-0 print:w-full border-collapse text-sm print:border-collapse !print:border-black">
+                  <Table className="w-full overflow-hidden min-w-[1000px] print:min-w-0 print:w-full border border-border/60 border-collapse text-sm print:border-collapse !print:border-black">
                     <TableHeader>
                       <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b">
                         <TableCell className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40 print:bg-white !print:border-r !print:border-black print:w-20 print:min-w-0">
@@ -722,10 +756,10 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                               strokeWidth="1"
                             />
                           </svg>
-                          <span className="absolute top-2 right-2 text-[10px] font-bold print:text-black print:text-[10px] print:top-1 print:right-1">
+                          <span className="absolute top-2 right-2 text-[10px] font-bold print:text-black print:text-[10px] print:top-[2px] print:right-[2px]">
                             Time
                           </span>
-                          <span className="absolute bottom-2 left-2 text-[10px] font-bold print:text-black print:text-[10px] print:bottom-1 print:left-1">
+                          <span className="absolute bottom-2 left-2 text-[10px] font-bold print:text-black print:text-[10px] print:bottom-[2px] print:left-[2px]">
                             Day
                           </span>
                         </TableCell>
@@ -845,11 +879,12 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                               );
                               const cancellationReason =
                                 classOffData?.reason || "No reason provided.";
-
                               const isTeacherOff =
                                 (!!teacherKey &&
                                   availabilityMap[teacherKey] === false) ||
-                                isClassOffToday;                              const highlighted = isMatch(session);
+                                  isClassOffToday;
+
+                              const highlighted = isMatch(session);
                               const isLab = session ? isLabClass(session.course, undefined, session.room) : false;
 
                               return (
@@ -882,7 +917,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                           "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden",
                                           "transition-colors duration-200",
                                           isTeacherOff
-                                            ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                                            ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-950/10 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
                                             : highlighted
                                             ? "bg-background border-emerald-500 shadow-md"
                                             : isLab
@@ -944,7 +979,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                   </Table>
                 </div>
               </motion.div>
-            </>
+            </div>
           )}
           <div className="text-center mt-6 print:hidden sm:hidden">
             <Button
