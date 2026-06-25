@@ -1,4 +1,5 @@
 import DepartmentRoutinePage from "@/components/modules/dashboard/student-routine";
+export const dynamic = "force-dynamic";
 import { getRoutine } from "@/services/routine";
 import { getUserProfile } from "@/services/users";
 import { getAllTimeSlots } from "@/services/time-slots";

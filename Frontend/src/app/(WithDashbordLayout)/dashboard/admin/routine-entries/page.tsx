@@ -1,4 +1,5 @@
 import AdminRoutinePage from "@/components/modules/dashboard/routine-entries";
+export const dynamic = "force-dynamic";
 import { getRoutine } from "@/services/routine";
 import { getAllTimeSlots } from "@/services/time-slots";
 import { getAllDepartments } from "@/services/departments";

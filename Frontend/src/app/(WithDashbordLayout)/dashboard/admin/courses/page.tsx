@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import AutomatedRoutineCourses from "@/components/modules/dashboard/courses";
+export const dynamic = "force-dynamic";
 import { getAllCourses } from "@/services/courses";
 import { getAllDepartments } from "@/services/departments";
 import { getAllSemesters } from "@/services/semesters";

@@ -1,4 +1,5 @@
 import AutomatedRoutineDashboard from "@/components/modules/dashboard/analytics";
+export const dynamic = "force-dynamic";
 import { getRoutine } from "@/services/routine";
 
 const page = async () => {

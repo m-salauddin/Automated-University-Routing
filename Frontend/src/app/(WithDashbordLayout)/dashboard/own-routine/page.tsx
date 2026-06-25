@@ -1,4 +1,5 @@
 import OwnRoutinePage from "@/components/modules/dashboard/own-routine";
+export const dynamic = "force-dynamic";
 import { getRoutine } from "@/services/routine";
 
 const StudentRoutine = async () => {
