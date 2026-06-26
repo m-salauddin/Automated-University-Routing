@@ -33,7 +33,7 @@ const getValidToken = async (): Promise<string | null> => {
                 const data = await refreshRes.json();
                 const newToken = data.access;
                 if (newToken) {
-                    cookieStore.set("accessToken", newToken);
+                    cookieStore.set("accessToken", newToken, { httpOnly: false, secure: process.env.NODE_ENV === "production", path: "/" });
                     return newToken;
                 }
             }

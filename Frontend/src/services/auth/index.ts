@@ -78,12 +78,14 @@ export const loginUser = async (userData: FieldValues) => {
             const cookieStore = await cookies();
             cookieStore.set(
                 "accessToken",
-                standardizedResult.data.accessToken
+                standardizedResult.data.accessToken,
+                { httpOnly: false, secure: process.env.NODE_ENV === "production", path: "/" }
             );
             if (standardizedResult.data.refreshToken) {
                 cookieStore.set(
                     "refreshToken",
-                    standardizedResult.data.refreshToken
+                    standardizedResult.data.refreshToken,
+                    { httpOnly: false, secure: process.env.NODE_ENV === "production", path: "/" }
                 );
             }
         }

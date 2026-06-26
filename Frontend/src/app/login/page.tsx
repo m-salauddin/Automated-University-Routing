@@ -44,7 +44,7 @@ function LoginContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isForgotOpen, setIsForgotOpen] = useState(false);
-  
+
   useEffect(() => {
     const redirectPath = searchParams.get("redirect");
     router.prefetch(redirectPath || "/dashboard/analytics");
@@ -126,7 +126,7 @@ function LoginContent() {
     }
   };
 
-  
+
   const cardVariants = {
     hidden: { scale: 0.96, opacity: 0, y: 16 },
     visible: {
