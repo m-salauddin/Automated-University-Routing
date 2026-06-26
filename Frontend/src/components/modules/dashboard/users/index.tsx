@@ -751,8 +751,12 @@ export default function UsersPageClient({
     setIsMounted(true);
   }, []);
 
-  if (!isMounted) {
-    return null;
+  if (!isMounted || user?.isLoading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
   }
 
   if (user?.role !== "admin") {

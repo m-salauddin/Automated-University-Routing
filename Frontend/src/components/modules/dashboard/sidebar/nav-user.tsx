@@ -60,10 +60,6 @@ export function NavUser() {
 
   const handleLogout = async () => {
     try {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("isLoggingOut", "true");
-      }
-
       await logout();
       dispatch(resetAuth());
 
@@ -73,7 +69,6 @@ export function NavUser() {
       });
 
       router.push("/login");
-      router.refresh();
     } catch (error) {
       console.error("Logout failed:", error);
       toast.error("Logout failed", {

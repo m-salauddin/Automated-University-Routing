@@ -1393,7 +1393,7 @@ export default function AdminRoutinePage({
   const router = useRouter();
   const dispatch = useDispatch();
 
-  const { role } = useSelector(
+  const { role, isLoading: isAuthLoading } = useSelector(
     (s: RootState) => s.auth
   );
   const availabilityMap = useSelector(
@@ -2090,7 +2090,13 @@ export default function AdminRoutinePage({
     };
   }, [debouncedSearch, validTeacherShortNames]);
 
-  if (!mounted) return null;
+  if (!mounted || isAuthLoading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
+  }
 
   if (role !== "admin") {
     return (

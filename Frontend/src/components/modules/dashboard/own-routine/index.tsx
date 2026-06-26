@@ -108,6 +108,7 @@ import { Input } from "@/components/ui/input";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { cancelClass, reactivateClass, updateCancelMessage, requestSwap, respondSwap, getRoutine } from "@/services/routine";
 import { getAllUsers } from "@/services/users";
+import { getAllCourses } from "@/services/courses";
 
 export type APIRoutineItem = {
   id: number;
@@ -515,12 +516,49 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
     const fetchTeachers = async () => {
       try {
         const res = await getAllUsers();
-        if (res.success && Array.isArray(res.data)) {
-          const filtered = res.data.filter((u: any) => u.role?.toUpperCase() === "TEACHER");
-          setTeachersList(filtered);
+        let fetchedTeachers: any[] = [];
+
+        if (res.success) {
+          let dataArray = [];
+          if (Array.isArray(res.data)) {
+            dataArray = res.data;
+          } else if (res.data && typeof res.data === "object" && Array.isArray(res.data.results)) {
+            dataArray = res.data.results;
+          }
+          fetchedTeachers = dataArray.filter((u: any) => u.role?.toUpperCase() === "TEACHER");
         }
-      } catch (err) {
+
+        if (fetchedTeachers.length > 0) {
+          setTeachersList(fetchedTeachers);
+          return;
+        }
+
+        // Fallback: extract unique teachers from courses API if /users/ is restricted (returns 403)
+        const coursesRes = await getAllCourses();
+        if (coursesRes.success && Array.isArray(coursesRes.data)) {
+          const uniqueTeachersMap = new Map();
+          coursesRes.data.forEach((c: any) => {
+            if (c.teacher && c.teacher_name) {
+              uniqueTeachersMap.set(c.teacher, {
+                id: c.teacher,
+                name: c.teacher_name,
+                username: c.teacher_name,
+                role: "TEACHER",
+                department: c.department || null,
+              });
+            }
+          });
+          fetchedTeachers = Array.from(uniqueTeachersMap.values());
+          if (fetchedTeachers.length > 0) {
+            setTeachersList(fetchedTeachers);
+            return;
+          }
+        }
+        
+        toast.error("Failed to load teachers list for swap");
+      } catch (err: any) {
         console.error("Failed to load teachers for swap:", err);
+        toast.error(`Error loading teachers: ${err.message || err}`);
       }
     };
     fetchTeachers();
@@ -1459,8 +1497,12 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
     setIsMounted(true);
   }, []);
 
-  if (!isMounted) {
-    return null;
+  if (!isMounted || isAuthLoading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
   }
 
   

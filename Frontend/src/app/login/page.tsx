@@ -102,11 +102,14 @@ function LoginContent() {
             student_id: user?.student_id || null,
           })
         );
-        
+
         toast.success("Login successful!", {
           description: `Welcome back, ${finalUsername}`,
           duration: 3000,
         });
+
+        const redirectPath = searchParams.get("redirect") || "/dashboard/analytics";
+        router.push(redirectPath);
 
       } else {
         toast.error("Login Failed", {
