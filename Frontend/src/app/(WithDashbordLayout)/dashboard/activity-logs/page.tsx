@@ -32,6 +32,10 @@ interface LogItem {
     created_at?: string;
     user?: string | { username: string; role?: string };
     ip_address?: string;
+    actor_name?: string;
+    action_description?: string;
+    severity?: string;
+    created_at_formatted?: string;
 }
 
 export default function ActivityLogsPage() {
@@ -49,6 +53,7 @@ export default function ActivityLogsPage() {
                 const list = Array.isArray(res.data) 
                     ? res.data 
                     : (res.data?.results ?? []);
+                console.log("[ActivityLogs] Fetched list:", list);
                 setLogs(list);
             } else {
                 toast.error(res.message || "Failed to load activity logs");
@@ -112,11 +117,17 @@ export default function ActivityLogsPage() {
     };
 
     const filteredLogs = logs.filter(log => {
-        const msg = (log.message || log.details || "").toLowerCase();
-        const action = (log.action || "").toLowerCase();
+        const msg = (log.message || log.details || log.action_description || "").toLowerCase();
+        let action = (log.action || "").toLowerCase();
+        if (log.action_description) {
+            const firstWord = log.action_description.split(" ")[0];
+            if (firstWord) {
+                action = firstWord.replace(":", "").toLowerCase();
+            }
+        }
         const user = typeof log.user === "object" 
             ? log.user.username.toLowerCase() 
-            : (log.user || "").toLowerCase();
+            : (log.user || log.actor_name || "").toLowerCase();
         const query = searchQuery.toLowerCase();
 
         return msg.includes(query) || action.includes(query) || user.includes(query);
@@ -190,12 +201,18 @@ export default function ActivityLogsPage() {
                         <div className="space-y-4">
                             <AnimatePresence initial={false}>
                                 {filteredLogs.map((log, index) => {
-                                    const actionText = log.action || "Activity";
-                                    const messageText = log.message || log.details || "No details provided";
+                                    let actionText = log.action || "Activity";
+                                    if (log.action_description) {
+                                        const firstWord = log.action_description.split(" ")[0];
+                                        if (firstWord) {
+                                            actionText = firstWord.replace(":", "");
+                                        }
+                                    }
+                                    const messageText = log.message || log.details || log.action_description || "No details provided";
                                     const dateStr = log.timestamp || log.created_at;
                                     const username = typeof log.user === "object" 
                                         ? log.user.username 
-                                        : (log.user || "System");
+                                        : (log.user || log.actor_name || "System");
 
                                     return (
                                         <motion.div
