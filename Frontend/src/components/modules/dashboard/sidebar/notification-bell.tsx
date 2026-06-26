@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, BellRing, Check, CheckCheck, Inbox } from "lucide-react";
+import { Bell, BellRing, Check, CheckCheck, Inbox, Loader2, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
@@ -13,6 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getNotifications, getUnreadCount, markNotificationRead } from "@/services/notifications";
+import { useSelector } from "react-redux";
+import type { RootState } from "@/store";
+import { respondSwap } from "@/services/routine";
 
 interface Notification {
     id: number | string;
@@ -27,10 +30,62 @@ interface Notification {
 }
 
 export function NotificationBell() {
+    const { role } = useSelector((state: RootState) => state.auth);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(true);
     const [isOpen, setIsOpen] = useState<boolean>(false);
+    const [submittingAction, setSubmittingAction] = useState<Record<string, boolean>>({});
+
+    const isSwapRequest = (notification: Notification): boolean => {
+        const text = `${notification.title || ""} ${notification.verb || ""} ${notification.message || ""} ${notification.description || ""}`.toLowerCase();
+        return text.includes("swap") || text.includes("proxy") || text.includes("mutual");
+    };
+
+    const getSwapRequestId = (notification: Notification): number | null => {
+        const n = notification as any;
+        if (n.action_object_id) return Number(n.action_object_id);
+        if (n.target_id) return Number(n.target_id);
+        if (n.data && typeof n.data === "object") {
+            if (n.data.request_id) return Number(n.data.request_id);
+            if (n.data.id) return Number(n.data.id);
+        }
+
+        const text = `${notification.title || ""} ${notification.verb || ""} ${notification.message || ""} ${notification.description || ""}`;
+        const match = text.match(/(?:request|swap|id)[:#\s]+(\d+)/i) || text.match(/id\s+(\d+)/i) || text.match(/#(\d+)/);
+        if (match && match[1]) {
+            return Number(match[1]);
+        }
+        return null;
+    };
+
+    const handleRespondToSwap = async (
+        requestId: number,
+        action: "ACCEPT" | "REJECT",
+        notificationId: number | string
+    ) => {
+        const actionKey = `${notificationId}-${action}`;
+        setSubmittingAction(prev => ({ ...prev, [actionKey]: true }));
+        const toastId = toast.loading(`${action === "ACCEPT" ? "Accepting" : "Rejecting"} class swap request...`);
+        try {
+            const res = await respondSwap({
+                request_id: requestId,
+                action: action
+            });
+
+            if (res.success) {
+                toast.success(`Swap request ${action.toLowerCase()}ed successfully!`, { id: toastId });
+                await markNotificationRead(notificationId);
+                fetchNotificationData();
+            } else {
+                toast.error(res.message || `Failed to respond to swap request`, { id: toastId });
+            }
+        } catch (err: any) {
+            toast.error(err.message || "An unexpected error occurred", { id: toastId });
+        } finally {
+            setSubmittingAction(prev => ({ ...prev, [actionKey]: false }));
+        }
+    };
 
     const fetchNotificationData = async () => {
         try {
@@ -200,6 +255,53 @@ export function NotificationBell() {
                                         <div className="flex items-center text-[10px] font-bold text-amber-600 dark:text-amber-400 mt-1">
                                             <Check className="size-3 mr-1" />
                                             Click to mark as read
+                                        </div>
+                                    )}
+
+                                    {isUnread && role === "teacher" && isSwapRequest(notification) && getSwapRequestId(notification) !== null && (
+                                        <div 
+                                            className="flex items-center gap-2 mt-2 w-full print:hidden"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Button
+                                                size="sm"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const swapId = getSwapRequestId(notification);
+                                                    if (swapId !== null) {
+                                                        handleRespondToSwap(swapId, "ACCEPT", notification.id);
+                                                    }
+                                                }}
+                                                disabled={submittingAction[`${notification.id}-ACCEPT`] || submittingAction[`${notification.id}-REJECT`]}
+                                                className="h-7 px-2.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-md flex items-center gap-1 cursor-pointer"
+                                            >
+                                                {submittingAction[`${notification.id}-ACCEPT`] ? (
+                                                    <Loader2 className="size-3 animate-spin" />
+                                                ) : (
+                                                    <Check className="size-3" />
+                                                )}
+                                                Accept
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const swapId = getSwapRequestId(notification);
+                                                    if (swapId !== null) {
+                                                        handleRespondToSwap(swapId, "REJECT", notification.id);
+                                                    }
+                                                }}
+                                                disabled={submittingAction[`${notification.id}-ACCEPT`] || submittingAction[`${notification.id}-REJECT`]}
+                                                className="h-7 px-2.5 text-xs font-semibold border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:hover:bg-red-950/20 dark:text-red-400 rounded-md flex items-center gap-1 cursor-pointer"
+                                            >
+                                                {submittingAction[`${notification.id}-REJECT`] ? (
+                                                    <Loader2 className="size-3 animate-spin" />
+                                                ) : (
+                                                    <X className="size-3" />
+                                                )}
+                                                Reject
+                                            </Button>
                                         </div>
                                     )}
                                 </DropdownMenuItem>

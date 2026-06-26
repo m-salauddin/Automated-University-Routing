@@ -1,6 +1,6 @@
 "use server"
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { cookies } from "next/headers";
+import { getValidToken } from "../auth";
 
 interface SemesterData {
     name: string;
@@ -11,11 +11,10 @@ interface SemesterData {
 export const getAllSemesters = async () => {
     try {
         const SEMESTERS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/semesters/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(SEMESTERS_URL, {
@@ -55,11 +54,10 @@ export const getAllSemesters = async () => {
 export const addSemester = async (semesterData: SemesterData) => {
     try {
         const SEMESTERS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/semesters/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(SEMESTERS_URL, {
@@ -103,11 +101,10 @@ export const updateSemester = async (
 ) => {
     try {
         const SEMESTERS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/semesters/${semesterId}/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(SEMESTERS_URL, {
@@ -148,11 +145,10 @@ export const updateSemester = async (
 export const deleteSemester = async (semesterId: number | string) => {
     try {
         const SEMESTERS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/semesters/${semesterId}/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(SEMESTERS_URL, {

@@ -4,6 +4,8 @@ import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Table, TableCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 import {
   Search,
   Printer,
@@ -17,6 +19,9 @@ import {
   Info,
   ShieldBan,
   ChevronLeft,
+  ArrowUpDown,
+  Calendar as CalendarIcon,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +36,14 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { toast } from "sonner";
+import { requestSwap } from "@/services/routine";
+import { getAllUsers } from "@/services/users";
 
 export type APIRoutineItem = {
   id: number;
@@ -54,6 +66,7 @@ export type TimeSlot = {
 };
 
 type ClassSession = {
+  id?: number;
   course: string;
   teacher: string;
   room: string;
@@ -235,6 +248,141 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
   const role = auth?.role?.toLowerCase();
   const isAllowed = role === "teacher" || role === "admin";
 
+  // Swap Request States
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [selectedRowForSwap, setSelectedRowForSwap] = useState<any>(null);
+  const [swapType, setSwapType] = useState<"PROXY" | "MUTUAL">("PROXY");
+  const [targetTeacherId, setTargetTeacherId] = useState<string>("");
+  const [targetRoutineId, setTargetRoutineId] = useState<string>("");
+  const [requesterRoutineId, setRequesterRoutineId] = useState<string>("");
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [swapDate, setSwapDate] = useState<string>("");
+  const [swapReason, setSwapReason] = useState<string>("");
+  const [isSubmittingSwap, setIsSubmittingSwap] = useState(false);
+  const [teachersList, setTeachersList] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (role !== "teacher") return;
+
+    const fetchTeachers = async () => {
+      try {
+        const res = await getAllUsers();
+        let fetchedTeachers: any[] = [];
+
+        if (res.success) {
+          let dataArray = [];
+          if (Array.isArray(res.data)) {
+            dataArray = res.data;
+          } else if (res.data && typeof res.data === "object" && Array.isArray(res.data.results)) {
+            dataArray = res.data.results;
+          }
+          fetchedTeachers = dataArray.filter((u: any) => u.role?.toUpperCase() === "TEACHER");
+        }
+
+        if (fetchedTeachers.length > 0) {
+          setTeachersList(fetchedTeachers);
+          return;
+        }
+
+        // Fallback: extract unique teachers from routineList
+        const uniqueTeachersMap = new Map();
+        routineList.forEach((item: any) => {
+          if (item.teacher_name) {
+            uniqueTeachersMap.set(item.teacher_name.toLowerCase(), {
+              id: item.teacher_name,
+              name: item.teacher_name,
+              username: item.teacher_name,
+              role: "TEACHER",
+            });
+          }
+        });
+        fetchedTeachers = Array.from(uniqueTeachersMap.values());
+        setTeachersList(fetchedTeachers);
+      } catch (err: any) {
+        console.error("Failed to load teachers for swap:", err);
+      }
+    };
+
+    fetchTeachers();
+  }, [role, routineList]);
+
+  // Calculate target teacher's classes for MUTUAL swap
+  const targetTeacherClasses = useMemo(() => {
+    if (swapType !== "MUTUAL" || !targetTeacherId || !teachersList.length) {
+      return [];
+    }
+    const targetTeacher = teachersList.find((t) => String(t.id) === targetTeacherId);
+    const targetUsername = targetTeacher ? (targetTeacher.username || targetTeacher.name) : "";
+    if (!targetUsername) return [];
+
+    return routineList.filter((item: any) => {
+      return (
+        item.teacher_name &&
+        item.teacher_name.toLowerCase() === targetUsername.toLowerCase()
+      );
+    });
+  }, [targetTeacherId, swapType, teachersList, routineList]);
+
+  // Calculate logged-in teacher's own classes for swap requester dropdown
+  const myClasses = useMemo(() => {
+    if (!routineList || !auth?.username) return [];
+    return routineList.filter(
+      (item: any) =>
+        item.teacher_name?.toLowerCase() === auth.username.toLowerCase() ||
+        item.teacher?.toLowerCase() === auth.username.toLowerCase()
+    );
+  }, [routineList, auth?.username]);
+
+
+  const handleSendSwapRequest = async () => {
+    if (!selectedRowForSwap || !swapDate) {
+      toast.error("Swap Date is required");
+      return;
+    }
+    if (!requesterRoutineId) {
+      toast.error(swapType === "PROXY" ? "Requester class is missing" : "Please select Your Class to swap");
+      return;
+    }
+    if (!targetTeacherId) {
+      toast.error("Please select a Target Teacher");
+      return;
+    }
+
+    setIsSubmittingSwap(true);
+    try {
+      let targetTeacherParam: string | number = parseInt(targetTeacherId);
+      if (isNaN(targetTeacherParam)) {
+        if (typeof targetTeacherId === "string" && targetTeacherId.trim().length > 0) {
+          targetTeacherParam = targetTeacherId;
+        } else {
+          toast.error(`Invalid target teacher. ${swapType === "MUTUAL" ? "Swap" : "Proxy"} request requires a target teacher.`);
+          setIsSubmittingSwap(false);
+          return;
+        }
+      }
+
+      const res = await requestSwap({
+        swap_type: swapType,
+        target_teacher_id: targetTeacherParam,
+        requester_routine_id: parseInt(requesterRoutineId),
+        target_routine_id: swapType === "MUTUAL" ? selectedRowForSwap.id : null,
+        swap_date: swapDate,
+        reason: swapReason,
+      });
+
+      if (res.success) {
+        toast.success(`${swapType === "MUTUAL" ? "Swap" : "Proxy"} request sent successfully!`);
+        setIsSwapModalOpen(false);
+      } else {
+        toast.error(res.message || `Failed to submit ${swapType === "MUTUAL" ? "swap" : "proxy"} request`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An unexpected error occurred");
+    } finally {
+      setIsSubmittingSwap(false);
+    }
+  };
+
   const formattedRoutineData = useMemo(() => {
     const grouped: Record<string, RoutineData> = {};
     const semesterUniqueCourses: Record<string, Set<string>> = {};
@@ -269,6 +417,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
 
       if (slotIndex !== -1 && slotIndex < sortedTimeSlots.length) {
         dayRow.slots[slotIndex] = {
+          id: item.id,
           course: item.course_code,
           teacher: item.teacher_name,
           room: item.room_number,
@@ -289,18 +438,55 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     return grouped;
   }, [routineList, sortedTimeSlots]);
 
+  const teacherSemesters = useMemo(() => {
+    const semesters = new Set<string>();
+    if (role === "teacher" && auth?.username) {
+      const currentTeacher = auth.username.toLowerCase();
+      routineList.forEach((item) => {
+        if (
+          item.teacher_name &&
+          item.teacher_name.toLowerCase() === currentTeacher
+        ) {
+          semesters.add(item.semester_name);
+        }
+      });
+    }
+    return semesters;
+  }, [routineList, role, auth?.username]);
+
   const semesterOptions = useMemo(() => {
-    return Object.keys(formattedRoutineData).map((key) => ({
-      id: key,
-      label: formattedRoutineData[key].label,
-    }));
-  }, [formattedRoutineData]);
+    return Object.keys(formattedRoutineData)
+      .map((key) => ({
+        id: key,
+        label: formattedRoutineData[key].label,
+        hasClasses: teacherSemesters.has(key),
+      }))
+      .sort((a, b) => {
+        const numA = parseInt(a.id) || 999;
+        const numB = parseInt(b.id) || 999;
+        return numA - numB;
+      });
+  }, [formattedRoutineData, teacherSemesters]);
 
   const activeSemesterId = useMemo(() => {
     if (selectedSemester && formattedRoutineData[selectedSemester])
       return selectedSemester;
     return semesterOptions.length > 0 ? semesterOptions[0].id : "";
   }, [selectedSemester, formattedRoutineData, semesterOptions]);
+
+  const myClassesInSemester = useMemo(() => {
+    return myClasses.filter((c: any) => c.semester_name === activeSemesterId);
+  }, [myClasses, activeSemesterId]);
+
+  const otherTeachers = useMemo(() => {
+    if (!teachersList || !auth?.username) return [];
+    const currentUsername = auth.username.toLowerCase();
+    return teachersList.filter((t: any) => {
+      const usernameNorm = t.username?.toLowerCase() || "";
+      const nameNorm = t.name?.toLowerCase() || "";
+      return usernameNorm !== currentUsername && nameNorm !== currentUsername;
+    });
+  }, [teachersList, auth?.username]);
 
   const currentRoutine = useMemo(
     () => formattedRoutineData[activeSemesterId],
@@ -617,15 +803,17 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                 </p>
               </motion.div>
             </div>
-            <motion.div variants={itemVariants}>
-              <Button
-                onClick={() => window.print()}
-                variant="outline"
-                className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex"
-              >
-                <Printer className="h-4 w-4" /> Print View
-              </Button>
-            </motion.div>
+            {role !== "teacher" && (
+              <motion.div variants={itemVariants}>
+                <Button
+                  onClick={() => window.print()}
+                  variant="outline"
+                  className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex"
+                >
+                  <Printer className="h-4 w-4" /> Print View
+                </Button>
+              </motion.div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 mb-5 lg:grid-cols-12 gap-4 print:hidden">
@@ -641,7 +829,16 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                     onChange={setSelectedSemester}
                     options={semesterOptions.map((opt) => ({
                       value: opt.id,
-                      label: opt.label,
+                      label: opt.hasClasses ? (
+                        <span className="flex items-center gap-2">
+                          <span>{opt.label}</span>
+                          <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-xs font-semibold text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
+                            my
+                          </span>
+                        </span>
+                      ) : (
+                        opt.label
+                      ),
                     }))}
                     placeholder="Select Semester"
                   />
@@ -857,19 +1054,68 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                               <TableCell
                                 key={index}
                                 onClick={() => {
-                                  if (session && isClassOffToday) {
-                                    setViewReasonModal({
-                                      isOpen: true,
-                                      course: session.course,
-                                      teacher: session.teacher,
-                                      reason: cancellationReason,
-                                    });
+                                  if (session) {
+                                    if (isClassOffToday) {
+                                      setViewReasonModal({
+                                        isOpen: true,
+                                        course: session.course,
+                                        teacher: session.teacher,
+                                        reason: cancellationReason,
+                                      });
+                                    } else if (role === "teacher" && teacherSemesters.has(activeSemesterId)) {
+                                      const isOwnClass = session.teacher?.toLowerCase() === auth?.username?.toLowerCase();
+                                      
+                                      if (isOwnClass) {
+                                        // Scenario A: PROXY (we click our own class to ask another teacher to take it)
+                                        setSelectedRowForSwap(session);
+                                        setSwapType("PROXY");
+                                        setTargetTeacherId(""); // User will select target teacher from dropdown
+                                        setTargetRoutineId(""); // No target class for proxy
+                                        setRequesterRoutineId(String(session.id)); // Our class is the one clicked
+                                        setSwapDate(format(new Date(), "yyyy-MM-dd"));
+                                        setSwapReason("");
+                                        setIsCalendarOpen(false);
+                                        setIsSwapModalOpen(true);
+                                      } else {
+                                        // Scenario B: MUTUAL (we click another teacher's class to swap our class with them)
+                                        const normalizeStr = (str: string) =>
+                                          str ? str.toLowerCase().replace(/[\s-_]/g, "") : "";
+
+                                        const targetTeacherObj = teachersList.find((t) => {
+                                          const usernameNorm = normalizeStr(t.username);
+                                          const nameNorm = normalizeStr(t.name);
+                                          const sessionTeacherNorm = normalizeStr(session.teacher);
+                                          
+                                          if (usernameNorm === sessionTeacherNorm || nameNorm === sessionTeacherNorm) {
+                                            return true;
+                                          }
+
+                                          const tInitials = getTeacherInitials(t.name || t.username).toLowerCase();
+                                          const sInitials = getTeacherInitials(session.teacher).toLowerCase();
+                                          return tInitials === sInitials;
+                                        });
+                                        const targetTeacherIdVal = targetTeacherObj ? String(targetTeacherObj.id) : "";
+
+                                        setSelectedRowForSwap(session); // Other teacher's class
+                                        setSwapType("MUTUAL");
+                                        setTargetTeacherId(targetTeacherIdVal); // Fixed target teacher
+                                        setTargetRoutineId(String(session.id)); // Fixed target class ID
+                                        setRequesterRoutineId(""); // User will select their own class from dropdown
+                                        setSwapDate(format(new Date(), "yyyy-MM-dd"));
+                                        setSwapReason("");
+                                        setIsCalendarOpen(false);
+                                        setIsSwapModalOpen(true);
+                                      }
+                                    }
                                   }
                                 }}
                                 className={cn(
                                   "p-2.5 h-px align-middle border-r border-border/60 transition-colors duration-200 !print:border-r !print:border-black print:p-0.5",
-                                  isClassOffToday
-                                    ? "cursor-pointer"
+                                  isClassOffToday ||
+                                    (role === "teacher" &&
+                                      session &&
+                                      teacherSemesters.has(activeSemesterId))
+                                    ? "cursor-pointer hover:border-indigo-400 hover:bg-muted/10"
                                     : "cursor-default",
                                   highlighted
                                     ? "bg-emerald-100/50 dark:bg-emerald-900/20 print:bg-transparent"
@@ -1005,6 +1251,206 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
               </motion.div>
             )}
           </AnimatePresence>
+        </DialogContent>
+      </Dialog>
+
+      {/* Swap Request Modal */}
+      <Dialog open={isSwapModalOpen} onOpenChange={setIsSwapModalOpen}>
+        <DialogContent 
+          className="sm:max-w-md w-full font-lexend"
+          onPointerDownOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (
+              target.closest('[data-slot="popover-content"]') ||
+              target.closest('.rdp') ||
+              target.closest('[data-radix-popper-content-wrapper]')
+            ) {
+              e.preventDefault();
+            }
+          }}
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (
+              target.closest('[data-slot="popover-content"]') ||
+              target.closest('.rdp') ||
+              target.closest('[data-radix-popper-content-wrapper]')
+            ) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+              <ArrowUpDown className="w-5 h-5 text-purple-500" />
+              Request Class Swap
+            </DialogTitle>
+            <DialogDescription>
+              {swapType === "PROXY"
+                ? "Submit a temporary PROXY request to ask another teacher to take your class."
+                : "Submit a temporary MUTUAL swap request with another teacher&apos;s class."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 py-2 text-sm">
+            {/* Swap Type */}
+            <div className="space-y-1">
+              <Label className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
+                Swap Type
+              </Label>
+              <Input
+                value={swapType === "PROXY" ? "PROXY (Teacher proxy request)" : "MUTUAL (Exchange classes)"}
+                disabled
+                className="h-10 bg-muted/30 cursor-not-allowed font-medium text-foreground text-xs sm:text-sm"
+              />
+            </div>
+
+            {/* Your Class */}
+            <div className="space-y-1">
+              <Label className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
+                Your Class *
+              </Label>
+              {swapType === "PROXY" ? (
+                <Input
+                  value={`${selectedRowForSwap?.course} - ${selectedRowForSwap?.day} (${selectedRowForSwap?.originalTime ? formatTimeSlotLabel(selectedRowForSwap.originalTime) : ""})`}
+                  disabled
+                  className="h-10 bg-muted/30 cursor-not-allowed font-medium text-foreground text-xs sm:text-sm"
+                />
+              ) : myClassesInSemester.length === 0 ? (
+                <div className="flex items-center gap-2 h-10 px-3 border rounded-md text-muted-foreground text-xs bg-muted/20">
+                  <span>No scheduled classes found for you in this semester.</span>
+                </div>
+              ) : (
+                <CustomSelect
+                  value={requesterRoutineId}
+                  onChange={setRequesterRoutineId}
+                  options={myClassesInSemester.map((item: any) => ({
+                    value: String(item.id),
+                    label: `${item.course_code} - ${item.day_name} (${formatTimeSlotLabel(item.start_time)} - ${formatTimeSlotLabel(item.end_time)})`,
+                  }))}
+                  placeholder="Select Your Class"
+                  id="requesterRoutineId"
+                />
+              )}
+            </div>
+
+            {/* Target Teacher */}
+            <div className="space-y-1">
+              <Label className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
+                Target Teacher *
+              </Label>
+              {swapType === "PROXY" ? (
+                otherTeachers.length === 0 ? (
+                  <div className="flex items-center gap-2 h-10 px-3 border rounded-md text-muted-foreground text-xs bg-muted/20">
+                    <span>No other teachers found in department.</span>
+                  </div>
+                ) : (
+                  <CustomSelect
+                    value={targetTeacherId}
+                    onChange={setTargetTeacherId}
+                    options={otherTeachers.map((t: any) => ({
+                      value: String(t.id),
+                      label: t.name || t.username,
+                    }))}
+                    placeholder="Select Target Teacher"
+                    id="targetTeacherId"
+                  />
+                )
+              ) : (
+                <Input
+                  value={
+                    teachersList.find((t) => String(t.id) === targetTeacherId)?.name ||
+                    teachersList.find((t) => String(t.id) === targetTeacherId)?.username ||
+                    selectedRowForSwap?.teacher ||
+                    ""
+                  }
+                  disabled
+                  className="h-10 bg-muted/30 cursor-not-allowed font-medium text-foreground text-xs sm:text-sm"
+                />
+              )}
+            </div>
+
+            {/* Swap Date - using Popover */}
+            <div className="space-y-1">
+              <Label htmlFor="swapDate" className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
+                Swap Date *
+              </Label>
+              <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-xs sm:text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-left font-medium text-foreground hover:bg-muted/30 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <CalendarIcon className="h-4 w-4 text-purple-500" />
+                      {swapDate ? format(new Date(swapDate), "PPP") : "Select Date"}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[100] pointer-events-auto" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={swapDate ? new Date(swapDate) : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        setSwapDate(format(date, "yyyy-MM-dd"));
+                        setIsCalendarOpen(false);
+                      }
+                    }}
+                    initialFocus
+                    className="rounded-md border bg-card"
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            {/* Target Class to Swap With - Show only if MUTUAL */}
+            {swapType === "MUTUAL" && (
+              <div className="space-y-1 sm:col-span-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                <Label className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
+                  Target Class to Swap With
+                </Label>
+                <Input
+                  value={`${selectedRowForSwap?.course} - ${selectedRowForSwap?.day} (${selectedRowForSwap?.originalTime ? formatTimeSlotLabel(selectedRowForSwap.originalTime) : ""})`}
+                  disabled
+                  className="h-10 bg-muted/30 cursor-not-allowed font-medium text-foreground text-xs sm:text-sm"
+                />
+              </div>
+            )}
+
+            {/* Reason Textarea - Span full width */}
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="swapReason" className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
+                Reason
+              </Label>
+              <Textarea
+                id="swapReason"
+                placeholder="e.g. Medical Emergency, Official Meeting..."
+                value={swapReason}
+                onChange={(e) => setSwapReason(e.target.value)}
+                className="h-14 py-1.5 resize-none text-xs sm:text-sm min-h-[56px]"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setIsSwapModalOpen(false)}
+              disabled={isSubmittingSwap}
+              className="h-10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendSwapRequest}
+              disabled={isSubmittingSwap}
+              className="bg-purple-600 hover:bg-purple-500 text-white min-w-[120px] h-10 gap-1.5 font-semibold"
+            >
+              {isSubmittingSwap && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Submit Request
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

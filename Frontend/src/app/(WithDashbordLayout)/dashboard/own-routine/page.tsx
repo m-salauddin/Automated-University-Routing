@@ -35,11 +35,13 @@ const StudentRoutine = async () => {
 
     // Ensure lunch break slot is present in the grid
     const lunchBreakStart = "13:15:00";
-    if (!uniqueSlotsMap.has(lunchBreakStart)) {
-      uniqueSlotsMap.set(lunchBreakStart, {
+    const lunchBreakEnd = "14:00:00";
+    const lunchBreakKey = `${lunchBreakStart}-${lunchBreakEnd}`;
+    if (!uniqueSlotsMap.has(lunchBreakKey)) {
+      uniqueSlotsMap.set(lunchBreakKey, {
         id: 999,
         start_time: lunchBreakStart,
-        end_time: "14:00:00",
+        end_time: lunchBreakEnd,
         is_lunch_break: true,
       });
     }

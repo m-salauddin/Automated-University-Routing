@@ -299,10 +299,16 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
   }, [routineList, sortedTimeSlots]);
 
   const semesterOptions = useMemo(() => {
-    return Object.keys(formattedRoutineData).map((key) => ({
-      id: key,
-      label: formattedRoutineData[key].label,
-    }));
+    return Object.keys(formattedRoutineData)
+      .map((key) => ({
+        id: key,
+        label: formattedRoutineData[key].label,
+      }))
+      .sort((a, b) => {
+        const numA = parseInt(a.id) || 999;
+        const numB = parseInt(b.id) || 999;
+        return numA - numB;
+      });
   }, [formattedRoutineData]);
 
 

@@ -1,49 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { jwtDecode } from "jwt-decode";
-
-const getValidToken = async (): Promise<string | null> => {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("accessToken")?.value;
-
-    if (!token) return null;
-
-    try {
-        const decoded = jwtDecode<{ exp?: number; token_type?: string }>(token);
-        const isExpired = decoded.exp ? decoded.exp * 1000 < Date.now() : false;
-        if (!isExpired) return token;
-    } catch {
-        console.warn("[Auth] Could not decode token — will try refresh");
-    }
-
-    const refreshToken = cookieStore.get("refreshToken")?.value;
-    if (refreshToken) {
-        try {
-            const refreshRes = await fetch(
-                `${process.env.NEXT_PUBLIC_BASE_API}/token/refresh/`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ refresh: refreshToken }),
-                    cache: "no-store",
-                }
-            );
-            if (refreshRes.ok) {
-                const data = await refreshRes.json();
-                const newToken = data.access;
-                if (newToken) {
-                    cookieStore.set("accessToken", newToken, { httpOnly: false, secure: process.env.NODE_ENV === "production", path: "/" });
-                    return newToken;
-                }
-            }
-        } catch (e) {
-            console.warn("[Auth] Token refresh error:", e);
-        }
-    }
-
-    return token;
-};
+import { getValidToken } from "../auth";
 
 export const getNotifications = async () => {
     try {

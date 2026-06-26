@@ -1,52 +1,5 @@
 "use server";
-import { cookies } from "next/headers";
-import { jwtDecode } from "jwt-decode";
-
-
-const getValidToken = async (): Promise<string | null> => {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("accessToken")?.value;
-
-    if (!token) return null;
-
-    try {
-        const decoded = jwtDecode<{ exp?: number; token_type?: string }>(token);
-        const isExpired = decoded.exp ? decoded.exp * 1000 < Date.now() : false;
-        if (!isExpired) return token; // Token is valid — use it directly
-    } catch {
-        console.warn("[Auth] Could not decode token — will try refresh");
-    }
-
-    const refreshToken = cookieStore.get("refreshToken")?.value;
-    if (refreshToken) {
-        try {
-            const refreshRes = await fetch(
-                `${process.env.NEXT_PUBLIC_BASE_API}/token/refresh/`,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ refresh: refreshToken }),
-                    cache: "no-store",
-                }
-            );
-            if (refreshRes.ok) {
-                const data = await refreshRes.json();
-                const newToken = data.access;
-                if (newToken) {
-                    cookieStore.set("accessToken", newToken, { httpOnly: false, secure: process.env.NODE_ENV === "production", path: "/" });
-                    return newToken;
-                }
-            } else {
-                console.warn("[Auth] Token refresh failed:", refreshRes.status);
-            }
-        } catch (e) {
-            console.warn("[Auth] Token refresh error:", e);
-        }
-    }
-
-    console.warn("[Auth] Falling back to original token");
-    return token;
-};
+import { getValidToken } from "../auth";
 
 export interface GetRoutineParams {
     day?: number | string;
@@ -76,11 +29,10 @@ const getRoutine = async (params?: GetRoutineParams) => {
         const queryString = queryParams.toString();
         const ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/view-routine/${queryString ? `?${queryString}` : ""}`;
 
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(ROUTINE_URL, {
@@ -115,7 +67,9 @@ const getRoutine = async (params?: GetRoutineParams) => {
 
         let normalizedData = rawResult;
         if (!Array.isArray(rawResult) && rawResult !== null && typeof rawResult === "object") {
-            if (Array.isArray(rawResult.results)) {
+            if (Array.isArray(rawResult.data)) {
+                normalizedData = rawResult.data;
+            } else if (Array.isArray(rawResult.results)) {
                 normalizedData = rawResult.results;
             }
         }
@@ -127,14 +81,68 @@ const getRoutine = async (params?: GetRoutineParams) => {
     }
 };
 
+const getDepartmentRoutine = async () => {
+    try {
+        const ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/department-routine/`;
+
+        const token = await getValidToken();
+
+        if (!token) {
+            return { success: false, message: "No access token found. Please log in." };
+        }
+
+        const res = await fetch(ROUTINE_URL, {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            let errorMessage = `Routine failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage =
+                    errorJson.detail ||
+                    errorJson.non_field_errors?.[0] ||
+                    errorJson.message ||
+                    errorMessage;
+            } catch {
+                console.error(
+                    `[Routine] Non-JSON Error Body: ${errorText.slice(0, 200)}`
+                );
+            }
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+
+        let normalizedData = rawResult;
+        if (!Array.isArray(rawResult) && rawResult !== null && typeof rawResult === "object") {
+            if (Array.isArray(rawResult.data)) {
+                normalizedData = rawResult.data;
+            } else if (Array.isArray(rawResult.results)) {
+                normalizedData = rawResult.results;
+            }
+        }
+
+        return { success: true, data: normalizedData };
+    } catch (error) {
+        console.error("[Routine] Failed to fetch department routine:", error);
+        return { success: false, message: "Failed to fetch department routine" };
+    }
+};
+
 const generateRoutine = async (params: GenerateRoutineParams) => {
     try {
         const GENERATE_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/generate-routine/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(GENERATE_ROUTINE_URL, {
@@ -177,11 +185,10 @@ const generateRoutine = async (params: GenerateRoutineParams) => {
 const rollbackRoutine = async (params: { department_id: number }) => {
     try {
         const ROLLBACK_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/rollback-routine/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(ROLLBACK_ROUTINE_URL, {
@@ -362,11 +369,10 @@ const updateCancelMessage = async (routineId: number, cancelMessage: string) => 
 const swapRoutineEntries = async (entry1Id: number, entry2Id: number) => {
     try {
         const SWAP_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/routine/swap/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(SWAP_ROUTINE_URL, {
@@ -405,11 +411,10 @@ const updateRoutineEntry = async (
 ) => {
     try {
         const UPDATE_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/routine/update/${entryId}/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const bodyData: Record<string, any> = {
@@ -450,7 +455,7 @@ const updateRoutineEntry = async (
 
 export interface RequestSwapParams {
     swap_type: "PROXY" | "MUTUAL";
-    target_teacher_id: number;
+    target_teacher_id: number | string;
     requester_routine_id: number;
     target_routine_id?: number | null;
     swap_date: string;
@@ -460,11 +465,10 @@ export interface RequestSwapParams {
 const requestSwap = async (params: RequestSwapParams) => {
     try {
         const SWAP_REQUEST_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/swap-request/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(SWAP_REQUEST_URL, {
@@ -507,11 +511,10 @@ export interface RespondSwapParams {
 const respondSwap = async (params: RespondSwapParams) => {
     try {
         const SWAP_REQUEST_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/swap-request/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(SWAP_REQUEST_URL, {
@@ -544,6 +547,7 @@ const respondSwap = async (params: RespondSwapParams) => {
 
 export {
     getRoutine,
+    getDepartmentRoutine,
     generateRoutine,
     rollbackRoutine,
     cancelClass,

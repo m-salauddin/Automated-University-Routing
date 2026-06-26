@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
-import { cookies } from "next/headers";
+import { getValidToken } from "../auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_BASE_API;
 
@@ -34,10 +34,9 @@ const handleResponse = async (res: Response) => {
 
 export const getAllCourses = async () => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/courses/`, {
             method: "GET",
@@ -57,10 +56,9 @@ export const getAllCourses = async () => {
 
 export const createCourse = async (courseData: any) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/courses/`, {
             method: "POST",
@@ -81,10 +79,9 @@ export const createCourse = async (courseData: any) => {
 
 export const updateCourse = async (courseId: number, courseData: any) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/courses/${courseId}/`, {
             method: "PUT",
@@ -105,10 +102,9 @@ export const updateCourse = async (courseId: number, courseData: any) => {
 
 export const deleteCourse = async (courseId: number) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/courses/${courseId}/`, {
             method: "DELETE",
