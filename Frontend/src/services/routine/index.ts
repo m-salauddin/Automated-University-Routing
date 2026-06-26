@@ -1,5 +1,61 @@
 "use server";
 import { cookies } from "next/headers";
+import { jwtDecode } from "jwt-decode";
+
+/**
+ * Returns a valid access token.
+ * If the stored token is expired, attempts a silent refresh via the refresh token.
+ * Falls back to the raw stored token so the request is never silently blocked.
+ */
+const getValidToken = async (): Promise<string | null> => {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("accessToken")?.value;
+
+    if (!token) return null;
+
+    // Check if the stored access token is still valid
+    try {
+        const decoded = jwtDecode<{ exp?: number; token_type?: string }>(token);
+        console.log("[Auth] Token type:", decoded.token_type, "exp:", decoded.exp);
+        const isExpired = decoded.exp ? decoded.exp * 1000 < Date.now() : false;
+        if (!isExpired) return token; // Token is valid — use it directly
+    } catch {
+        console.warn("[Auth] Could not decode token — will try refresh");
+    }
+
+    // Token is expired — try a silent refresh
+    const refreshToken = cookieStore.get("refreshToken")?.value;
+    if (refreshToken) {
+        try {
+            const refreshRes = await fetch(
+                `${process.env.NEXT_PUBLIC_BASE_API}/token/refresh/`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ refresh: refreshToken }),
+                    cache: "no-store",
+                }
+            );
+            if (refreshRes.ok) {
+                const data = await refreshRes.json();
+                const newToken = data.access;
+                if (newToken) {
+                    cookieStore.set("accessToken", newToken);
+                    console.log("[Auth] Token refreshed successfully");
+                    return newToken;
+                }
+            } else {
+                console.warn("[Auth] Token refresh failed:", refreshRes.status);
+            }
+        } catch (e) {
+            console.warn("[Auth] Token refresh error:", e);
+        }
+    }
+
+    // Fall back to the original token — let the backend return the real error
+    console.warn("[Auth] Falling back to original token");
+    return token;
+};
 
 export interface GetRoutineParams {
     day?: number | string;
@@ -177,13 +233,18 @@ const rollbackRoutine = async (params: { department_id: number }) => {
 
 const cancelClass = async (routineId: number, cancelMessage: string) => {
     try {
-        const CANCEL_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const CANCEL_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
+
+        const body = { 
+            action: "cancel", 
+            cancel_message: cancelMessage 
+        };
+        console.log("[CancelClass] POST", CANCEL_CLASS_URL, "body:", JSON.stringify(body));
 
         const res = await fetch(CANCEL_CLASS_URL, {
             method: "POST",
@@ -191,12 +252,15 @@ const cancelClass = async (routineId: number, cancelMessage: string) => {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ routine_id: routineId, cancel_message: cancelMessage }),
+            body: JSON.stringify(body),
             cache: "no-store",
         });
 
+        console.log("[CancelClass] Response status:", res.status);
+
         if (!res.ok) {
             const errorText = await res.text();
+            console.error("[CancelClass] Error body:", errorText);
             let errorMessage = `Cancellation failed (${res.status})`;
             try {
                 const errorJson = JSON.parse(errorText);
@@ -206,6 +270,7 @@ const cancelClass = async (routineId: number, cancelMessage: string) => {
         }
 
         const rawResult = await res.json();
+        console.log("[CancelClass] Success:", JSON.stringify(rawResult));
         return { success: true, data: rawResult };
     } catch (error) {
         console.error("[Routine] Failed to cancel class:", error);
@@ -215,27 +280,81 @@ const cancelClass = async (routineId: number, cancelMessage: string) => {
 
 const reactivateClass = async (routineId: number) => {
     try {
-        const ACTIVATE_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/activate-class/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const CANCEL_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
-        const res = await fetch(ACTIVATE_CLASS_URL, {
+        const body = { 
+            action: "reactivate" 
+        };
+        console.log("[ReactivateClass] POST", CANCEL_CLASS_URL, JSON.stringify(body));
+
+        const res = await fetch(CANCEL_CLASS_URL, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ routine_id: routineId }),
+            body: JSON.stringify(body),
             cache: "no-store",
         });
 
+        console.log("[ReactivateClass] Response status:", res.status);
+
         if (!res.ok) {
             const errorText = await res.text();
+            console.error("[ReactivateClass] Error body:", errorText);
             let errorMessage = `Reactivation failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
+            } catch {}
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+        console.log("[ReactivateClass] Success:", JSON.stringify(rawResult));
+        return { success: true, data: rawResult };
+    } catch (error) {
+        console.error("[Routine] Failed to activate class:", error);
+        return { success: false, message: "Failed to activate class" };
+    }
+};
+
+const updateCancelMessage = async (routineId: number, cancelMessage: string) => {
+    try {
+        const CANCEL_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
+        const token = await getValidToken();
+
+        if (!token) {
+            return { success: false, message: "No access token found. Please log in." };
+        }
+
+        const body = { 
+            action: "update", 
+            cancel_message: cancelMessage 
+        };
+        console.log("[UpdateCancelMsg] POST", CANCEL_CLASS_URL, JSON.stringify(body));
+
+        const res = await fetch(CANCEL_CLASS_URL, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+            cache: "no-store",
+        });
+
+        console.log("[UpdateCancelMsg] Response status:", res.status);
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("[UpdateCancelMsg] Error body:", errorText);
+            let errorMessage = `Updating cancellation message failed (${res.status})`;
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
@@ -246,8 +365,8 @@ const reactivateClass = async (routineId: number) => {
         const rawResult = await res.json();
         return { success: true, data: rawResult };
     } catch (error) {
-        console.error("[Routine] Failed to activate class:", error);
-        return { success: false, message: "Failed to activate class" };
+        console.error("[Routine] Failed to update cancellation message:", error);
+        return { success: false, message: "Failed to update cancellation message" };
     }
 };
 
@@ -440,6 +559,7 @@ export {
     rollbackRoutine, 
     cancelClass, 
     reactivateClass,
+    updateCancelMessage,
     swapRoutineEntries, 
     updateRoutineEntry,
     requestSwap,

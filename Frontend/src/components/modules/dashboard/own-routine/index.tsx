@@ -88,6 +88,7 @@ import {
   ArrowUpDown,
   Loader2,
   Utensils,
+  Pencil,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { markOff, markOn, generateClassKey, normalizeTime } from "@/store/classOffSlice";
@@ -105,7 +106,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { CustomSelect } from "@/components/ui/custom-select";
-import { cancelClass, reactivateClass, requestSwap, respondSwap, getRoutine } from "@/services/routine";
+import { cancelClass, reactivateClass, updateCancelMessage, requestSwap, respondSwap, getRoutine } from "@/services/routine";
 import { getAllUsers } from "@/services/users";
 
 export type APIRoutineItem = {
@@ -231,6 +232,9 @@ interface CancellationModalProps {
   onOpenChange: (open: boolean) => void;
   courseName: string | undefined;
   onConfirm: (reason: string) => void;
+  title?: string;
+  confirmLabel?: string;
+  initialReason?: string;
 }
 
 function CancellationModal({
@@ -238,9 +242,18 @@ function CancellationModal({
   onOpenChange,
   courseName,
   onConfirm,
+  title = "Cancel Class",
+  confirmLabel = "Confirm Cancellation",
+  initialReason = "",
 }: CancellationModalProps) {
   const [reason, setReason] = useState("");
   const LIMIT = 100;
+
+  useEffect(() => {
+    if (isOpen) {
+      setReason(initialReason || "");
+    }
+  }, [isOpen, initialReason]);
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
@@ -279,7 +292,7 @@ function CancellationModal({
             >
               <motion.div variants={modalItemVariants}>
                 <DialogHeader>
-                  <DialogTitle>Cancel Class</DialogTitle>
+                  <DialogTitle>{title}</DialogTitle>
                   <DialogDescription>
                     Please provide a reason for cancelling{" "}
                     <strong>{courseName}</strong>. This will be visible to
@@ -324,7 +337,7 @@ function CancellationModal({
                     onClick={handleConfirmClick}
                     disabled={!reason.trim()}
                   >
-                    Confirm Cancellation
+                    {confirmLabel}
                   </Button>
                 </DialogFooter>
               </motion.div>
@@ -398,6 +411,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
 
   
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
+  const [cancellationMode, setCancellationMode] = useState<"cancel" | "update">("cancel");
 
   
   const [pendingCancellation, setPendingCancellation] = useState<{
@@ -408,6 +422,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
     department: string;
     semester: string;
     day: string;
+    initialReason?: string;
   } | null>(null);
 
   const [visibleCols, setVisibleCols] = useState<
@@ -854,9 +869,16 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
     if (!pendingCancellation) return;
 
     try {
-      const res = await cancelClass(pendingCancellation.id, reason);
+      const res = cancellationMode === "update"
+        ? await updateCancelMessage(pendingCancellation.id, reason)
+        : await cancelClass(pendingCancellation.id, reason);
+
       if (res.success) {
-        toast.warning(`${pendingCancellation.courseName} class has been cancelled`);
+        if (cancellationMode === "update") {
+          toast.success("Cancellation message updated successfully");
+        } else {
+          toast.warning(`${pendingCancellation.courseName} class has been cancelled`);
+        }
         setRows((prev) =>
           prev.map((r) =>
             r.id === pendingCancellation.id
@@ -865,10 +887,10 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           )
         );
       } else {
-        toast.error(res.message || "Failed to cancel class");
+        toast.error(res.message || (cancellationMode === "update" ? "Failed to update cancellation message" : "Failed to cancel class"));
       }
     } catch (err: any) {
-      toast.error(err.message || "An error occurred while cancelling class");
+      toast.error(err.message || "An error occurred");
     } finally {
       setIsReasonModalOpen(false);
       setPendingCancellation(null);
@@ -1018,6 +1040,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           semester: row.semester,
           day: row.day,
         });
+        setCancellationMode("cancel");
         setIsReasonModalOpen(true);
       } else {
         dispatch(
@@ -1056,6 +1079,21 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
       } else {
         toast.error(res.message || "Failed to activate class");
       }
+    };
+
+    const handleUpdateMessageClick = () => {
+      setPendingCancellation({
+        id: row.id,
+        teacherId: row.teacherId,
+        startTimeRaw: row.startTimeRaw,
+        courseName: row.course,
+        department: row.department,
+        semester: row.semester,
+        day: row.day,
+        initialReason: row.cancel_message || "",
+      });
+      setCancellationMode("update");
+      setIsReasonModalOpen(true);
     };
 
     const isLab = row.type === "Lab";
@@ -1147,12 +1185,20 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
             ) : (
               <>
                 {row.is_cancelled ? (
-                  <DropdownMenuItem
-                    className="text-emerald-500 focus:text-emerald-500 cursor-pointer"
-                    onClick={handleReactivate}
-                  >
-                    <CheckCheck className="size-4 mr-2 text-emerald-500" /> Activate Class
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem
+                      className="text-emerald-500 focus:text-emerald-500 cursor-pointer"
+                      onClick={handleReactivate}
+                    >
+                      <CheckCheck className="size-4 mr-2 text-emerald-500" /> Activate Class
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-amber-500 focus:text-amber-500 cursor-pointer"
+                      onClick={handleUpdateMessageClick}
+                    >
+                      <Pencil className="size-4 mr-2 text-amber-500" /> Update Message
+                    </DropdownMenuItem>
+                  </>
                 ) : (
                   <DropdownMenuItem
                     className="opacity-50 cursor-not-allowed"
@@ -1218,6 +1264,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           semester: row.semester,
           day: row.day,
         });
+        setCancellationMode("cancel");
         setIsReasonModalOpen(true);
       } else {
         dispatch(
@@ -1258,6 +1305,21 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
       }
     };
 
+    const handleUpdateMessageClick = () => {
+      setPendingCancellation({
+        id: row.id,
+        teacherId: row.teacherId,
+        startTimeRaw: row.startTimeRaw,
+        courseName: row.course,
+        department: row.department,
+        semester: row.semester,
+        day: row.day,
+        initialReason: row.cancel_message || "",
+      });
+      setCancellationMode("update");
+      setIsReasonModalOpen(true);
+    };
+
     return (
       <TableRow
         ref={setNodeRef}
@@ -1296,7 +1358,9 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                   variant="outline"
                   className={cn(
                     "rounded-md px-2.5 py-0.5 font-medium border shadow-sm",
-                    row.type === "Lab"
+                    currentStatus === "off"
+                      ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/20"
+                      : row.type === "Lab"
                       ? "bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/20"
                       : "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/20"
                   )}
@@ -1357,12 +1421,20 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
               ) : (
                 <>
                   {row.is_cancelled ? (
-                    <DropdownMenuItem
-                      className="text-emerald-500 focus:text-emerald-500 cursor-pointer"
-                      onClick={handleReactivate}
-                    >
-                      <CheckCheck className="size-4 mr-2 text-emerald-500" /> Activate Class
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem
+                        className="text-emerald-500 focus:text-emerald-500 cursor-pointer"
+                        onClick={handleReactivate}
+                      >
+                        <CheckCheck className="size-4 mr-2 text-emerald-500" /> Activate Class
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-amber-500 focus:text-amber-500 cursor-pointer"
+                        onClick={handleUpdateMessageClick}
+                      >
+                        <Pencil className="size-4 mr-2 text-amber-500" /> Update Message
+                      </DropdownMenuItem>
+                    </>
                   ) : (
                     <DropdownMenuItem
                       className="opacity-50 cursor-not-allowed"
@@ -2093,6 +2165,9 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
         onOpenChange={setIsReasonModalOpen}
         courseName={pendingCancellation?.courseName}
         onConfirm={submitCancellation}
+        title={cancellationMode === "update" ? "Update Cancellation Message" : "Cancel Class"}
+        confirmLabel={cancellationMode === "update" ? "Update Message" : "Confirm Cancellation"}
+        initialReason={pendingCancellation?.initialReason}
       />
 
       {/* Swap Request Modal */}

@@ -38,6 +38,9 @@ import {
   CheckCircle2,
   X,
   ArrowLeftRight,
+  PowerOff,
+  CheckCheck,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +51,8 @@ import {
   generateClassKey,
   normalizeTime,
   resetAll,
+  markOff,
+  markOn,
 } from "@/store/classOffSlice";
 import { setIsLocked } from "@/store/routineSlice";
 import DataLoader from "@/components/ui/data-loader";
@@ -60,11 +65,144 @@ import {
   DialogClose,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { generateRoutine, getRoutine, updateRoutineEntry, swapRoutineEntries } from "@/services/routine";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { generateRoutine, getRoutine, updateRoutineEntry, swapRoutineEntries, cancelClass, reactivateClass, updateCancelMessage } from "@/services/routine";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+
+interface CancellationModalProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  courseName: string | undefined;
+  onConfirm: (reason: string) => void;
+  title?: string;
+  confirmLabel?: string;
+  initialReason?: string;
+}
+
+function CancellationModal({
+  isOpen,
+  onOpenChange,
+  courseName,
+  onConfirm,
+  title = "Cancel Class",
+  confirmLabel = "Confirm Cancellation",
+  initialReason = "",
+}: CancellationModalProps) {
+  const [reason, setReason] = useState("");
+  const LIMIT = 100;
+
+  useEffect(() => {
+    if (isOpen) {
+      setReason(initialReason || "");
+    }
+  }, [isOpen, initialReason]);
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      setReason("");
+    }
+    onOpenChange(open);
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value;
+    if (text.length <= LIMIT) {
+      setReason(text);
+    }
+  };
+
+  const handleCloseClick = () => {
+    setReason("");
+    onOpenChange(false);
+  };
+
+  const handleConfirmClick = () => {
+    onConfirm(reason);
+    setReason("");
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-md w-full overflow-hidden">
+        <AnimatePresence mode="wait">
+          {isOpen && (
+            <motion.div
+              variants={modalContentVariants}
+              initial="hidden"
+              animate="visible"
+              className="flex flex-col gap-4"
+            >
+              <motion.div variants={modalItemVariants}>
+                <DialogHeader>
+                  <DialogTitle>{title}</DialogTitle>
+                  <DialogDescription>
+                    Please provide a reason for cancelling{" "}
+                    <strong>{courseName}</strong>. This will be visible to
+                    students.
+                  </DialogDescription>
+                </DialogHeader>
+              </motion.div>
+
+              <motion.div variants={modalItemVariants} className="space-y-3">
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="reason"
+                    className="flex justify-between text-xs font-medium"
+                  >
+                    <span>Reason</span>
+                    <span
+                      className={cn(
+                        "text-muted-foreground",
+                        reason.length === LIMIT && "text-red-500"
+                      )}
+                    >
+                      {reason.length}/{LIMIT} characters
+                    </span>
+                  </Label>
+                  <Textarea
+                    id="reason"
+                    placeholder="e.g., Sick leave, Emergency meeting..."
+                    value={reason}
+                    onChange={handleTextChange}
+                    className="h-32 resize-none break-all whitespace-pre-wrap"
+                  />
+                </div>
+              </motion.div>
+
+              <motion.div variants={modalItemVariants}>
+                <DialogFooter className="sm:justify-end gap-2">
+                  <Button variant="outline" onClick={handleCloseClick}>
+                    Close
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleConfirmClick}
+                    disabled={!reason.trim()}
+                  >
+                    {confirmLabel}
+                  </Button>
+                </DialogFooter>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 
 export type APIRoutineItem = {
@@ -251,6 +389,9 @@ interface RoutineTableProps {
   printHeader?: React.ReactNode;
   refreshRoutine: () => Promise<void>;
   isRoutineLocked: boolean;
+  onCancelClass?: (session: ClassSession) => void;
+  onReactivateClass?: (session: ClassSession) => void;
+  onUpdateCancelMessage?: (session: ClassSession) => void;
 }
 
 const MemoizedRoutineTable = React.memo(
@@ -266,6 +407,9 @@ const MemoizedRoutineTable = React.memo(
     printHeader,
     refreshRoutine,
     isRoutineLocked,
+    onCancelClass,
+    onReactivateClass,
+    onUpdateCancelMessage,
   }: RoutineTableProps) => {
     try {
       const [draggedSession, setDraggedSession] = useState<ClassSession | null>(null);
@@ -666,75 +810,110 @@ const MemoizedRoutineTable = React.memo(
                                     </>
                                   )}
                                 </AnimatePresence>
-                                {session ? (
-                                  <>
-                                    <motion.div
-                                      draggable={!isRoutineLocked && !isClassOffToday && !isSubmitting}
-                                      onDragStart={(e) => {
-                                        if (isRoutineLocked || isClassOffToday || isSubmitting) {
-                                          e.preventDefault();
-                                          return;
-                                        }
-                                        setDraggedSession(session);
-                                      }}
-                                      onDragEnd={() => {
-                                        setDraggedSession(null);
-                                        setHoveredCell(null);
-                                      }}
-                                      whileHover={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? { scale: 1.01, y: -0.5 } : {}}
-                                      className={cn(
-                                        "w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden",
-                                        "transition-colors duration-200",
-                                        (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:shadow-md",
-                                        isTeacherOff
-                                          ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
-                                          : highlighted
-                                          ? "bg-background border-emerald-500 shadow-md"
-                                          : isLab
-                                          ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40"
-                                          : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40"
-                                      )}
-                                    >
-                                      <div className="flex justify-between items-start w-full gap-1">
-                                        <span className={cn(
-                                          "text-xs font-extrabold tracking-tight leading-tight text-foreground",
-                                          isClassOffToday && "opacity-70"
-                                        )}>
-                                          {session.course}
-                                        </span>
-                                        {isLab ? (
-                                          <span className={cn(
-                                            "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
-                                            isTeacherOff
-                                              ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                              : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
-                                          )}>
-                                            Lab
-                                          </span>
-                                        ) : (
-                                          <span className={cn(
-                                            "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
-                                            isTeacherOff
-                                              ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                              : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
-                                          )}>
-                                            Theory
-                                          </span>
-                                        )}
-                                      </div>
-                                      <div className="flex flex-col gap-0.5 mt-1">
-                                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                                          <User className="w-3 h-3 opacity-70" />
-                                          <span>
-                                            {getTeacherInitials(session.teacher)}
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-                                          <MapPin className="w-3 h-3 opacity-70" />
-                                          <span>{session.room}</span>
-                                        </div>
-                                      </div>
-                                    </motion.div>
+                                 {session ? (
+                                   <>
+                                     <DropdownMenu>
+                                       <DropdownMenuTrigger asChild>
+                                         <motion.div
+                                           draggable={!isRoutineLocked && !isClassOffToday && !isSubmitting}
+                                           onDragStart={(e) => {
+                                             if (isRoutineLocked || isClassOffToday || isSubmitting) {
+                                               e.preventDefault();
+                                               return;
+                                             }
+                                             setDraggedSession(session);
+                                           }}
+                                           onDragEnd={() => {
+                                             setDraggedSession(null);
+                                             setHoveredCell(null);
+                                           }}
+                                           whileHover={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? { scale: 1.01, y: -0.5 } : {}}
+                                           className={cn(
+                                             "w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden cursor-pointer",
+                                             "transition-colors duration-200",
+                                             (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:shadow-md",
+                                             isTeacherOff
+                                               ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                                               : highlighted
+                                               ? "bg-background border-emerald-500 shadow-md"
+                                               : isLab
+                                               ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40"
+                                               : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40"
+                                           )}
+                                         >
+                                           <div className="flex justify-between items-start w-full gap-1">
+                                             <span className={cn(
+                                               "text-xs font-extrabold tracking-tight leading-tight text-foreground",
+                                               isClassOffToday && "opacity-70"
+                                             )}>
+                                               {session.course}
+                                             </span>
+                                             {isLab ? (
+                                               <span className={cn(
+                                                 "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                                 isTeacherOff
+                                                   ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                   : "bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                               )}>
+                                                 Lab
+                                               </span>
+                                             ) : (
+                                               <span className={cn(
+                                                 "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                                 isTeacherOff
+                                                   ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                   : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                               )}>
+                                                 Theory
+                                               </span>
+                                             )}
+                                           </div>
+                                           <div className="flex flex-col gap-0.5 mt-1">
+                                             <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                                               <User className="w-3 h-3 opacity-70" />
+                                               <span>
+                                                 {getTeacherInitials(session.teacher)}
+                                               </span>
+                                             </div>
+                                             <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
+                                               <MapPin className="w-3 h-3 opacity-70" />
+                                               <span>{session.room}</span>
+                                             </div>
+                                           </div>
+                                         </motion.div>
+                                       </DropdownMenuTrigger>
+                                       {!isRoutineLocked && !isSubmitting && (
+                                         <DropdownMenuContent align="start" className="w-48">
+                                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                           <DropdownMenuSeparator />
+                                           {!isClassOffToday ? (
+                                             <DropdownMenuItem
+                                               className="text-red-500 focus:text-red-500 cursor-pointer"
+                                               onClick={() => onCancelClass?.(session)}
+                                             >
+                                               <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
+                                             </DropdownMenuItem>
+                                           ) : (
+                                             <>
+                                               <DropdownMenuItem
+                                                 className="text-emerald-500 focus:text-emerald-500 cursor-pointer"
+                                                 onClick={() => onReactivateClass?.(session)}
+                                               >
+                                                 <CheckCheck className="size-4 mr-2 text-emerald-500" /> Activate Class
+                                               </DropdownMenuItem>
+                                               {session.is_cancelled && (
+                                                 <DropdownMenuItem
+                                                   className="text-amber-500 focus:text-amber-500 cursor-pointer"
+                                                   onClick={() => onUpdateCancelMessage?.(session)}
+                                                 >
+                                                   <Pencil className="size-4 mr-2 text-amber-500" /> Update Message
+                                                 </DropdownMenuItem>
+                                               )}
+                                             </>
+                                           )}
+                                         </DropdownMenuContent>
+                                       )}
+                                     </DropdownMenu>
                                     <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
                                       <span className="font-bold text-[11px]">
                                         {session.course}, T-
@@ -972,6 +1151,94 @@ export default function AdminRoutinePage({
   const [selectedSemester, setSelectedSemester] = useState<string>("");
 
   const [localRoutineList, setLocalRoutineList] = useState<APIRoutineItem[]>(routineList);
+  const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
+  const [cancellationMode, setCancellationMode] = useState<"cancel" | "update">("cancel");
+  const [pendingCancellation, setPendingCancellation] = useState<{
+    id: number;
+    courseName: string;
+    teacherId: string;
+    startTimeRaw: string;
+    department: string;
+    semester: string;
+    day: string;
+    initialReason?: string;
+  } | null>(null);
+
+  const submitCancellation = async (reason: string) => {
+    if (!pendingCancellation) return;
+
+    try {
+      const res = cancellationMode === "update"
+        ? await updateCancelMessage(pendingCancellation.id, reason)
+        : await cancelClass(pendingCancellation.id, reason);
+
+      if (res.success) {
+        if (cancellationMode === "update") {
+          toast.success("Cancellation message updated successfully");
+        } else {
+          toast.warning(`${pendingCancellation.courseName} class has been cancelled`);
+        }
+        
+        setLocalRoutineList((prev) =>
+          prev.map((r) =>
+            r.id === pendingCancellation.id
+              ? { ...r, is_cancelled: true, cancel_message: reason }
+              : r
+          )
+        );
+
+        dispatch(
+          markOff({
+            department: pendingCancellation.department,
+            semester: pendingCancellation.semester,
+            day: pendingCancellation.day,
+            teacherId: pendingCancellation.teacherId,
+            startTime: pendingCancellation.startTimeRaw,
+            reason: reason,
+          })
+        );
+      } else {
+        toast.error(res.message || (cancellationMode === "update" ? "Failed to update cancellation message" : "Failed to cancel class"));
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An error occurred");
+    } finally {
+      setIsReasonModalOpen(false);
+      setPendingCancellation(null);
+    }
+  };
+
+  const handleReactivate = async (session: ClassSession) => {
+    try {
+      const res = await reactivateClass(session.id);
+      if (res.success) {
+        toast.success(`${session.course} is now active (ON)`);
+        
+        setLocalRoutineList((prev) =>
+          prev.map((r) =>
+            r.id === session.id
+              ? { ...r, is_cancelled: false, cancel_message: null }
+              : r
+          )
+        );
+
+        dispatch(
+          markOn({
+            department: session.department,
+            semester: session.semester,
+            day: session.day,
+            teacherId: session.teacherId || session.teacher,
+            startTime: session.originalTime || "",
+          })
+        );
+      } else {
+        toast.error(res.message || "Failed to activate class");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An error occurred");
+    }
+  };
+
   const [isLoadingRoutine, setIsLoadingRoutine] = useState(false);
 
   useEffect(() => {
@@ -1200,6 +1467,39 @@ export default function AdminRoutinePage({
     },
     []
   );
+
+  const handleCancelClass = useCallback((session: any) => {
+    setPendingCancellation({
+      id: session.id,
+      courseName: session.course,
+      teacherId: session.teacherId || session.teacher,
+      startTimeRaw: session.originalTime || "",
+      department: session.department,
+      semester: session.semester,
+      day: session.day,
+    });
+    setCancellationMode("cancel");
+    setIsReasonModalOpen(true);
+  }, []);
+
+  const handleUpdateCancelMessage = useCallback((session: any) => {
+    setPendingCancellation({
+      id: session.id,
+      courseName: session.course,
+      teacherId: session.teacherId || session.teacher,
+      startTimeRaw: session.originalTime || "",
+      department: session.department,
+      semester: session.semester,
+      day: session.day,
+      initialReason: session.cancel_message || "",
+    });
+    setCancellationMode("update");
+    setIsReasonModalOpen(true);
+  }, []);
+
+  const handleReactivateClass = useCallback(async (session: any) => {
+    await handleReactivate(session);
+  }, [handleReactivate]);
 
   
   const currentRoutineSchedule = useMemo(() => {
@@ -1844,6 +2144,9 @@ export default function AdminRoutinePage({
                   printHeader={printHeader}
                   refreshRoutine={refreshRoutine}
                   isRoutineLocked={isRoutineLocked}
+                  onCancelClass={handleCancelClass}
+                  onReactivateClass={handleReactivateClass}
+                  onUpdateCancelMessage={handleUpdateCancelMessage}
                 />
               </div>
             </motion.div>
@@ -2187,6 +2490,16 @@ export default function AdminRoutinePage({
           </AnimatePresence>
         </DialogContent>
       </Dialog>
+
+      <CancellationModal
+        isOpen={isReasonModalOpen}
+        onOpenChange={setIsReasonModalOpen}
+        courseName={pendingCancellation?.courseName}
+        onConfirm={submitCancellation}
+        title={cancellationMode === "update" ? "Update Cancellation Message" : "Cancel Class"}
+        confirmLabel={cancellationMode === "update" ? "Update Message" : "Confirm Cancellation"}
+        initialReason={pendingCancellation?.initialReason}
+      />
     </>
   );
 }
