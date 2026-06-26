@@ -76,6 +76,11 @@ export function AppSidebar() {
       url: "/dashboard/own-routine",
       icon: CalendarCheck,
     },
+    {
+      title: "Department Routine",
+      url: "/dashboard/department-routine",
+      icon: View,
+    },
   ];
 
   const adminPanel = [

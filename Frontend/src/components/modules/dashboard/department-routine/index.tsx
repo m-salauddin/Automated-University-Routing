@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import { generateClassKey, normalizeTime } from "@/store/classOffSlice";
-import DataLoader from "@/components/ui/data-loader";
+import { CustomSelect } from "@/components/ui/custom-select";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +32,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { useRouter } from "next/navigation";
 
 export type APIRoutineItem = {
   id: number;
@@ -92,7 +91,6 @@ const formatTimeSlotLabel = (timeStr: string) => {
 };
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
-
 
 const getTeacherInitials = (name: string) => {
   if (!name) return "";
@@ -211,8 +209,6 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
 
   const auth = useSelector((s: RootState) => s.auth) as any;
 
-
-
   const availabilityMap = useSelector(
     (s: RootState) => s.teacherAvailability?.map || EMPTY_OBJ
   );
@@ -220,9 +216,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     (s: RootState) => s.classOff.offMap || EMPTY_OBJ
   );
 
-
-
-  const [selectedSemester] = useState<string>("");
+  const [selectedSemester, setSelectedSemester] = useState<string>("");
   const [inputValue, setInputValue] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
 
@@ -238,14 +232,13 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     reason: "",
   });
 
-  const isStudent = auth?.role?.toLowerCase() === "student";
-  const studentSemester = auth?.semester_name;
+  const role = auth?.role?.toLowerCase();
+  const isAllowed = role === "teacher" || role === "admin";
 
   const formattedRoutineData = useMemo(() => {
     const grouped: Record<string, RoutineData> = {};
     const semesterUniqueCourses: Record<string, Set<string>> = {};
     const slotStartTimes = sortedTimeSlots.map((ts) => normalizeTime(ts.start_time));
-
 
     routineList.forEach((item) => {
       if (!grouped[item.semester_name]) {
@@ -261,7 +254,6 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
         semesterUniqueCourses[item.semester_name] = new Set();
       }
     });
-
 
     routineList.forEach((item) => {
       const semesterGroup = grouped[item.semester_name];
@@ -289,7 +281,6 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
       }
     });
 
-
     Object.keys(grouped).forEach((semesterName) => {
       const uniqueCount = semesterUniqueCourses[semesterName].size;
       grouped[semesterName].credits = uniqueCount * 3.0;
@@ -305,36 +296,21 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     }));
   }, [formattedRoutineData]);
 
-
   const activeSemesterId = useMemo(() => {
     if (selectedSemester && formattedRoutineData[selectedSemester])
       return selectedSemester;
-    if (isStudent && studentSemester && formattedRoutineData[studentSemester])
-      return studentSemester;
     return semesterOptions.length > 0 ? semesterOptions[0].id : "";
-  }, [
-    selectedSemester,
-    formattedRoutineData,
-    semesterOptions,
-    isStudent,
-    studentSemester,
-  ]);
+  }, [selectedSemester, formattedRoutineData, semesterOptions]);
 
   const currentRoutine = useMemo(
     () => formattedRoutineData[activeSemesterId],
     [activeSemesterId, formattedRoutineData]
   );
 
-  const hasAccess = useMemo(() => {
-    if (!isStudent) return true;
-    return activeSemesterId === studentSemester;
-  }, [isStudent, activeSemesterId, studentSemester]);
-
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(inputValue), 300);
     return () => clearTimeout(timer);
   }, [inputValue]);
-
 
   const validTeacherShortNames = useMemo(() => {
     const uniqueShortNames = new Set<string>();
@@ -369,9 +345,6 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     };
   }, [debouncedSearch, validTeacherShortNames]);
 
-
-
-
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -383,6 +356,36 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
       <div className="min-h-[80vh] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
       </div>
+    );
+  }
+
+  if (!isAllowed) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="h-[80vh] w-full flex flex-col font-lexend items-center justify-center gap-6 text-center px-4"
+      >
+        <div className="rounded-full bg-red-100 p-6 dark:bg-red-900/20 ring-1 ring-red-200 dark:ring-red-900/40 shadow-sm">
+          <ShieldBan className="h-12 w-12 text-red-600 dark:text-red-500" />
+        </div>
+        <div className="space-y-3 max-w-[500px]">
+          <h2 className="sm:text-2xl text-xl font-bold tracking-tight text-foreground">
+            Access Restricted
+          </h2>
+          <p className="text-muted-foreground text-xs sm:text-base leading-relaxed">
+            This page is exclusively for teachers and admins. It seems you do not
+            have the required permissions to view this content.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() => window.history.back()}
+        >
+          <ChevronLeft className="h-4 w-4" /> Go Back
+        </Button>
+      </motion.div>
     );
   }
 
@@ -413,7 +416,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
         </h2>
         <p className="text-muted-foreground max-w-[400px] text-base leading-relaxed">
           {isEmpty
-            ? "There is no schedule data available for this semester yet."
+            ? "There is no schedule data available for this department yet."
             : "Please wait while we finalize the display."}
         </p>
         {isEmpty && (
@@ -425,36 +428,6 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             Refresh Page
           </Button>
         )}
-      </motion.div>
-    );
-  }
-
-  if (auth?.role?.toLowerCase() !== "student") {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="h-[80vh] w-full flex flex-col font-lexend items-center justify-center gap-6 text-center px-4"
-      >
-        <div className="rounded-full bg-red-100 p-6 dark:bg-red-900/20 ring-1 ring-red-200 dark:ring-red-900/40 shadow-sm">
-          <ShieldBan className="h-12 w-12 text-red-600 dark:text-red-500" />
-        </div>
-        <div className="space-y-3 max-w-[500px]">
-          <h2 className="sm:text-2xl text-xl font-bold tracking-tight text-foreground">
-            Access Restricted
-          </h2>
-          <p className="text-muted-foreground text-xs sm:text-base leading-relaxed">
-            This page is exclusively for students. It seems you do not
-            have the required permissions to view this content.
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          className="gap-2"
-          onClick={() => window.history.back()}
-        >
-          <ChevronLeft className="h-4 w-4" /> Go Back
-        </Button>
       </motion.div>
     );
   }
@@ -629,7 +602,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                 variants={itemVariants}
                 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"
               >
-                Routine for {auth.department_name || "N/A"}
+                Routine for {auth.department_name || "Department"}
               </motion.h1>
               <motion.div
                 variants={itemVariants}
@@ -660,19 +633,26 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
               variants={itemVariants}
               className="lg:col-span-8 flex justify-between flex-col sm:flex-row gap-3 bg-card border rounded-xl p-1.5 shadow-sm"
             >
-              { }
-              <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 rounded-lg border border-transparent transition-all">
-                <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">
-                  {currentRoutine.label}
-                </span>
+              <div className="flex items-center gap-2 px-2 min-w-[200px] w-full sm:w-auto">
+                <GraduationCap className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-[150px]">
+                  <CustomSelect
+                    value={activeSemesterId}
+                    onChange={setSelectedSemester}
+                    options={semesterOptions.map((opt) => ({
+                      value: opt.id,
+                      label: opt.label,
+                    }))}
+                    placeholder="Select Semester"
+                  />
+                </div>
               </div>
 
-              <div className="flex font-lexend items-center justify-between px-4 py-2 bg-muted/30 rounded-lg min-w-[140px]">
+              <div className="flex font-lexend items-center justify-between px-4 py-2 bg-muted/30 rounded-lg min-w-[140px] w-full sm:w-auto">
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Total Credits
                 </span>
-                <span className="ml-2 text-primary">
+                <span className="ml-2 text-primary font-bold">
                   {currentRoutine.credits > 0 ? currentRoutine.credits : "N/A"}
                 </span>
               </div>
@@ -693,28 +673,10 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             </motion.div>
           </div>
 
-          {!hasAccess ? (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              variants={itemVariants}
-              className="rounded-xl border-2 border-dashed border-amber-200 dark:border-amber-900/30 bg-amber-50/50 dark:bg-amber-900/10 p-12 flex flex-col items-center justify-center text-center print:hidden"
-            >
-              <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/20 rounded-full flex items-center justify-center mb-4 text-amber-600 dark:text-amber-500">
-                <ShieldAlert className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold text-amber-900 dark:text-amber-100 mb-2">
-                Access Restricted
-              </h3>
-              <p className="text-amber-700 dark:text-amber-400 max-w-md">
-                As a student, you are only authorized to view the routine for
-                your assigned semester (<strong>{studentSemester}</strong>).
-              </p>
-            </motion.div>
-          ) : (<div className="print-page-container w-full">
+          <div className="print-page-container w-full">
             <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-3 pt-0 text-center w-full font-serif text-black">
               <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
-                Department of Computer Science & Engineering
+                {auth.department_name || "Department Routine"}
               </h1>
               <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
                 <h2 className="text-base font-bold uppercase text-black tracking-wide">
@@ -984,7 +946,6 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
               </div>
             </motion.div>
           </div>
-          )}
           <div className="text-center mt-6 print:hidden sm:hidden">
             <Button
               onClick={() => window.print()}

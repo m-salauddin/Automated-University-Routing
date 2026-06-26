@@ -1,18 +1,25 @@
-import OwnRoutinePage from "@/components/modules/dashboard/own-routine";
+import DepartmentRoutinePage from "@/components/modules/dashboard/department-routine";
 export const dynamic = "force-dynamic";
 import { getRoutine } from "@/services/routine";
+import { getUserProfile } from "@/services/users";
 import { getAllTimeSlots } from "@/services/time-slots";
 
-const StudentRoutine = async () => {
-  const [routineResponse, timeSlotsResponse] = await Promise.all([
-    getRoutine(),
+const DepartmentRoutine = async () => {
+  const [profileResponse, timeSlotsResponse] = await Promise.all([
+    getUserProfile(),
     getAllTimeSlots(),
   ]);
 
-  const routineList =
-    routineResponse.success && Array.isArray(routineResponse.data)
-      ? routineResponse.data
-      : [];
+  let routineList = [];
+  if (profileResponse.success && profileResponse.data) {
+    const { department } = profileResponse.data;
+    const routineResponse = await getRoutine({
+      department_id: department,
+    });
+    if (routineResponse.success && Array.isArray(routineResponse.data)) {
+      routineList = routineResponse.data;
+    }
+  }
 
   let timeSlots = [];
   if (timeSlotsResponse.success && Array.isArray(timeSlotsResponse.data)) {
@@ -49,10 +56,9 @@ const StudentRoutine = async () => {
 
   return (
     <>
-      <OwnRoutinePage routineList={routineList} timeSlots={timeSlots} />
+      <DepartmentRoutinePage routineList={routineList} timeSlots={timeSlots} />
     </>
   );
 };
 
-export default StudentRoutine;
-
+export default DepartmentRoutine;
