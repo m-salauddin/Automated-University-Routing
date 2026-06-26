@@ -130,7 +130,7 @@ const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string
   const codeLower = courseCode.trim().toLowerCase();
   const nameLower = (courseName || "").toLowerCase();
   const roomLower = (roomNumber || "").toLowerCase();
-  
+
   if (codeLower.endsWith("l") || codeLower.includes("lab") || codeLower.includes("sessional") || codeLower.includes("practical") || codeLower.includes("work")) {
     return true;
   }
@@ -140,7 +140,7 @@ const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string
   if (roomLower.includes("lab") || roomLower.includes("laboratory") || roomLower.includes("computer center")) {
     return true;
   }
-  
+
   const match = courseCode.match(/\d+/);
   if (match) {
     const numStr = match[0];
@@ -220,8 +220,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     (s: RootState) => s.classOff.offMap || EMPTY_OBJ
   );
 
-  
-  
+
+
   const [selectedSemester] = useState<string>("");
   const [inputValue, setInputValue] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
@@ -246,7 +246,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     const semesterUniqueCourses: Record<string, Set<string>> = {};
     const slotStartTimes = sortedTimeSlots.map((ts) => normalizeTime(ts.start_time));
 
-    
+
     routineList.forEach((item) => {
       if (!grouped[item.semester_name]) {
         grouped[item.semester_name] = {
@@ -262,7 +262,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
       }
     });
 
-    
+
     routineList.forEach((item) => {
       const semesterGroup = grouped[item.semester_name];
       if (!semesterGroup) return;
@@ -289,7 +289,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
       }
     });
 
-    
+
     Object.keys(grouped).forEach((semesterName) => {
       const uniqueCount = semesterUniqueCourses[semesterName].size;
       grouped[semesterName].credits = uniqueCount * 3.0;
@@ -305,7 +305,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     }));
   }, [formattedRoutineData]);
 
-  
+
   const activeSemesterId = useMemo(() => {
     if (selectedSemester && formattedRoutineData[selectedSemester])
       return selectedSemester;
@@ -335,7 +335,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
     return () => clearTimeout(timer);
   }, [inputValue]);
 
-  
+
   const validTeacherShortNames = useMemo(() => {
     const uniqueShortNames = new Set<string>();
     routineList.forEach((item) => {
@@ -371,7 +371,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
 
 
 
-  
+
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -656,7 +656,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
               variants={itemVariants}
               className="lg:col-span-8 flex justify-between flex-col sm:flex-row gap-3 bg-card border rounded-xl p-1.5 shadow-sm"
             >
-              {}
+              { }
               <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 rounded-lg border border-transparent transition-all">
                 <GraduationCap className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-medium text-foreground">
@@ -707,279 +707,279 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                 your assigned semester (<strong>{studentSemester}</strong>).
               </p>
             </motion.div>
-          ) : (            <div className="print-page-container w-full">
-              <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-3 pt-0 text-center w-full font-serif text-black">
-                <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
-                  Department of Computer Science & Engineering
-                </h1>
-                <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
-                  <h2 className="text-base font-bold uppercase text-black tracking-wide">
-                    Class Routine – {currentRoutine.session}
-                  </h2>
+          ) : (<div className="print-page-container w-full">
+            <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-3 pt-0 text-center w-full font-serif text-black">
+              <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
+                Department of Computer Science & Engineering
+              </h1>
+              <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
+                <h2 className="text-base font-bold uppercase text-black tracking-wide">
+                  Class Routine – {currentRoutine.session}
+                </h2>
+              </div>
+              <div className="w-full flex border! border-black! font-bold text-xs mt-3 print-header-table">
+                <div className="bg-gray-200 border-r! border-black! px-6 py-1">
+                  Semester
                 </div>
-                <div className="w-full flex border! border-black! font-bold text-xs mt-3 print-header-table">
-                  <div className="bg-gray-200 border-r! border-black! px-6 py-1">
-                    Semester
-                  </div>
-                  <div className="flex-1 text-center py-1 border-r! border-black!">
-                    {currentRoutine.label}
-                  </div>
-                  <div className="bg-gray-200 border-r! border-black! px-6 py-1">
-                    Total Credit
-                  </div>
-                  <div className="px-10 py-1 text-center">
-                    {currentRoutine.credits > 0 ? currentRoutine.credits : "-"}
-                  </div>
+                <div className="flex-1 text-center py-1 border-r! border-black!">
+                  {currentRoutine.label}
+                </div>
+                <div className="bg-gray-200 border-r! border-black! px-6 py-1">
+                  Total Credit
+                </div>
+                <div className="px-10 py-1 text-center">
+                  {currentRoutine.credits > 0 ? currentRoutine.credits : "-"}
                 </div>
               </div>
+            </div>
 
-              <motion.div
-                id="print-container-wrapper"
-                variants={itemVariants}
-                className="rounded-xl font-lexend bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:shadow-none print:bg-transparent print:overflow-visible"
-              >
-                <div className="overflow-x-auto w-full print:overflow-visible">
-                  <Table className="w-full overflow-hidden min-w-[1000px] print:min-w-0 print:w-full border border-border/60 border-collapse text-sm print:border-collapse !print:border-black">
-                    <TableHeader>
-                      <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b">
-                        <TableCell className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40 print:bg-white !print:border-r !print:border-black print:w-20 print:min-w-0">
-                          <svg
-                            className="absolute inset-0 w-full h-full pointer-events-none"
-                            preserveAspectRatio="none"
+            <motion.div
+              id="print-container-wrapper"
+              variants={itemVariants}
+              className="rounded-xl font-lexend bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:shadow-none print:bg-transparent print:overflow-visible"
+            >
+              <div className="overflow-x-auto w-full print:overflow-visible">
+                <Table className="w-full overflow-hidden min-w-[1000px] print:min-w-0 print:w-full border border-border/60 border-collapse text-sm print:border-collapse !print:border-black">
+                  <TableHeader>
+                    <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b">
+                      <TableCell className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40 print:bg-white !print:border-r !print:border-black print:w-20 print:min-w-0">
+                        <svg
+                          className="absolute inset-0 w-full h-full pointer-events-none"
+                          preserveAspectRatio="none"
+                        >
+                          <line
+                            x1="0"
+                            y1="0"
+                            x2="100%"
+                            y2="100%"
+                            className="stroke-border/60 print:stroke-black"
+                            strokeWidth="1"
+                          />
+                        </svg>
+                        <span className="absolute top-2 right-2 text-[10px] font-bold print:text-black print:text-[10px] print:top-[2px] print:right-[2px]">
+                          Time
+                        </span>
+                        <span className="absolute bottom-2 left-2 text-[10px] font-bold print:text-black print:text-[10px] print:bottom-[2px] print:left-[2px]">
+                          Day
+                        </span>
+                      </TableCell>
+                      {sortedTimeSlots.map((slot, idx) => {
+                        const hasClass = currentRoutine?.schedule?.some(dayRow => dayRow.slots[idx] !== null);
+                        if (isBreakSlot(slot)) {
+                          if (!hasClass) {
+                            return (
+                              <TableCell key={slot.id} className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border/60 !print:border-r !print:border-black">
+                                <div className="h-full flex items-center justify-center">
+                                  <span className="text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black">
+                                    BREAK
+                                  </span>
+                                </div>
+                              </TableCell>
+                            );
+                          } else {
+                            return (
+                              <TableCell key={slot.id} className="bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black border-r border-border/60 !print:border-r !print:border-black min-w-[100px]">
+                                <div className="h-full flex items-center justify-center">
+                                  <span className="text-xs font-black uppercase tracking-widest text-background whitespace-nowrap print:text-black">
+                                    BREAK
+                                  </span>
+                                </div>
+                              </TableCell>
+                            );
+                          }
+                        }
+                        return (
+                          <TableCell
+                            key={slot.id}
+                            className={cn(
+                              "text-center align-middle h-[60px] border-r border-border/60 last:border-r-0 p-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto",
+                              "min-w-[100px] bg-muted/10 print:bg-white print:min-w-0"
+                            )}
                           >
-                            <line
-                              x1="0"
-                              y1="0"
-                              x2="100%"
-                              y2="100%"
-                              className="stroke-border/60 print:stroke-black"
-                              strokeWidth="1"
-                            />
-                          </svg>
-                          <span className="absolute top-2 right-2 text-[10px] font-bold print:text-black print:text-[10px] print:top-[2px] print:right-[2px]">
-                            Time
-                          </span>
-                          <span className="absolute bottom-2 left-2 text-[10px] font-bold print:text-black print:text-[10px] print:bottom-[2px] print:left-[2px]">
-                            Day
-                          </span>
-                        </TableCell>
-                        {sortedTimeSlots.map((slot, idx) => {
-                          const hasClass = currentRoutine?.schedule?.some(dayRow => dayRow.slots[idx] !== null);
-                          if (isBreakSlot(slot)) {
-                            if (!hasClass) {
+                            <div className="flex flex-col items-center justify-center h-full w-full px-1">
+                              <span className="font-bold text-xs whitespace-nowrap print:text-[11px] print:font-bold print:text-black">
+                                {formatTimeSlotLabel(slot.start_time)}
+                                <span className="mx-1">-</span>
+                                {formatTimeSlotLabel(slot.end_time)}
+                              </span>
+                            </div>
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  </TableHeader>
+                  <motion.tbody
+                    key={activeSemesterId}
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                    exit="hidden"
+                  >
+                    <AnimatePresence mode="popLayout">
+                      {currentRoutine.schedule.map((dayRow) => (
+                        <motion.tr
+                          key={dayRow.day}
+                          variants={itemVariants}
+                          className="border-b border-border/60 hover:bg-muted/5 !print:border-black print:border-b print:h-auto"
+                        >
+                          <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 !print:border-r !print:border-black print:bg-white print:text-black print:font-bold">
+                            <div className="flex items-center justify-center h-full w-full py-4 print:py-2">
+                              <span className="writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0 print:rotate-0 print:text-[12px]">
+                                {dayRow.day.slice(0, 3).toUpperCase()}
+                              </span>
+                            </div>
+                          </TableCell>
+                          {dayRow.slots.map((session, index) => {
+                            const slot = sortedTimeSlots[index];
+                            if (isBreakSlot(slot) && !session) {
                               return (
-                                <TableCell key={slot.id} className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border/60 !print:border-r !print:border-black">
-                                  <div className="h-full flex items-center justify-center">
-                                    <span className="text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black">
-                                      BREAK
-                                    </span>
+                                <TableCell key={index} className="p-0 h-px align-middle border-r border-border/60 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black">
+                                  <div
+                                    className="absolute inset-0 opacity-10 print:hidden"
+                                    style={{
+                                      backgroundImage:
+                                        "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
+                                      backgroundSize: "4px 4px",
+                                    }}
+                                  />
+                                  <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden">
+                                    <Utensils className="w-3 h-3 text-foreground/40" />
                                   </div>
-                                </TableCell>
-                              );
-                            } else {
-                              return (
-                                <TableCell key={slot.id} className="bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black border-r border-border/60 !print:border-r !print:border-black min-w-[100px]">
-                                  <div className="h-full flex items-center justify-center">
-                                    <span className="text-xs font-black uppercase tracking-widest text-background whitespace-nowrap print:text-black">
-                                      BREAK
-                                    </span>
+                                  <div className="hidden print:flex h-full w-full items-center justify-center relative z-10">
+                                    <Utensils className="w-3 h-3 text-black" />
                                   </div>
                                 </TableCell>
                               );
                             }
-                          }
-                          return (
-                            <TableCell
-                              key={slot.id}
-                              className={cn(
-                                "text-center align-middle h-[60px] border-r border-border/60 last:border-r-0 p-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto",
-                                "min-w-[100px] bg-muted/10 print:bg-white print:min-w-0"
-                              )}
-                            >
-                              <div className="flex flex-col items-center justify-center h-full w-full px-1">
-                                <span className="font-bold text-xs whitespace-nowrap print:text-[11px] print:font-bold print:text-black">
-                                  {formatTimeSlotLabel(slot.start_time)}
-                                  <span className="mx-1">-</span>
-                                  {formatTimeSlotLabel(slot.end_time)}
-                                </span>
-                              </div>
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    </TableHeader>
-                    <motion.tbody
-                      key={activeSemesterId}
-                      variants={containerVariants}
-                      initial="hidden"
-                      animate="visible"
-                      exit="hidden"
-                    >
-                      <AnimatePresence mode="popLayout">
-                        {currentRoutine.schedule.map((dayRow) => (
-                          <motion.tr
-                            key={dayRow.day}
-                            variants={itemVariants}
-                            className="border-b border-border/60 hover:bg-muted/5 !print:border-black print:border-b print:h-auto"
-                          >
-                            <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 !print:border-r !print:border-black print:bg-white print:text-black print:font-bold">
-                              <div className="flex items-center justify-center h-full w-full py-4 print:py-2">
-                                <span className="writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0 print:rotate-0 print:text-[12px]">
-                                  {dayRow.day.slice(0, 3).toUpperCase()}
-                                </span>
-                              </div>
-                            </TableCell>
-                            {dayRow.slots.map((session, index) => {
-                              const slot = sortedTimeSlots[index];
-                              if (isBreakSlot(slot) && !session) {
-                                return (
-                                  <TableCell key={index} className="p-0 h-px align-middle border-r border-border/60 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black">
-                                    <div
-                                      className="absolute inset-0 opacity-10 print:hidden"
-                                      style={{
-                                        backgroundImage:
-                                          "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
-                                        backgroundSize: "4px 4px",
-                                      }}
-                                    />
-                                    <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden">
-                                      <Utensils className="w-3 h-3 text-foreground/40" />
-                                    </div>
-                                    <div className="hidden print:flex h-full w-full items-center justify-center relative z-10">
-                                      <Utensils className="w-3 h-3 text-black" />
-                                    </div>
-                                  </TableCell>
-                                );
-                              }
 
-                              const teacherKey = session
-                                ? session.teacherId ?? session.teacher
+                            const teacherKey = session
+                              ? session.teacherId ?? session.teacher
+                              : undefined;
+
+                            const startTimeRaw = session?.originalTime || "";
+
+                            const key =
+                              session && teacherKey
+                                ? generateClassKey(
+                                  session.department,
+                                  session.semester,
+                                  abbreviateDay(session.day),
+                                  teacherKey,
+                                  startTimeRaw
+                                )
+                                : "";
+
+                            const classOffData =
+                              teacherKey && startTimeRaw && key
+                                ? classOffMap[key]
                                 : undefined;
 
-                              const startTimeRaw = session?.originalTime || "";
+                            const isClassOffToday = Boolean(
+                              classOffData?.status
+                            );
+                            const cancellationReason =
+                              classOffData?.reason || "No reason provided.";
+                            const isTeacherOff =
+                              (!!teacherKey &&
+                                availabilityMap[teacherKey] === false) ||
+                              isClassOffToday;
 
-                              const key =
-                                session && teacherKey
-                                  ? generateClassKey(
-                                      session.department,
-                                      session.semester,
-                                      abbreviateDay(session.day),
-                                      teacherKey,
-                                      startTimeRaw
-                                    )
-                                  : "";
+                            const highlighted = isMatch(session);
+                            const isLab = session ? isLabClass(session.course, undefined, session.room) : false;
 
-                              const classOffData =
-                                teacherKey && startTimeRaw && key
-                                  ? classOffMap[key]
-                                  : undefined;
-
-                              const isClassOffToday = Boolean(
-                                classOffData?.status
-                              );
-                              const cancellationReason =
-                                classOffData?.reason || "No reason provided.";
-                              const isTeacherOff =
-                                (!!teacherKey &&
-                                  availabilityMap[teacherKey] === false) ||
-                                  isClassOffToday;
-
-                              const highlighted = isMatch(session);
-                              const isLab = session ? isLabClass(session.course, undefined, session.room) : false;
-
-                              return (
-                                <TableCell
-                                  key={index}
-                                  onClick={() => {
-                                    if (session && isClassOffToday) {
-                                      setViewReasonModal({
-                                        isOpen: true,
-                                        course: session.course,
-                                        teacher: session.teacher,
-                                        reason: cancellationReason,
-                                      });
-                                    }
-                                  }}
-                                  className={cn(
-                                    "p-2.5 h-px align-middle border-r border-border/60 transition-colors duration-200 !print:border-r !print:border-black print:p-0.5",
-                                    isClassOffToday
-                                      ? "cursor-pointer"
-                                      : "cursor-default",
-                                    highlighted
-                                      ? "bg-emerald-100/50 dark:bg-emerald-900/20 print:bg-transparent"
-                                      : "bg-transparent print:bg-white"
-                                  )}
-                                >
-                                  {session ? (
-                                    <>
-                                      <div
-                                        className={cn(
-                                          "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden",
-                                          "transition-colors duration-200",
-                                          isTeacherOff
-                                            ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-950/10 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
-                                            : highlighted
+                            return (
+                              <TableCell
+                                key={index}
+                                onClick={() => {
+                                  if (session && isClassOffToday) {
+                                    setViewReasonModal({
+                                      isOpen: true,
+                                      course: session.course,
+                                      teacher: session.teacher,
+                                      reason: cancellationReason,
+                                    });
+                                  }
+                                }}
+                                className={cn(
+                                  "p-2.5 h-px align-middle border-r border-border/60 transition-colors duration-200 !print:border-r !print:border-black print:p-0.5",
+                                  isClassOffToday
+                                    ? "cursor-pointer"
+                                    : "cursor-default",
+                                  highlighted
+                                    ? "bg-emerald-100/50 dark:bg-emerald-900/20 print:bg-transparent"
+                                    : "bg-transparent print:bg-white"
+                                )}
+                              >
+                                {session ? (
+                                  <>
+                                    <div
+                                      className={cn(
+                                        "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden",
+                                        "transition-colors duration-200",
+                                        isTeacherOff
+                                          ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-950/10 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                                          : highlighted
                                             ? "bg-background border-emerald-500 shadow-md"
                                             : isLab
-                                            ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40 hover:shadow-md"
-                                            : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40 hover:shadow-md"
-                                        )}
-                                      >
-                                        <div className="flex justify-between items-start w-full gap-1">
-                                          <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
-                                            {session.course}
+                                              ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40 hover:shadow-md"
+                                              : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40 hover:shadow-md"
+                                      )}
+                                    >
+                                      <div className="flex justify-between items-start w-full gap-1">
+                                        <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
+                                          {session.course}
+                                        </span>
+                                        {isLab ? (
+                                          <span className="text-[9px] font-black uppercase tracking-wider bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-1 py-0.2 rounded border border-violet-200/50 dark:border-violet-800/40">
+                                            Lab
                                           </span>
-                                          {isLab ? (
-                                            <span className="text-[9px] font-black uppercase tracking-wider bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-1 py-0.2 rounded border border-violet-200/50 dark:border-violet-800/40">
-                                              Lab
-                                            </span>
-                                          ) : (
-                                            <span className="text-[9px] font-black uppercase tracking-wider bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 px-1 py-0.2 rounded border border-teal-200/50 dark:border-teal-800/40">
-                                              Theory
-                                            </span>
-                                          )}
+                                        ) : (
+                                          <span className="text-[9px] font-black uppercase tracking-wider bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 px-1 py-0.2 rounded border border-teal-200/50 dark:border-teal-800/40">
+                                            Theory
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-col gap-0.5 mt-1">
+                                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                                          <User className="w-3 h-3 opacity-70" />
+                                          <span>
+                                            {getTeacherInitials(
+                                              session.teacher
+                                            )}
+                                          </span>
                                         </div>
-                                        <div className="flex flex-col gap-0.5 mt-1">
-                                          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                                            <User className="w-3 h-3 opacity-70" />
-                                            <span>
-                                              {getTeacherInitials(
-                                                session.teacher
-                                              )}
-                                            </span>
-                                          </div>
-                                          <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-                                            <MapPin className="w-3 h-3 opacity-70" />
-                                            <span>{session.room}</span>
-                                          </div>
+                                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
+                                          <MapPin className="w-3 h-3 opacity-70" />
+                                          <span>{session.room}</span>
                                         </div>
                                       </div>
-                                      <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
-                                        <span className="font-bold text-[11px]">
-                                          {session.course}, T-
-                                          {getTeacherInitials(session.teacher)}
-                                        </span>
-                                        <span className="font-bold text-[11px]">
-                                          {session.room}
-                                        </span>
-                                      </div>
-                                    </>
-                                  ) : (
-                                    <div className="h-full w-full flex items-center justify-center">
-                                      <div className="w-1 h-1 rounded-full bg-border print:hidden" />
                                     </div>
-                                  )}
-                                </TableCell>
-                              );
-                            })}
-                          </motion.tr>
-                        ))}
-                      </AnimatePresence>
-                    </motion.tbody>
-                  </Table>
-                </div>
-              </motion.div>
-            </div>
+                                    <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
+                                      <span className="font-bold text-[11px]">
+                                        {session.course}, T-
+                                        {getTeacherInitials(session.teacher)}
+                                      </span>
+                                      <span className="font-bold text-[11px]">
+                                        {session.room}
+                                      </span>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center">
+                                    <div className="w-1 h-1 rounded-full bg-border print:hidden" />
+                                  </div>
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                        </motion.tr>
+                      ))}
+                    </AnimatePresence>
+                  </motion.tbody>
+                </Table>
+              </div>
+            </motion.div>
+          </div>
           )}
           <div className="text-center mt-6 print:hidden sm:hidden">
             <Button

@@ -11,6 +11,7 @@ import {
   Building2,
   CalendarRange,
   Users,
+  History,
 } from "lucide-react";
 
 import {
@@ -40,6 +41,7 @@ import { initializeAuth } from "@/store/authSlice";
 const globalItems = [
   { title: "Analytics", url: "/dashboard/analytics", icon: ChartColumnBig },
   { title: "Curriculum", url: "/dashboard/course-curriculum", icon: ListTodo },
+  { title: "Activity Logs", url: "/dashboard/activity-logs", icon: History },
 ];
 
 export function AppSidebar() {

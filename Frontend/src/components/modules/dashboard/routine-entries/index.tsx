@@ -8,6 +8,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
+import ReactDOM from "react-dom";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import {
@@ -41,12 +42,16 @@ import {
   PowerOff,
   CheckCheck,
   Pencil,
+  MoreVertical,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState } from "@/store";
+import { store } from "@/store";
 import {
   generateClassKey,
   normalizeTime,
@@ -54,7 +59,7 @@ import {
   markOff,
   markOn,
 } from "@/store/classOffSlice";
-import { setIsLocked } from "@/store/routineSlice";
+import { setIsLocked, setRoutineList, setIsLoading } from "@/store/routineSlice";
 import DataLoader from "@/components/ui/data-loader";
 import {
   Dialog,
@@ -73,13 +78,31 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { generateRoutine, getRoutine, updateRoutineEntry, swapRoutineEntries, cancelClass, reactivateClass, updateCancelMessage } from "@/services/routine";
+import { generateRoutine, getRoutine, updateRoutineEntry, swapRoutineEntries, cancelClass, reactivateClass, updateCancelMessage, rollbackRoutine } from "@/services/routine";
+import { createLog } from "@/services/logs";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CustomSelect } from "@/components/ui/custom-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+
+type HistoryAction = 
+  | {
+      type: "SWAP";
+      payload: { id1: number; id2: number; course1: string; course2: string };
+      description: string;
+    }
+  | {
+      type: "UPDATE";
+      payload: { id: number; fromDayId: number; fromSlotId: number; toDayId: number; toSlotId: number; course: string };
+      description: string;
+    }
+  | {
+      type: "GENERATE";
+      payload: { departmentId: number; semesterId?: number; ignoreWarnings?: boolean };
+      description: string;
+    };
 
 
 interface CancellationModalProps {
@@ -282,7 +305,7 @@ const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string
   const codeLower = courseCode.trim().toLowerCase();
   const nameLower = (courseName || "").toLowerCase();
   const roomLower = (roomNumber || "").toLowerCase();
-  
+
   if (codeLower.endsWith("l") || codeLower.includes("lab") || codeLower.includes("sessional") || codeLower.includes("practical") || codeLower.includes("work")) {
     return true;
   }
@@ -292,7 +315,7 @@ const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string
   if (roomLower.includes("lab") || roomLower.includes("laboratory") || roomLower.includes("computer center")) {
     return true;
   }
-  
+
   const match = courseCode.match(/\d+/);
   if (match) {
     const numStr = match[0];
@@ -387,11 +410,13 @@ interface RoutineTableProps {
   }) => void;
   generationVersion: number;
   printHeader?: React.ReactNode;
-  refreshRoutine: () => Promise<void>;
+  refreshRoutine: (silent?: boolean) => Promise<void>;
+  setLocalRoutineList: React.Dispatch<React.SetStateAction<APIRoutineItem[]>>;
   isRoutineLocked: boolean;
   onCancelClass?: (session: ClassSession) => void;
   onReactivateClass?: (session: ClassSession) => void;
   onUpdateCancelMessage?: (session: ClassSession) => void;
+  onHistoryAction?: (action: HistoryAction) => void;
 }
 
 const MemoizedRoutineTable = React.memo(
@@ -406,20 +431,35 @@ const MemoizedRoutineTable = React.memo(
     generationVersion,
     printHeader,
     refreshRoutine,
+    setLocalRoutineList,
     isRoutineLocked,
     onCancelClass,
     onReactivateClass,
     onUpdateCancelMessage,
+    onHistoryAction,
   }: RoutineTableProps) => {
     try {
-      const [draggedSession, setDraggedSession] = useState<ClassSession | null>(null);
-      const [hoveredCell, setHoveredCell] = useState<{ rowKey: string; cellIndex: number } | null>(null);
       const [isSubmitting, setIsSubmitting] = useState(false);
       const [swapConfirmModal, setSwapConfirmModal] = useState<{
         isOpen: boolean;
         source?: ClassSession;
         target?: ClassSession;
       }>({ isOpen: false });
+
+      // All drag state lives in refs — zero React re-renders during drag
+      const ghostRef = useRef<HTMLDivElement | null>(null);
+      const tableWrapperRef = useRef<HTMLDivElement | null>(null);
+      const hoveredCellRef = useRef<HTMLElement | null>(null);
+      const dragStateRef = useRef<{
+        session: ClassSession | null;
+        hoveredRowKey: string | null;
+        hoveredCellIndex: number | null;
+      }>({
+        session: null,
+        hoveredRowKey: null,
+        hoveredCellIndex: null,
+      });
+      const dragScheduleRef = useRef<typeof schedule>([]);
 
       const pageGroups = useMemo(() => {
         if (!isAllSemestersMode) return [schedule];
@@ -437,14 +477,24 @@ const MemoizedRoutineTable = React.memo(
         return groups.filter((g) => g.length > 0);
       }, [schedule, isAllSemestersMode]);
 
-      const handleDrop = async (targetRow: any, targetCellIndex: number) => {
-        if (!draggedSession) return;
-        const sourceSession = draggedSession;
+      // Direct-DOM rollback animation — add CSS class, remove on animationend
+      const triggerRollbackAnimation = useCallback((ids: number[]) => {
+        ids.forEach(id => {
+          const el = tableWrapperRef.current?.querySelector<HTMLElement>(`[data-session-id="${id}"]`);
+          if (!el) return;
+          el.classList.remove('card-rollback');
+          // Force reflow so removing+re-adding the class restarts the animation
+          void el.offsetWidth;
+          el.classList.add('card-rollback');
+          const cleanup = () => {
+            el.classList.remove('card-rollback');
+            el.removeEventListener('animationend', cleanup);
+          };
+          el.addEventListener('animationend', cleanup);
+        });
+      }, []);
 
-        // Reset drag states immediately on drop to clear borders and states
-        setDraggedSession(null);
-        setHoveredCell(null);
-
+      const handleDropOnCell = useCallback(async (targetRow: any, targetCellIndex: number, sourceSession: ClassSession) => {
         const targetSession = targetRow.slots[targetCellIndex];
         const targetDayName = targetRow.day;
         const targetDayId = DAY_NAME_TO_ID[targetDayName.toLowerCase()];
@@ -456,6 +506,20 @@ const MemoizedRoutineTable = React.memo(
         }
 
         if (!targetSession) {
+          // Optimistically update the UI list instantly
+          setLocalRoutineList(prev => prev.map(r => {
+            if (r.id === sourceSession.id) {
+              return {
+                ...r,
+                day: targetDayId,
+                day_name: targetDayName,
+                start_time: targetSlot.start_time,
+                end_time: targetSlot.end_time
+              };
+            }
+            return r;
+          }));
+
           // Empty slot drop -> Manual update
           setIsSubmitting(true);
           const toastId = toast.loading("Updating routine entry...");
@@ -463,45 +527,298 @@ const MemoizedRoutineTable = React.memo(
             const res = await updateRoutineEntry(sourceSession.id, targetDayId, targetSlot.id);
             if (res.success) {
               toast.success("Routine updated successfully!", { id: toastId });
-              await refreshRoutine();
+              const sourceSlot = timeSlots.find(
+                (s) => normalizeTime(s.start_time) === normalizeTime(sourceSession.originalTime || "")
+              );
+              if (sourceSlot) {
+                onHistoryAction?.({
+                  type: "UPDATE",
+                  payload: {
+                    id: sourceSession.id,
+                    fromDayId: sourceSession.dayId,
+                    fromSlotId: sourceSlot.id,
+                    toDayId: targetDayId,
+                    toSlotId: targetSlot.id,
+                    course: sourceSession.course,
+                  },
+                  description: `Moved class ${sourceSession.course} from ${sourceSession.day} to ${targetRow.day} (${targetSlot.start_time})`,
+                });
+              }
+              createLog(
+                "Update",
+                `Moved class ${sourceSession.course} (T: ${sourceSession.teacher}) from ${sourceSession.day} to ${targetRow.day} (${targetSlot.start_time})`
+              );
+              refreshRoutine(); // Show loading skeleton to refresh data
             } else {
               toast.error(res.message || "Failed to update routine", { id: toastId });
+              refreshRoutine(); // Rollback & show loading skeleton
             }
           } catch (err) {
             console.error(err);
             toast.error("An unexpected error occurred", { id: toastId });
+            refreshRoutine(); // Rollback & show loading skeleton
           } finally {
             setIsSubmitting(false);
           }
         } else {
-          // Occupied slot drop -> Confirmation Modal
+          // Occupied slot drop -> Swap Instantly!
           if (targetSession.id === sourceSession.id) return;
-          setSwapConfirmModal({
-            isOpen: true,
-            source: sourceSession,
-            target: targetSession,
+
+          // Optimistically update the UI list instantly by swapping source and target slots
+          setLocalRoutineList(prev => {
+            const sourceItem = prev.find(r => r.id === sourceSession.id);
+            const targetItem = prev.find(r => r.id === targetSession.id);
+            if (!sourceItem || !targetItem) return prev;
+
+            return prev.map(r => {
+              if (r.id === sourceSession.id) {
+                return {
+                  ...r,
+                  day: targetItem.day,
+                  day_name: targetItem.day_name,
+                  start_time: targetItem.start_time,
+                  end_time: targetItem.end_time
+                };
+              }
+              if (r.id === targetSession.id) {
+                return {
+                  ...r,
+                  day: sourceItem.day,
+                  day_name: sourceItem.day_name,
+                  start_time: sourceItem.start_time,
+                  end_time: sourceItem.end_time
+                };
+              }
+              return r;
+            });
           });
+
+          setIsSubmitting(true);
+          const toastId = toast.loading("Swapping class times...");
+          try {
+            const res = await swapRoutineEntries(sourceSession.id, targetSession.id);
+            if (res.success) {
+              toast.success("Classes swapped successfully!", { id: toastId });
+              onHistoryAction?.({
+                type: "SWAP",
+                payload: {
+                  id1: sourceSession.id,
+                  id2: targetSession.id,
+                  course1: sourceSession.course,
+                  course2: targetSession.course,
+                },
+                description: `Swapped class ${sourceSession.course} with ${targetSession.course}`,
+              });
+              createLog(
+                "Swap",
+                `Swapped class ${sourceSession.course} (T: ${sourceSession.teacher}, Day: ${sourceSession.day}) with ${targetSession.course} (T: ${targetSession.teacher}, Day: ${targetSession.day})`
+              );
+              refreshRoutine(); // Show loading skeleton to refresh data
+            } else {
+              toast.error(res.message || "Failed to swap class times", { id: toastId });
+              await refreshRoutine(); // Rollback first — move cards back & show skeleton
+              triggerRollbackAnimation([sourceSession.id, targetSession.id]);
+            }
+          } catch (err) {
+            console.error(err);
+            toast.error("An unexpected error occurred", { id: toastId });
+            await refreshRoutine(); // Rollback first — move cards back & show skeleton
+            triggerRollbackAnimation([sourceSession.id, targetSession.id]);
+          } finally {
+            setIsSubmitting(false);
+          }
         }
-      };
+      }, [timeSlots, refreshRoutine, setLocalRoutineList, triggerRollbackAnimation, onHistoryAction]);
+
+      // Pointer-based drag handlers
+      const startPointerDrag = useCallback((e: React.PointerEvent<HTMLDivElement>, session: ClassSession, isLab: boolean) => {
+        if (isSubmitting) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+
+        dragStateRef.current.session = session;
+        dragScheduleRef.current = schedule;
+        dragStateRef.current.hoveredRowKey = null;
+        dragStateRef.current.hoveredCellIndex = null;
+
+        // Mark dragging source card via DOM
+        e.currentTarget.setAttribute('data-drag-source', '1');
+        // Mark wrapper so CSS can dim non-target cells
+        tableWrapperRef.current?.setAttribute('data-dragging-semester', session.semester);
+
+        // Highlight only cells belonging to the same semester
+        const cells = tableWrapperRef.current?.querySelectorAll(`[data-cell-semester="${session.semester}"]`);
+        cells?.forEach(cell => cell.setAttribute('data-drag-target-valid', '1'));
+
+        if (ghostRef.current) {
+          const courseSpan = ghostRef.current.querySelector('[data-ghost-course]');
+          const typeSpan = ghostRef.current.querySelector('[data-ghost-type]');
+          const teacherSpan = ghostRef.current.querySelector('[data-ghost-teacher]');
+          const roomSpan = ghostRef.current.querySelector('[data-ghost-room]');
+
+          if (courseSpan) courseSpan.textContent = session.course;
+          if (teacherSpan) teacherSpan.textContent = getTeacherInitials(session.teacher);
+          if (roomSpan) roomSpan.textContent = session.room;
+          if (typeSpan) {
+            typeSpan.textContent = isLab ? 'Lab' : 'Theory';
+            typeSpan.className = isLab
+              ? "text-[9px] font-black uppercase tracking-wider px-1 rounded border shrink-0 bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border-violet-200/50"
+              : "text-[9px] font-black uppercase tracking-wider px-1 rounded border shrink-0 bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50";
+          }
+
+          ghostRef.current.style.display = 'flex';
+          ghostRef.current.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%)) scale(1.06)`;
+        }
+        document.body.style.cursor = 'grabbing';
+      }, [isSubmitting, schedule]);
+
+      const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        if (!dragStateRef.current.session) return;
+        // Update ghost position directly on DOM — zero React re-render cost
+        if (ghostRef.current) {
+          ghostRef.current.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%)) scale(1.06)`;
+        }
+
+        // Detect hovered cell and toggle data-hovered attribute directly on DOM
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const cell = el?.closest('[data-cell-key]') as HTMLElement | null;
+
+        if (cell !== hoveredCellRef.current) {
+          // Clear previous
+          hoveredCellRef.current?.removeAttribute('data-hovered');
+          if (cell) {
+            // Only highlight cells matching dragged session's semester
+            const sem = tableWrapperRef.current?.getAttribute('data-dragging-semester');
+            if (sem && cell.getAttribute('data-cell-semester') === sem) {
+              cell.setAttribute('data-hovered', '1');
+              hoveredCellRef.current = cell;
+              // Track for drop
+              dragStateRef.current.hoveredRowKey = cell.dataset.cellKey ?? null;
+              dragStateRef.current.hoveredCellIndex = cell.dataset.cellIndex != null ? parseInt(cell.dataset.cellIndex) : null;
+            } else {
+              hoveredCellRef.current = null;
+              dragStateRef.current.hoveredRowKey = null;
+              dragStateRef.current.hoveredCellIndex = null;
+            }
+          } else {
+            hoveredCellRef.current = null;
+            dragStateRef.current.hoveredRowKey = null;
+            dragStateRef.current.hoveredCellIndex = null;
+          }
+        }
+      }, []);
+
+      const clearDragDom = useCallback(() => {
+        hoveredCellRef.current?.removeAttribute('data-hovered');
+        hoveredCellRef.current = null;
+        tableWrapperRef.current?.removeAttribute('data-dragging-semester');
+        // Clear source card attribute
+        tableWrapperRef.current?.querySelector('[data-drag-source]')?.removeAttribute('data-drag-source');
+
+        // Clear drag target classes
+        const targets = tableWrapperRef.current?.querySelectorAll('[data-drag-target-valid]');
+        targets?.forEach(el => el.removeAttribute('data-drag-target-valid'));
+
+        if (ghostRef.current) ghostRef.current.style.display = 'none';
+        document.body.style.cursor = '';
+      }, []);
+
+      const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+        const src = dragStateRef.current.session;
+        if (!src) return;
+
+        e.currentTarget.releasePointerCapture(e.pointerId);
+        e.currentTarget.removeAttribute('data-drag-source');
+
+        const rowKey = dragStateRef.current.hoveredRowKey;
+        const cellIdx = dragStateRef.current.hoveredCellIndex;
+
+        dragStateRef.current.session = null;
+        dragStateRef.current.hoveredRowKey = null;
+        dragStateRef.current.hoveredCellIndex = null;
+        clearDragDom();
+
+        if (rowKey == null || cellIdx == null) return;
+        const targetRow = dragScheduleRef.current.find(
+          (r) => `${r.day}-${r.semester}` === rowKey && r.semester === src.semester
+        );
+        if (!targetRow) return;
+        handleDropOnCell(targetRow, cellIdx, src);
+      }, [handleDropOnCell, clearDragDom]);
+
+      const onPointerCancel = useCallback(() => {
+        dragStateRef.current.session = null;
+        dragStateRef.current.hoveredRowKey = null;
+        dragStateRef.current.hoveredCellIndex = null;
+        clearDragDom();
+        document.body.style.cursor = '';
+      }, [clearDragDom]);
 
       const confirmSwap = async () => {
         const { source, target } = swapConfirmModal;
         if (!source || !target) return;
 
         setSwapConfirmModal({ isOpen: false });
+
+        // Optimistically update the UI list instantly
+        setLocalRoutineList(prev => {
+          const sourceItem = prev.find(r => r.id === source.id);
+          const targetItem = prev.find(r => r.id === target.id);
+          if (!sourceItem || !targetItem) return prev;
+
+          return prev.map(r => {
+            if (r.id === source.id) {
+              return {
+                ...r,
+                day: targetItem.day,
+                day_name: targetItem.day_name,
+                start_time: targetItem.start_time,
+                end_time: targetItem.end_time
+              };
+            }
+            if (r.id === target.id) {
+              return {
+                ...r,
+                day: sourceItem.day,
+                day_name: sourceItem.day_name,
+                start_time: sourceItem.start_time,
+                end_time: sourceItem.end_time
+              };
+            }
+            return r;
+          });
+        });
+
         setIsSubmitting(true);
         const toastId = toast.loading("Swapping class times...");
         try {
           const res = await swapRoutineEntries(source.id, target.id);
           if (res.success) {
             toast.success("Classes swapped successfully!", { id: toastId });
-            await refreshRoutine();
+            onHistoryAction?.({
+              type: "SWAP",
+              payload: {
+                id1: source.id,
+                id2: target.id,
+                course1: source.course,
+                course2: target.course,
+              },
+              description: `Swapped class ${source.course} with ${target.course}`,
+            });
+            createLog(
+              "Swap",
+              `Swapped class ${source.course} (T: ${source.teacher}, Day: ${source.day}) with ${target.course} (T: ${target.teacher}, Day: ${target.day})`
+            );
+            refreshRoutine(); // Show loading skeleton to refresh data
           } else {
             toast.error(res.message || "Failed to swap class times", { id: toastId });
+            await refreshRoutine(); // Rollback first — cards back to original & show skeleton
+            triggerRollbackAnimation([source.id, target.id]);
           }
         } catch (err) {
           console.error(err);
           toast.error("An unexpected error occurred", { id: toastId });
+          await refreshRoutine(); // Rollback first — cards back to original & show skeleton
+          triggerRollbackAnimation([source.id, target.id]);
         } finally {
           setIsSubmitting(false);
         }
@@ -687,12 +1004,12 @@ const MemoizedRoutineTable = React.memo(
                             const key =
                               session && teacherKey
                                 ? generateClassKey(
-                                    session.department,
-                                    session.semester,
-                                    abbreviateDay(session.day),
-                                    teacherKey,
-                                    startTimeRaw
-                                  )
+                                  session.department,
+                                  session.semester,
+                                  abbreviateDay(session.day),
+                                  teacherKey,
+                                  startTimeRaw
+                                )
                                 : "";
 
                             const classOffData =
@@ -710,18 +1027,6 @@ const MemoizedRoutineTable = React.memo(
                             const highlighted = isMatch(session);
                             const isLab = session ? isLabClass(session.course, undefined, session.room) : false;
 
-                            // Drag & drop checks
-                            const isValidTarget =
-                              !isPrint &&
-                              draggedSession !== null &&
-                              rowItem.semester === draggedSession.semester;
-
-                            const isHovered =
-                              !isPrint &&
-                              hoveredCell !== null &&
-                              hoveredCell.rowKey === `${rowItem.day}-${rowItem.semester}` &&
-                              hoveredCell.cellIndex === index;
-
                             return (
                               <TableCell
                                 key={index}
@@ -734,186 +1039,151 @@ const MemoizedRoutineTable = React.memo(
                                     });
                                   }
                                 }}
-                                onDragOver={(e) => {
-                                  if (isValidTarget) {
-                                    e.preventDefault();
-                                    if (
-                                      !hoveredCell ||
-                                      hoveredCell.rowKey !== `${rowItem.day}-${rowItem.semester}` ||
-                                      hoveredCell.cellIndex !== index
-                                    ) {
-                                      setHoveredCell({
-                                        rowKey: `${rowItem.day}-${rowItem.semester}`,
-                                        cellIndex: index,
-                                      });
-                                    }
-                                  }
-                                }}
-                                onDragLeave={() => {
-                                  if (isValidTarget) {
-                                    setHoveredCell(null);
-                                  }
-                                }}
-                                onDrop={(e) => {
-                                  if (isValidTarget) {
-                                    e.preventDefault();
-                                    handleDrop(rowItem, index);
-                                  }
-                                }}
+                                data-cell-key={`${rowItem.day}-${rowItem.semester}`}
+                                data-cell-index={index}
+                                data-cell-semester={rowItem.semester}
                                 className={cn(
-                                  "align-middle border-r border-border/60 transition-all duration-200 relative",
+                                  "align-middle border-r border-border/60 relative",
                                   isPrint ? "!print:border-r !print:border-black" : "",
                                   (!session && isBreakSlot(slot))
                                     ? "p-0 overflow-hidden"
                                     : isPrint
-                                    ? "p-0.5"
-                                    : "p-2",
-                                  isClassOffToday
-                                    ? "cursor-pointer"
-                                    : "cursor-default",
+                                      ? "p-0.5"
+                                      : "p-2",
+                                  isClassOffToday ? "cursor-pointer" : "cursor-default",
                                   highlighted
                                     ? "bg-emerald-100/50 dark:bg-emerald-900/20" + (isPrint ? " print:bg-transparent" : "")
                                     : (!session && isBreakSlot(slot))
-                                    ? "bg-muted/20"
-                                    : "bg-transparent" + (isPrint ? " print:bg-white" : ""),
-                                  // Drag targets styles
-                                  draggedSession && !isValidTarget && "opacity-40 filter blur-[0.3px]"
+                                      ? "bg-muted/20"
+                                      : "bg-transparent" + (isPrint ? " print:bg-white" : "")
                                 )}
                               >
-                                <AnimatePresence>
-                                  {isValidTarget && (
-                                    <>
-                                      {/* Dashed Border Overlay (Visible when not hovered, fades out when hovered) */}
-                                      <motion.div
-                                        key="dashed-overlay"
-                                        initial={{ opacity: 0, scale: 0.96 }}
-                                        animate={{
-                                          opacity: isHovered ? 0 : 1,
-                                          scale: isHovered ? 0.96 : 1,
-                                        }}
-                                        exit={{ opacity: 0, scale: 0.96 }}
-                                        transition={{ duration: 0.2, ease: "easeInOut" }}
-                                        className="absolute inset-0.5 rounded-lg border-2 border-dashed border-primary/45 bg-primary/5 dark:bg-primary/2 pointer-events-none z-20"
-                                      />
-                                      {/* Solid Border Overlay (Visible when hovered, fades in when hovered) */}
-                                      <motion.div
-                                        key="solid-overlay"
-                                        initial={{ opacity: 0, scale: 1.04 }}
-                                        animate={{
-                                          opacity: isHovered ? 1 : 0,
-                                          scale: isHovered ? 1 : 1.04,
-                                        }}
-                                        exit={{ opacity: 0, scale: 1.04 }}
-                                        transition={{ duration: 0.2, ease: "easeInOut" }}
-                                        className="absolute inset-0.5 rounded-lg border-2 border-solid border-primary bg-primary/15 shadow-md shadow-primary/20 pointer-events-none z-20"
-                                      />
-                                    </>
-                                  )}
-                                </AnimatePresence>
-                                 {session ? (
-                                   <>
-                                     <DropdownMenu>
-                                       <DropdownMenuTrigger asChild>
-                                         <motion.div
-                                           draggable={!isRoutineLocked && !isClassOffToday && !isSubmitting}
-                                           onDragStart={(e) => {
-                                             if (isRoutineLocked || isClassOffToday || isSubmitting) {
-                                               e.preventDefault();
-                                               return;
-                                             }
-                                             setDraggedSession(session);
-                                           }}
-                                           onDragEnd={() => {
-                                             setDraggedSession(null);
-                                             setHoveredCell(null);
-                                           }}
-                                           whileHover={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? { scale: 1.01, y: -0.5 } : {}}
-                                           className={cn(
-                                             "w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden cursor-pointer",
-                                             "transition-colors duration-200",
-                                             (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:shadow-md",
-                                             isTeacherOff
-                                               ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
-                                               : highlighted
-                                               ? "bg-background border-emerald-500 shadow-md"
-                                               : isLab
-                                               ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40"
-                                               : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40"
-                                           )}
-                                         >
-                                           <div className="flex justify-between items-start w-full gap-1">
-                                             <span className={cn(
-                                               "text-xs font-extrabold tracking-tight leading-tight text-foreground",
-                                               isClassOffToday && "opacity-70"
-                                             )}>
-                                               {session.course}
-                                             </span>
-                                             {isLab ? (
-                                               <span className={cn(
-                                                 "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
-                                                 isTeacherOff
-                                                   ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                   : "bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
-                                               )}>
-                                                 Lab
-                                               </span>
-                                             ) : (
-                                               <span className={cn(
-                                                 "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
-                                                 isTeacherOff
-                                                   ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                   : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
-                                               )}>
-                                                 Theory
-                                               </span>
-                                             )}
-                                           </div>
-                                           <div className="flex flex-col gap-0.5 mt-1">
-                                             <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                                               <User className="w-3 h-3 opacity-70" />
-                                               <span>
-                                                 {getTeacherInitials(session.teacher)}
-                                               </span>
-                                             </div>
-                                             <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-                                               <MapPin className="w-3 h-3 opacity-70" />
-                                               <span>{session.room}</span>
-                                             </div>
-                                           </div>
-                                         </motion.div>
-                                       </DropdownMenuTrigger>
-                                       {!isRoutineLocked && !isSubmitting && (
-                                         <DropdownMenuContent align="start" className="w-48">
-                                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                           <DropdownMenuSeparator />
-                                           {!isClassOffToday ? (
-                                             <DropdownMenuItem
-                                               className="text-red-500 focus:text-red-500 cursor-pointer"
-                                               onClick={() => onCancelClass?.(session)}
-                                             >
-                                               <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
-                                             </DropdownMenuItem>
-                                           ) : (
-                                             <>
-                                               <DropdownMenuItem
-                                                 className="text-emerald-500 focus:text-emerald-500 cursor-pointer"
-                                                 onClick={() => onReactivateClass?.(session)}
-                                               >
-                                                 <CheckCheck className="size-4 mr-2 text-emerald-500" /> Activate Class
-                                               </DropdownMenuItem>
-                                               {session.is_cancelled && (
-                                                 <DropdownMenuItem
-                                                   className="text-amber-500 focus:text-amber-500 cursor-pointer"
-                                                   onClick={() => onUpdateCancelMessage?.(session)}
-                                                 >
-                                                   <Pencil className="size-4 mr-2 text-amber-500" /> Update Message
-                                                 </DropdownMenuItem>
-                                               )}
-                                             </>
-                                           )}
-                                         </DropdownMenuContent>
-                                       )}
-                                     </DropdownMenu>
+                                {/* CSS-driven drag overlays — shown/hidden via data-attributes, zero JS per frame */}
+                                {!isPrint && (
+                                  <>
+                                    {/* Dashed overlay: visible on same-semester cells while dragging (hidden when this cell is hovered) */}
+                                    <div className="drag-target-dashed absolute inset-0.5 rounded-lg border-2 border-dashed border-primary/45 bg-primary/5 pointer-events-none z-20 opacity-0 scale-95 transition-all duration-150" />
+                                    {/* Solid overlay: visible only on the hovered cell */}
+                                    <div className="drag-target-hovered absolute inset-0.5 rounded-lg border-2 border-solid border-primary bg-primary/15 shadow-md shadow-primary/20 pointer-events-none z-20 opacity-0 transition-all duration-150" />
+                                  </>
+                                )}
+                                {session ? (
+                                  <>
+                                    {/* Draggable card — NOT wrapped in DropdownMenuTrigger */}
+                                    <motion.div
+                                      data-session-id={session.id}
+                                      onPointerDown={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? (e) => startPointerDrag(e, session, isLab) : undefined}
+                                      onPointerMove={onPointerMove}
+                                      onPointerUp={onPointerUp}
+                                      onPointerCancel={onPointerCancel}
+                                      className={cn(
+                                        "w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden relative select-none",
+                                        "transition-colors duration-150",
+                                        (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:shadow-md",
+                                        isTeacherOff
+                                          ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                                          : highlighted
+                                            ? "bg-background border-emerald-500 shadow-md"
+                                            : isLab
+                                              ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40"
+                                              : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40"
+                                      )}
+                                    >
+                                      <div className="flex justify-between items-start w-full gap-1">
+                                        <div className="flex flex-col">
+                                          <span className={cn(
+                                            "text-xs font-extrabold tracking-tight leading-tight text-foreground",
+                                            isClassOffToday && "opacity-70"
+                                          )}>
+                                            {session.course}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-0.5 shrink-0">
+                                          {isLab ? (
+                                            <span className={cn(
+                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                              isTeacherOff
+                                                ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                : "bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                            )}>
+                                              Lab
+                                            </span>
+                                          ) : (
+                                            <span className={cn(
+                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                              isTeacherOff
+                                                ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                            )}>
+                                              Theory
+                                            </span>
+                                          )}
+                                          {/* Three-dot menu button — sole dropdown trigger, does NOT interfere with drag */}
+                                          {!isRoutineLocked && !isSubmitting && (
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <button
+                                                  draggable={false}
+                                                  onMouseDown={(e) => e.stopPropagation()}
+                                                  onPointerDown={(e) => e.stopPropagation()}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  className="ml-0.5 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-opacity focus:opacity-100 outline-none cursor-pointer"
+                                                  aria-label="Class actions"
+                                                >
+                                                  <MoreVertical className="w-3 h-3 text-muted-foreground" />
+                                                </button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent
+                                                align="end"
+                                                className="w-48"
+                                                onPointerDown={(e) => e.stopPropagation()}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                              >
+                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                {!isClassOffToday ? (
+                                                  <DropdownMenuItem
+                                                    className="text-red-500 focus:text-red-500 cursor-pointer"
+                                                    onClick={() => onCancelClass?.(session)}
+                                                  >
+                                                    <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
+                                                  </DropdownMenuItem>
+                                                ) : (
+                                                  <>
+                                                    <DropdownMenuItem
+                                                      className="text-emerald-500 focus:text-emerald-500 cursor-pointer"
+                                                      onClick={() => onReactivateClass?.(session)}
+                                                    >
+                                                      <CheckCheck className="size-4 mr-2 text-emerald-500" /> Activate Class
+                                                    </DropdownMenuItem>
+                                                    {session.is_cancelled && (
+                                                      <DropdownMenuItem
+                                                        className="text-amber-500 focus:text-amber-500 cursor-pointer"
+                                                        onClick={() => onUpdateCancelMessage?.(session)}
+                                                      >
+                                                        <Pencil className="size-4 mr-2 text-amber-500" /> Update Message
+                                                      </DropdownMenuItem>
+                                                    )}
+                                                  </>
+                                                )}
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex flex-col gap-0.5 mt-1">
+                                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                                          <User className="w-3 h-3 opacity-70" />
+                                          <span>
+                                            {getTeacherInitials(session.teacher)}
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
+                                          <MapPin className="w-3 h-3 opacity-70" />
+                                          <span>{session.room}</span>
+                                        </div>
+                                      </div>
+                                    </motion.div>
                                     <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
                                       <span className="font-bold text-[11px]">
                                         {session.course}, T-
@@ -922,9 +1192,6 @@ const MemoizedRoutineTable = React.memo(
                                       <span className="font-bold text-[11px]">
                                         {session.room}
                                       </span>
-                                      {isClassOffToday && (
-                                        <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">(Cancelled)</span>
-                                      )}
                                     </div>
                                   </>
                                 ) : isBreakSlot(slot) ? (
@@ -966,7 +1233,7 @@ const MemoizedRoutineTable = React.memo(
       return (
         <div className="w-full flex flex-col gap-6 print:gap-0 print:block">
           {/* Screen view: single table */}
-          <div className="w-full print:hidden">
+          <div ref={tableWrapperRef} className="w-full print:hidden">
             {renderTable(schedule, false)}
           </div>
 
@@ -1046,6 +1313,42 @@ const MemoizedRoutineTable = React.memo(
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Ghost portal — rendered into document.body to escape transformed ancestors */}
+          {typeof document !== 'undefined' && ReactDOM.createPortal(
+            <div
+              ref={ghostRef}
+              style={{
+                display: 'none',
+                position: 'fixed',
+                left: 0,
+                top: 0,
+                transform: 'translate(0, 0)',
+                pointerEvents: 'none',
+                zIndex: 9999,
+                willChange: 'transform',
+              }}
+              className="w-[130px] rounded-md border-2 border-primary shadow-2xl shadow-primary/30 p-2 flex flex-col gap-1 backdrop-blur-md bg-background/90"
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span data-ghost-course="" className="text-xs font-extrabold tracking-tight text-foreground truncate">
+                  -
+                </span>
+                <span data-ghost-type="" className="text-[9px] font-black uppercase tracking-wider px-1 rounded border shrink-0">
+                  -
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <User className="w-3 h-3 shrink-0" />
+                <span data-ghost-teacher="">-</span>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] font-mono text-muted-foreground/80">
+                <MapPin className="w-3 h-3 shrink-0" />
+                <span data-ghost-room="">-</span>
+              </div>
+            </div>,
+            document.body
+          )}
         </div>
       );
     } catch (error) {
@@ -1100,7 +1403,7 @@ export default function AdminRoutinePage({
     (s: RootState) => s.classOff.offMap || EMPTY_OBJ
   );
 
-  
+
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -1109,7 +1412,16 @@ export default function AdminRoutinePage({
   const [isGenerating, setIsGenerating] = useState(false);
   const isRoutineLocked = useSelector((s: RootState) => s.routine.isLocked);
 
-  
+  const [undoStack, setUndoStack] = useState<HistoryAction[]>([]);
+  const [redoStack, setRedoStack] = useState<HistoryAction[]>([]);
+  const [isProcessingHistory, setIsProcessingHistory] = useState(false);
+
+  const handleHistoryAction = useCallback((action: HistoryAction) => {
+    setUndoStack((prev) => [...prev, action]);
+    setRedoStack([]);
+  }, []);
+
+
   const [lockConfirmModal, setLockConfirmModal] = useState<{
     isOpen: boolean;
     type: "lock" | "unlock";
@@ -1146,11 +1458,21 @@ export default function AdminRoutinePage({
 
   const [generationVersion, setGenerationVersion] = useState(0);
   const isFirstRender = useRef(true);
+  const isFirstFetchRef = useRef(true);
 
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [selectedSemester, setSelectedSemester] = useState<string>("");
 
-  const [localRoutineList, setLocalRoutineList] = useState<APIRoutineItem[]>(routineList);
+  const localRoutineList = useSelector((s: RootState) => s.routine.routineList);
+
+  const setLocalRoutineList = useCallback((updater: React.SetStateAction<APIRoutineItem[]>) => {
+    if (typeof updater === "function") {
+      const currentState = (store.getState() as RootState).routine.routineList;
+      dispatch(setRoutineList(updater(currentState)));
+    } else {
+      dispatch(setRoutineList(updater));
+    }
+  }, [dispatch]);
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
   const [cancellationMode, setCancellationMode] = useState<"cancel" | "update">("cancel");
   const [pendingCancellation, setPendingCancellation] = useState<{
@@ -1178,7 +1500,7 @@ export default function AdminRoutinePage({
         } else {
           toast.warning(`${pendingCancellation.courseName} class has been cancelled`);
         }
-        
+
         setLocalRoutineList((prev) =>
           prev.map((r) =>
             r.id === pendingCancellation.id
@@ -1213,7 +1535,7 @@ export default function AdminRoutinePage({
       const res = await reactivateClass(session.id);
       if (res.success) {
         toast.success(`${session.course} is now active (ON)`);
-        
+
         setLocalRoutineList((prev) =>
           prev.map((r) =>
             r.id === session.id
@@ -1239,7 +1561,11 @@ export default function AdminRoutinePage({
     }
   };
 
-  const [isLoadingRoutine, setIsLoadingRoutine] = useState(false);
+  const isLoadingRoutine = useSelector((s: RootState) => s.routine.isLoading);
+
+  const setIsLoadingRoutine = useCallback((loading: boolean) => {
+    dispatch(setIsLoading(loading));
+  }, [dispatch]);
 
   useEffect(() => {
     setLocalRoutineList(routineList);
@@ -1262,7 +1588,7 @@ export default function AdminRoutinePage({
     return () => clearTimeout(timer);
   }, [inputValue]);
 
-  
+
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
@@ -1315,9 +1641,9 @@ export default function AdminRoutinePage({
     return found ? found.id : undefined;
   }, [dbSemesters, selectedSemester]);
 
-  const refreshRoutine = useCallback(async () => {
+  const refreshRoutine = useCallback(async (silent = false) => {
     if (selectedDeptId === undefined) return;
-    setIsLoadingRoutine(true);
+    if (!silent) setIsLoadingRoutine(true);
     try {
       const res = await getRoutine({
         department_id: selectedDeptId,
@@ -1332,9 +1658,103 @@ export default function AdminRoutinePage({
       console.error("Failed to refresh routine:", err);
       toast.error("Failed to refresh routine data");
     } finally {
-      setIsLoadingRoutine(false);
+      if (!silent) setIsLoadingRoutine(false);
     }
   }, [selectedDeptId, selectedSemesterId]);
+
+  const handleUndo = useCallback(async () => {
+    if (undoStack.length === 0 || isProcessingHistory || isRoutineLocked) return;
+
+    const action = undoStack[undoStack.length - 1];
+    setIsProcessingHistory(true);
+    const toastId = toast.loading(`Undoing: ${action.description}...`);
+
+    try {
+      let success = false;
+      let errorMsg = "";
+
+      if (action.type === "SWAP") {
+        const res = await swapRoutineEntries(action.payload.id1, action.payload.id2);
+        success = res.success;
+        errorMsg = res.message || "Failed to undo swap";
+      } else if (action.type === "UPDATE") {
+        const res = await updateRoutineEntry(
+          action.payload.id,
+          action.payload.fromDayId,
+          action.payload.fromSlotId
+        );
+        success = res.success;
+        errorMsg = res.message || "Failed to undo move";
+      } else if (action.type === "GENERATE") {
+        const res = await rollbackRoutine({ department_id: action.payload.departmentId });
+        success = res.success;
+        errorMsg = res.message || "Failed to undo generation";
+      }
+
+      if (success) {
+        toast.success(`Undone: ${action.description}`, { id: toastId });
+        setUndoStack((prev) => prev.slice(0, -1));
+        setRedoStack((prev) => [...prev, action]);
+        await refreshRoutine();
+      } else {
+        toast.error(errorMsg, { id: toastId });
+      }
+    } catch (err) {
+      console.error("Undo error:", err);
+      toast.error("An error occurred while performing undo", { id: toastId });
+    } finally {
+      setIsProcessingHistory(false);
+    }
+  }, [undoStack, isProcessingHistory, isRoutineLocked, refreshRoutine]);
+
+  const handleRedo = useCallback(async () => {
+    if (redoStack.length === 0 || isProcessingHistory || isRoutineLocked) return;
+
+    const action = redoStack[redoStack.length - 1];
+    setIsProcessingHistory(true);
+    const toastId = toast.loading(`Redoing: ${action.description}...`);
+
+    try {
+      let success = false;
+      let errorMsg = "";
+
+      if (action.type === "SWAP") {
+        const res = await swapRoutineEntries(action.payload.id1, action.payload.id2);
+        success = res.success;
+        errorMsg = res.message || "Failed to redo swap";
+      } else if (action.type === "UPDATE") {
+        const res = await updateRoutineEntry(
+          action.payload.id,
+          action.payload.toDayId,
+          action.payload.toSlotId
+        );
+        success = res.success;
+        errorMsg = res.message || "Failed to redo move";
+      } else if (action.type === "GENERATE") {
+        const res = await generateRoutine({
+          department_id: action.payload.departmentId,
+          semester_id: action.payload.semesterId,
+          ignore_warnings: action.payload.ignoreWarnings,
+        });
+        success = res.success;
+        errorMsg = res.message || "Failed to redo generation";
+      }
+
+      if (success) {
+        toast.success(`Redone: ${action.description}`, { id: toastId });
+        setRedoStack((prev) => prev.slice(0, -1));
+        setUndoStack((prev) => [...prev, action]);
+        await refreshRoutine();
+      } else {
+        toast.error(errorMsg, { id: toastId });
+      }
+    } catch (err) {
+      console.error("Redo error:", err);
+      toast.error("An error occurred while performing redo", { id: toastId });
+    } finally {
+      setIsProcessingHistory(false);
+    }
+  }, [redoStack, isProcessingHistory, isRoutineLocked, refreshRoutine]);
 
   useEffect(() => {
     if (departments.length > 0 && !selectedDept) {
@@ -1355,6 +1775,11 @@ export default function AdminRoutinePage({
 
   useEffect(() => {
     if (selectedDeptId === undefined) return;
+
+    if (isFirstFetchRef.current) {
+      isFirstFetchRef.current = false;
+      return;
+    }
 
     const fetchUpdatedRoutine = async () => {
       setIsLoadingRoutine(true);
@@ -1396,12 +1821,26 @@ export default function AdminRoutinePage({
       if (result.success) {
         dispatch(resetAll());
         toast.success("Routine generated successfully!");
-        
+
+        setUndoStack((prev) => [
+          ...prev,
+          {
+            type: "GENERATE",
+            payload: {
+              departmentId: generateModal.departmentId as number,
+              semesterId: generateModal.semesterId,
+              ignoreWarnings: generateModal.ignoreWarnings,
+            },
+            description: `Generated routine for department`,
+          },
+        ]);
+        setRedoStack([]);
+
         const targetDept = dbDepartments.find((d) => d.id === generateModal.departmentId);
         if (targetDept) {
           setSelectedDept(targetDept.name);
         }
-        
+
         if (generateModal.semesterId === undefined) {
           setSelectedSemester("All Semesters");
         } else {
@@ -1418,7 +1857,7 @@ export default function AdminRoutinePage({
         if (res.success && Array.isArray(res.data)) {
           setLocalRoutineList(res.data);
         }
-        
+
         setGenerateModal((prev) => ({ ...prev, isOpen: false }));
         router.refresh();
       } else {
@@ -1432,7 +1871,7 @@ export default function AdminRoutinePage({
     }
   };
 
-  
+
   const initiateLockAction = () => {
     if (isRoutineLocked) {
       setLockConfirmModal({ isOpen: true, type: "unlock" });
@@ -1501,7 +1940,7 @@ export default function AdminRoutinePage({
     await handleReactivate(session);
   }, [handleReactivate]);
 
-  
+
   const currentRoutineSchedule = useMemo(() => {
     const isAllSemesters = selectedSemester === "All Semesters";
 
@@ -1828,7 +2267,7 @@ export default function AdminRoutinePage({
                 variants={itemVariants}
                 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground"
               >
-               Department of {currentRoutineSchedule.label}
+                Department of {currentRoutineSchedule.label}
               </motion.h1>
               <motion.div
                 variants={itemVariants}
@@ -1848,7 +2287,7 @@ export default function AdminRoutinePage({
               variants={itemVariants}
               className="flex items-center gap-3"
             >
-              {}
+              { }
               <Button
                 onClick={initiateLockAction}
                 variant={isRoutineLocked ? "destructive" : "outline"}
@@ -1863,6 +2302,28 @@ export default function AdminRoutinePage({
                     <Lock className="h-4 w-4" /> Lock
                   </>
                 )}
+              </Button>
+
+              <Button
+                onClick={handleUndo}
+                disabled={undoStack.length === 0 || isProcessingHistory || isRoutineLocked}
+                variant="outline"
+                className="gap-2 border-primary/20"
+                title={undoStack.length > 0 ? `Undo: ${undoStack[undoStack.length - 1].description}` : "Undo"}
+              >
+                <Undo2 className="h-4.5 w-4.5" />
+                <span className="hidden sm:inline">Undo</span>
+              </Button>
+
+              <Button
+                onClick={handleRedo}
+                disabled={redoStack.length === 0 || isProcessingHistory || isRoutineLocked}
+                variant="outline"
+                className="gap-2 border-primary/20"
+                title={redoStack.length > 0 ? `Redo: ${redoStack[redoStack.length - 1].description}` : "Redo"}
+              >
+                <Redo2 className="h-4.5 w-4.5" />
+                <span className="hidden sm:inline">Redo</span>
               </Button>
 
               {!isRoutineLocked && (
@@ -1902,13 +2363,13 @@ export default function AdminRoutinePage({
             </motion.div>
           </div>
 
-          {}
+          { }
           <div className="flex flex-wrap items-center mb-5 gap-4 print:hidden">
             <motion.div
               variants={itemVariants}
               className="flex flex-wrap items-center gap-3 bg-card border rounded-xl p-1.5 shadow-sm w-full lg:w-fit"
             >
-              {}
+              { }
               <div className="flex-1 min-w-[220px]">
                 <CustomSelect
                   value={selectedDept}
@@ -1918,7 +2379,7 @@ export default function AdminRoutinePage({
                 />
               </div>
 
-              {}
+              { }
               <div className="flex-1 min-w-[150px]">
                 <CustomSelect
                   value={selectedSemester}
@@ -1931,7 +2392,7 @@ export default function AdminRoutinePage({
                 />
               </div>
 
-              {}
+              { }
               <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 rounded-lg border border-transparent transition-all flex-1 min-w-[150px] justify-center sm:justify-start">
                 <div>
                   <BookOpen className="h-3.5 w-3.5 text-primary" />
@@ -1947,7 +2408,7 @@ export default function AdminRoutinePage({
               </div>
             </motion.div>
 
-            {}
+            { }
             <motion.div
               variants={itemVariants}
               className="flex-1 min-w-[200px] bg-card border rounded-xl p-1.5 shadow-sm"
@@ -1965,7 +2426,7 @@ export default function AdminRoutinePage({
           </div>
 
 
-          {}
+          { }
           {isLoadingRoutine ? (
             <div className="skeleton-sweep rounded-xl overflow-hidden bg-card/35 font-lexend w-full grid grid-cols-1">
               <div className="overflow-x-auto w-full">
@@ -2007,24 +2468,19 @@ export default function AdminRoutinePage({
                           return (
                             <TableCell
                               key={slot.id}
-                              className="w-10 min-w-10 bg-foreground/5 text-center align-middle p-0 border-r border-border/60"
+                              className="w-10 min-w-10 bg-muted/5 text-center align-middle p-0 border-r border-border/60"
                             >
-                              <div className="h-full flex items-center justify-center">
-                                <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-muted-foreground/30">
-                                  Break
-                                </span>
-                              </div>
+                              <div className="h-full flex items-center justify-center" />
                             </TableCell>
                           );
                         }
                         return (
                           <TableCell
                             key={slot.id}
-                            className="text-center align-middle h-[60px] border-r border-border/60 last:border-r-0 p-0 min-w-[100px] bg-muted/10"
+                            className="text-center align-middle h-[50px] border-r border-border/60 last:border-r-0 p-0 min-w-[100px] bg-muted/5"
                           >
-                            <div className="flex flex-col items-center justify-center gap-1.5 w-full px-1">
-                              <Skeleton className="w-16 h-3.5 mx-auto" />
-                              <Skeleton className="w-20 h-2.5 mx-auto" />
+                            <div className="flex items-center justify-center w-full px-1">
+                              <Skeleton className="w-16 h-3 mx-auto" />
                             </div>
                           </TableCell>
                         );
@@ -2035,20 +2491,20 @@ export default function AdminRoutinePage({
                     {DAYS_ORDER.map((day, rowIndex) => (
                       <TableRow
                         key={day}
-                        className="border-b border-border/60 hover:bg-muted/5 h-[85px]"
+                        className="border-b border-border/60 hover:bg-muted/5 h-[80px]"
                       >
                         {/* Day Label */}
-                        <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 w-[90px] min-w-[90px]">
+                        <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/10 border-r border-border/60 w-[90px] min-w-[90px]">
                           <div className="flex items-center justify-center h-full w-full py-4">
-                            <span className="writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0">
+                            <span>
                               {day.slice(0, 3).toUpperCase()}
                             </span>
                           </div>
                         </TableCell>
 
                         {currentRoutineSchedule.isAllSemestersMode && (
-                          <TableCell className="font-bold text-xs text-center border-r border-border/60 bg-muted/10">
-                            <Skeleton className="w-8 h-4 mx-auto" />
+                          <TableCell className="font-bold text-xs text-center border-r border-border/60 bg-muted/5">
+                            <Skeleton className="w-8 h-3.5 mx-auto" />
                           </TableCell>
                         )}
 
@@ -2058,11 +2514,9 @@ export default function AdminRoutinePage({
                             return (
                               <TableCell
                                 key={slot.id}
-                                className="p-0 align-middle border-r border-border/60 relative overflow-hidden bg-muted/20"
+                                className="p-0 align-middle border-r border-border/60 bg-muted/5"
                               >
-                                <div className="h-full w-full flex items-center justify-center">
-                                  <Utensils className="w-3 h-3 text-muted-foreground/20" />
-                                </div>
+                                <div className="h-full w-full flex items-center justify-center" />
                               </TableCell>
                             );
                           }
@@ -2072,30 +2526,14 @@ export default function AdminRoutinePage({
                           return (
                             <TableCell
                               key={slot.id}
-                              className="p-2.5 h-px align-middle border-r border-border/60 last:border-r-0 min-w-[100px]"
+                              className="p-2 h-px align-middle border-r border-border/60 last:border-r-0 min-w-[100px]"
                             >
                               {hasClass ? (
-                                <div className="h-full w-full rounded-md border border-muted/20 bg-background/50 flex flex-col justify-between p-2 shadow-sm space-y-1.5">
-                                  <div className="flex justify-between items-start w-full">
-                                    <Skeleton className="h-3 w-14" />
-                                    <Skeleton className="h-3.5 w-8 rounded" />
-                                  </div>
-                                  <div className="flex flex-col gap-1 mt-0.5">
-                                    <div className="flex items-center gap-1">
-                                      <User className="w-2.5 h-2.5 text-muted-foreground/35" />
-                                      <Skeleton className="w-10 h-2.5" />
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                      <MapPin className="w-2.5 h-2.5 text-muted-foreground/35" />
-                                      <Skeleton className="w-8 h-2.5" />
-                                    </div>
-                                  </div>
+                                <div className="h-[55px] w-full rounded bg-muted/15 flex flex-col justify-center gap-2 p-2.5">
+                                  <Skeleton className="h-2.5 w-14" />
+                                  <Skeleton className="h-2 w-8" />
                                 </div>
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center">
-                                  <div className="w-1 h-1 rounded-full bg-border/40" />
-                                </div>
-                              )}
+                              ) : null}
                             </TableCell>
                           );
                         })}
@@ -2131,7 +2569,7 @@ export default function AdminRoutinePage({
               className="rounded-xl font-lexend bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:shadow-none print:bg-transparent print:overflow-visible"
             >
               <div className="overflow-x-auto w-full print:overflow-visible">
-                {}
+                { }
                 <MemoizedRoutineTable
                   schedule={currentRoutineSchedule.schedule}
                   timeSlots={sortedTimeSlots}
@@ -2143,10 +2581,12 @@ export default function AdminRoutinePage({
                   generationVersion={generationVersion}
                   printHeader={printHeader}
                   refreshRoutine={refreshRoutine}
+                  setLocalRoutineList={setLocalRoutineList}
                   isRoutineLocked={isRoutineLocked}
                   onCancelClass={handleCancelClass}
                   onReactivateClass={handleReactivateClass}
                   onUpdateCancelMessage={handleUpdateCancelMessage}
+                  onHistoryAction={handleHistoryAction}
                 />
               </div>
             </motion.div>
@@ -2164,7 +2604,7 @@ export default function AdminRoutinePage({
         </div>
       </motion.div>
 
-      {}
+      { }
       <Dialog
         open={viewReasonModal.isOpen}
         onOpenChange={(open) =>
@@ -2216,7 +2656,7 @@ export default function AdminRoutinePage({
         </DialogContent>
       </Dialog>
 
-      {}
+      { }
       <Dialog
         open={lockConfirmModal.isOpen}
         onOpenChange={(open) =>
@@ -2239,7 +2679,7 @@ export default function AdminRoutinePage({
                     : "border-emerald-500/30"
                 )}
               >
-                {}
+                { }
                 <motion.div
                   variants={modalItemVariants}
                   className={cn(
@@ -2286,7 +2726,7 @@ export default function AdminRoutinePage({
                   </div>
                 </motion.div>
 
-                {}
+                { }
                 <div className="p-6 space-y-4 bg-card">
                   <motion.div
                     variants={modalItemVariants}
@@ -2316,7 +2756,7 @@ export default function AdminRoutinePage({
                   </motion.div>
                 </div>
 
-                {}
+                { }
                 <motion.div
                   variants={modalItemVariants}
                   className="p-6 pt-2 bg-card flex justify-end gap-3"

@@ -9,8 +9,6 @@ export const loginUser = async (userData: FieldValues) => {
     try {
         const LOGIN_URL = `${process.env.NEXT_PUBLIC_BASE_API}/login/`;
 
-        console.log(`[Auth] Attempting login to: ${LOGIN_URL}`);
-
         const res = await fetch(LOGIN_URL, {
             method: "POST",
             headers: {
@@ -40,10 +38,6 @@ export const loginUser = async (userData: FieldValues) => {
         }
 
         const rawResult = await res.json();
-        console.log(
-            "[Auth] API Response:",
-            JSON.stringify(rawResult, null, 2)
-        );
 
         let standardizedResult;
 

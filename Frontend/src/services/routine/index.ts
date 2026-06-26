@@ -2,28 +2,21 @@
 import { cookies } from "next/headers";
 import { jwtDecode } from "jwt-decode";
 
-/**
- * Returns a valid access token.
- * If the stored token is expired, attempts a silent refresh via the refresh token.
- * Falls back to the raw stored token so the request is never silently blocked.
- */
+
 const getValidToken = async (): Promise<string | null> => {
     const cookieStore = await cookies();
     const token = cookieStore.get("accessToken")?.value;
 
     if (!token) return null;
 
-    // Check if the stored access token is still valid
     try {
         const decoded = jwtDecode<{ exp?: number; token_type?: string }>(token);
-        console.log("[Auth] Token type:", decoded.token_type, "exp:", decoded.exp);
         const isExpired = decoded.exp ? decoded.exp * 1000 < Date.now() : false;
         if (!isExpired) return token; // Token is valid — use it directly
     } catch {
         console.warn("[Auth] Could not decode token — will try refresh");
     }
 
-    // Token is expired — try a silent refresh
     const refreshToken = cookieStore.get("refreshToken")?.value;
     if (refreshToken) {
         try {
@@ -41,7 +34,6 @@ const getValidToken = async (): Promise<string | null> => {
                 const newToken = data.access;
                 if (newToken) {
                     cookieStore.set("accessToken", newToken);
-                    console.log("[Auth] Token refreshed successfully");
                     return newToken;
                 }
             } else {
@@ -52,7 +44,6 @@ const getValidToken = async (): Promise<string | null> => {
         }
     }
 
-    // Fall back to the original token — let the backend return the real error
     console.warn("[Auth] Falling back to original token");
     return token;
 };
@@ -120,9 +111,8 @@ const getRoutine = async (params?: GetRoutineParams) => {
         }
 
         const rawResult = await res.json();
-        console.log("[Routine] API Response:", JSON.stringify(rawResult, null, 2));
 
-        
+
         let normalizedData = rawResult;
         if (!Array.isArray(rawResult) && rawResult !== null && typeof rawResult === "object") {
             if (Array.isArray(rawResult.results)) {
@@ -176,7 +166,6 @@ const generateRoutine = async (params: GenerateRoutineParams) => {
         }
 
         const rawResult = await res.json();
-        console.log("[Routine] API Response:", JSON.stringify(rawResult, null, 2));
 
         return { success: true, data: rawResult };
     } catch (error) {
@@ -396,7 +385,7 @@ const swapRoutineEntries = async (entry1Id: number, entry2Id: number) => {
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -447,7 +436,7 @@ const updateRoutineEntry = async (
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -498,7 +487,7 @@ const requestSwap = async (params: RequestSwapParams) => {
                 } else {
                     errorMessage = errorJson.detail || errorJson.message || errorMessage;
                 }
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -541,7 +530,7 @@ const respondSwap = async (params: RespondSwapParams) => {
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -553,14 +542,14 @@ const respondSwap = async (params: RespondSwapParams) => {
     }
 };
 
-export { 
-    getRoutine, 
-    generateRoutine, 
-    rollbackRoutine, 
-    cancelClass, 
+export {
+    getRoutine,
+    generateRoutine,
+    rollbackRoutine,
+    cancelClass,
     reactivateClass,
     updateCancelMessage,
-    swapRoutineEntries, 
+    swapRoutineEntries,
     updateRoutineEntry,
     requestSwap,
     respondSwap
