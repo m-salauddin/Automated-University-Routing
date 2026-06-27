@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+console.log("Department Routine client component loaded v6");
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { Table, TableCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -53,10 +54,16 @@ export type APIRoutineItem = {
   end_time: string;
   course_name: string;
   course_code: string;
+  course_type?: string;
+  credits?: number;
+  teacher_id?: number;
   teacher_name: string;
   department_name: string;
   semester_name: string;
   room_number: string;
+  group_name?: string | null;
+  is_cancelled?: boolean;
+  cancel_message?: string | null;
 };
 
 export type TimeSlot = {
@@ -71,6 +78,7 @@ type ClassSession = {
   teacher: string;
   room: string;
   teacherId?: string;
+  teacherNumericId?: number;
   originalTime?: string;
   department: string;
   semester: string;
@@ -200,6 +208,23 @@ const dialogItemVariants = {
   },
 };
 
+// Mapping from normalized teacher names to their database integer IDs
+// Modify these database IDs if they change on the backend.
+const TEACHER_ID_MAP: Record<string, number> = {
+  taniasultana: 2,
+  santaislam: 5,
+  shatabdebala: 6,
+  nilakhan: 7,
+  mdraselmia: 8,
+  adilanuzhat: 9,
+  taniaakter: 10,
+  osmangoni: 11,
+  sharifahamed: 12,
+  ummefarhana: 13,
+  nurmohammad: 14,
+  farzanatasnim: 15,
+};
+
 const EMPTY_OBJ = {};
 
 interface Props {
@@ -284,12 +309,18 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
           return;
         }
 
-        // Fallback: extract unique teachers from routineList
+        // Fallback: extract unique teachers from routineList (use teacher_id from API)
         const uniqueTeachersMap = new Map();
         routineList.forEach((item: any) => {
           if (item.teacher_name) {
-            uniqueTeachersMap.set(item.teacher_name.toLowerCase(), {
-              id: item.teacher_name,
+            const nameKey = item.teacher_name.toLowerCase();
+            // Prefer the numeric teacher_id from the API response; fall back to TEACHER_ID_MAP
+            const mappedId =
+              item.teacher_id ??
+              TEACHER_ID_MAP[nameKey] ??
+              item.teacher_name;
+            uniqueTeachersMap.set(nameKey, {
+              id: mappedId,
               name: item.teacher_name,
               username: item.teacher_name,
               role: "TEACHER",
@@ -305,6 +336,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
 
     fetchTeachers();
   }, [role, routineList]);
+
+
 
   // Calculate target teacher's classes for MUTUAL swap
   const targetTeacherClasses = useMemo(() => {
@@ -361,14 +394,18 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
         }
       }
 
-      const res = await requestSwap({
+      const swapPayload: any = {
         swap_type: swapType,
         target_teacher_id: targetTeacherParam,
         requester_routine_id: parseInt(requesterRoutineId),
-        target_routine_id: swapType === "MUTUAL" ? selectedRowForSwap.id : null,
         swap_date: swapDate,
         reason: swapReason,
-      });
+      };
+      if (swapType === "MUTUAL" && selectedRowForSwap?.id) {
+        swapPayload.target_routine_id = selectedRowForSwap.id;
+      }
+
+      const res = await requestSwap(swapPayload);
 
       if (res.success) {
         toast.success(`${swapType === "MUTUAL" ? "Swap" : "Proxy"} request sent successfully!`);
@@ -422,6 +459,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
           teacher: item.teacher_name,
           room: item.room_number,
           teacherId: item.teacher_name,
+          teacherNumericId: item.teacher_id,
           originalTime: item.start_time,
           department: item.department_name,
           semester: item.semester_name,
@@ -824,24 +862,30 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
               <div className="flex items-center gap-2 px-2 min-w-[200px] w-full sm:w-auto">
                 <GraduationCap className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-[150px]">
-                  <CustomSelect
-                    value={activeSemesterId}
-                    onChange={setSelectedSemester}
-                    options={semesterOptions.map((opt) => ({
-                      value: opt.id,
-                      label: opt.hasClasses ? (
-                        <span className="flex items-center gap-2">
-                          <span>{opt.label}</span>
-                          <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-xs font-semibold text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
-                            my
+                  {role === "student" ? (
+                    <span className="text-sm font-semibold text-foreground px-1">
+                      {currentRoutine?.label || activeSemesterId}
+                    </span>
+                  ) : (
+                    <CustomSelect
+                      value={activeSemesterId}
+                      onChange={setSelectedSemester}
+                      options={semesterOptions.map((opt) => ({
+                        value: opt.id,
+                        label: opt.hasClasses ? (
+                          <span className="flex items-center gap-2">
+                            <span>{opt.label}</span>
+                            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-xs font-semibold text-emerald-500 ring-1 ring-inset ring-emerald-500/20">
+                              my
+                            </span>
                           </span>
-                        </span>
-                      ) : (
-                        opt.label
-                      ),
-                    }))}
-                    placeholder="Select Semester"
-                  />
+                        ) : (
+                          opt.label
+                        ),
+                      }))}
+                      placeholder="Select Semester"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -1078,23 +1122,32 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                         setIsSwapModalOpen(true);
                                       } else {
                                         // Scenario B: MUTUAL (we click another teacher's class to swap our class with them)
-                                        const normalizeStr = (str: string) =>
-                                          str ? str.toLowerCase().replace(/[\s-_]/g, "") : "";
+                                        // Use teacher_id directly from the API response if available;
+                                        // fall back to name-matching in teachersList.
+                                        let targetTeacherIdVal = "";
 
-                                        const targetTeacherObj = teachersList.find((t) => {
-                                          const usernameNorm = normalizeStr(t.username);
-                                          const nameNorm = normalizeStr(t.name);
-                                          const sessionTeacherNorm = normalizeStr(session.teacher);
-                                          
-                                          if (usernameNorm === sessionTeacherNorm || nameNorm === sessionTeacherNorm) {
-                                            return true;
-                                          }
+                                        if (session.teacherNumericId) {
+                                          // Direct match from API data — most reliable
+                                          targetTeacherIdVal = String(session.teacherNumericId);
+                                        } else {
+                                          const normalizeStr = (str: string) =>
+                                            str ? str.toLowerCase().replace(/[\s-_]/g, "") : "";
 
-                                          const tInitials = getTeacherInitials(t.name || t.username).toLowerCase();
-                                          const sInitials = getTeacherInitials(session.teacher).toLowerCase();
-                                          return tInitials === sInitials;
-                                        });
-                                        const targetTeacherIdVal = targetTeacherObj ? String(targetTeacherObj.id) : "";
+                                          const targetTeacherObj = teachersList.find((t) => {
+                                            const usernameNorm = normalizeStr(t.username);
+                                            const nameNorm = normalizeStr(t.name);
+                                            const sessionTeacherNorm = normalizeStr(session.teacher);
+
+                                            if (usernameNorm === sessionTeacherNorm || nameNorm === sessionTeacherNorm) {
+                                              return true;
+                                            }
+
+                                            const tInitials = getTeacherInitials(t.name || t.username).toLowerCase();
+                                            const sInitials = getTeacherInitials(session.teacher).toLowerCase();
+                                            return tInitials === sInitials;
+                                          });
+                                          targetTeacherIdVal = targetTeacherObj ? String(targetTeacherObj.id) : "";
+                                        }
 
                                         setSelectedRowForSwap(session); // Other teacher's class
                                         setSwapType("MUTUAL");
@@ -1397,6 +1450,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                         setIsCalendarOpen(false);
                       }
                     }}
+                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                     initialFocus
                     className="rounded-md border bg-card"
                   />

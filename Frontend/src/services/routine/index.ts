@@ -1,5 +1,6 @@
 "use server";
 import { getValidToken } from "../auth";
+import { jwtDecode } from "jwt-decode";
 
 export interface GetRoutineParams {
     day?: number | string;
@@ -229,12 +230,21 @@ const rollbackRoutine = async (params: { department_id: number }) => {
 
 const cancelClass = async (routineId: number, cancelMessage: string) => {
     try {
-        const CANCEL_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
         const token = await getValidToken();
 
         if (!token) {
             return { success: false, message: "No access token found. Please log in." };
         }
+
+        let isAdmin = false;
+        try {
+            const decoded = jwtDecode<{ role?: string }>(token);
+            isAdmin = decoded.role?.toLowerCase() === "admin";
+        } catch {}
+
+        const CANCEL_CLASS_URL = isAdmin
+            ? `${process.env.NEXT_PUBLIC_BASE_API}/academic/admin/routine/${routineId}/cancel/`
+            : `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
 
         const body = { 
             action: "cancel", 
@@ -276,12 +286,21 @@ const cancelClass = async (routineId: number, cancelMessage: string) => {
 
 const reactivateClass = async (routineId: number) => {
     try {
-        const CANCEL_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
         const token = await getValidToken();
 
         if (!token) {
             return { success: false, message: "No access token found. Please log in." };
         }
+
+        let isAdmin = false;
+        try {
+            const decoded = jwtDecode<{ role?: string }>(token);
+            isAdmin = decoded.role?.toLowerCase() === "admin";
+        } catch {}
+
+        const CANCEL_CLASS_URL = isAdmin
+            ? `${process.env.NEXT_PUBLIC_BASE_API}/academic/admin/routine/${routineId}/cancel/`
+            : `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
 
         const body = { 
             action: "reactivate" 
@@ -322,12 +341,21 @@ const reactivateClass = async (routineId: number) => {
 
 const updateCancelMessage = async (routineId: number, cancelMessage: string) => {
     try {
-        const CANCEL_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
         const token = await getValidToken();
 
         if (!token) {
             return { success: false, message: "No access token found. Please log in." };
         }
+
+        let isAdmin = false;
+        try {
+            const decoded = jwtDecode<{ role?: string }>(token);
+            isAdmin = decoded.role?.toLowerCase() === "admin";
+        } catch {}
+
+        const CANCEL_CLASS_URL = isAdmin
+            ? `${process.env.NEXT_PUBLIC_BASE_API}/academic/admin/routine/${routineId}/cancel/`
+            : `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
 
         const body = { 
             action: "update", 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronsUpDown, LogOut, User, Sparkles } from "lucide-react"; 
+import { ChevronsUpDown, LogOut, User, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -60,12 +60,12 @@ export function NavUser() {
     return () => clearTimeout(timer);
   }, []);
 
-  
+
   const displayName = username || "Guest User";
   const secondary = role ? String(role) : "";
   const initials = getInitials(displayName);
 
-  
+
   const isAdmin = String(role).toLowerCase() === "admin";
 
   const handleLogout = async () => {
@@ -182,7 +182,7 @@ export function NavUser() {
 
             {isAdmin && (
               <>
-                <a target="1" href="https://routineproject-s6dh.onrender.com/admin/">
+                <a target="1" href="https://routine-nvxe.onrender.com/admin/">
                   <DropdownMenuItem
                     className="cursor-pointer animate-in fade-in slide-in-from-left-8 duration-500 fill-mode-backwards"
                     style={{ animationDelay: "100ms" }}
@@ -210,14 +210,13 @@ export function NavUser() {
 
       {/* Logout Confirmation Dialog */}
       <Dialog open={isLogoutDialogOpen} onOpenChange={setIsLogoutDialogOpen}>
-        <DialogContent className="sm:max-w-md w-full border border-[#ca2a30]/20 bg-background/95 backdrop-blur-md shadow-2xl shadow-[#ca2a30]/5 rounded-2xl p-6 font-lexend overflow-hidden">
+        <DialogContent className="sm:max-w-md w-full bg-background/95 backdrop-blur-md shadow-2xl rounded-2xl p-6 font-lexend overflow-hidden">
           <div className="flex flex-col items-center text-center space-y-4 pt-2">
             {/* Premium warning icon circle */}
-            <div className="relative flex items-center justify-center w-14 h-14 rounded-full bg-[#ca2a30]/10 border border-[#ca2a30]/20 shadow-[0_0_15px_rgba(202,42,48,0.15)] animate-in fade-in zoom-in-75 duration-300">
-              <LogOut className="w-6 h-6 text-[#ca2a30]" />
-              <div className="absolute inset-0 rounded-full bg-[#ca2a30]/5 animate-ping opacity-75" />
+            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-[#ca2a30] shadow-lg shadow-[#ca2a30]/30 animate-in fade-in zoom-in-75 duration-300">
+              <LogOut className="w-6 h-6 text-white" />
             </div>
-            
+
             <div className="space-y-2">
               <DialogTitle className="text-xl font-bold tracking-tight text-foreground text-center">
                 Secure Logout
@@ -227,7 +226,7 @@ export function NavUser() {
               </DialogDescription>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3 mt-6">
             <Button
               variant="outline"

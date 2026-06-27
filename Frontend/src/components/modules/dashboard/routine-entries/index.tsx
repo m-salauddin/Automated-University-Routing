@@ -1144,24 +1144,33 @@ const MemoizedRoutineTable = React.memo(
                                                 {!isClassOffToday ? (
                                                   <DropdownMenuItem
                                                     className="text-red-500 focus:text-red-500 cursor-pointer"
-                                                    onClick={() => onCancelClass?.(session)}
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      onCancelClass?.(session);
+                                                    }}
                                                   >
                                                     <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
                                                   </DropdownMenuItem>
                                                 ) : (
                                                   <>
                                                     <DropdownMenuItem
-                                                      className="text-emerald-500 focus:text-emerald-500 cursor-pointer"
-                                                      onClick={() => onReactivateClass?.(session)}
+                                                      className="cursor-pointer"
+                                                      onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onReactivateClass?.(session);
+                                                      }}
                                                     >
-                                                      <CheckCheck className="size-4 mr-2 text-emerald-500" /> Activate Class
+                                                      <CheckCheck className="size-4 mr-2" /> Activate Class
                                                     </DropdownMenuItem>
                                                     {session.is_cancelled && (
                                                       <DropdownMenuItem
-                                                        className="text-amber-500 focus:text-amber-500 cursor-pointer"
-                                                        onClick={() => onUpdateCancelMessage?.(session)}
+                                                        className="cursor-pointer"
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          onUpdateCancelMessage?.(session);
+                                                        }}
                                                       >
-                                                        <Pencil className="size-4 mr-2 text-amber-500" /> Update Message
+                                                        <Pencil className="size-4 mr-2" /> Update Message
                                                       </DropdownMenuItem>
                                                     )}
                                                   </>

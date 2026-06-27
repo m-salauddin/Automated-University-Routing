@@ -194,9 +194,10 @@ const EMPTY_OBJ = {};
 interface Props {
   routineList: APIRoutineItem[];
   timeSlots: TimeSlot[];
+  studentSemesterProp?: string | null;
 }
 
-export default function DepartmentRoutinePage({ routineList, timeSlots }: Props) {
+export default function DepartmentRoutinePage({ routineList, timeSlots, studentSemesterProp }: Props) {
   const sortedTimeSlots = useMemo(() => {
     const getMinutes = (timeStr: string) => {
       if (!timeStr) return 0;
@@ -239,7 +240,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
   });
 
   const isStudent = auth?.role?.toLowerCase() === "student";
-  const studentSemester = auth?.semester_name;
+  const studentSemester = studentSemesterProp || auth?.semester_name;
 
   const formattedRoutineData = useMemo(() => {
     const grouped: Record<string, RoutineData> = {};
@@ -333,6 +334,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
 
   const hasAccess = useMemo(() => {
     if (!isStudent) return true;
+    if (!studentSemester) return true;
     return activeSemesterId === studentSemester;
   }, [isStudent, activeSemesterId, studentSemester]);
 

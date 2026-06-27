@@ -61,24 +61,31 @@ export const markNotificationRead = async (notificationId: number | string) => {
         const token = await getValidToken();
         if (!token) return { success: false, message: "No access token found" };
 
-        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_API}/academic/notifications/${notificationId}/read/`, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${token}`,
-                "Content-Type": "application/json",
-            },
-            cache: "no-store",
-        });
+        const res = await fetch(
+            `${process.env.NEXT_PUBLIC_BASE_API}/academic/notifications/${notificationId}/mark-read/`,
+            {
+                method: "PATCH",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
+                cache: "no-store",
+            }
+        );
 
         if (!res.ok) {
-            const errText = await res.text();
-            return { success: false, message: `Failed to mark notification as read: ${res.status}` };
+            const errData = await res.json().catch(() => ({}));
+            return {
+                success: false,
+                message: errData?.error || `Failed to mark notification as read: ${res.status}`,
+            };
         }
 
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         return { success: true, data };
     } catch (error) {
         console.error("[Notifications] Mark read error:", error);
         return { success: false, message: "Failed to mark notification as read" };
     }
 };
+

@@ -15,7 +15,7 @@ const StudentRoutine = async () => {
       : [];
 
   let timeSlots = [];
-  if (timeSlotsResponse.success && Array.isArray(timeSlotsResponse.data)) {
+  if (timeSlotsResponse.success && Array.isArray(timeSlotsResponse.data) && timeSlotsResponse.data.length > 0) {
     timeSlots = timeSlotsResponse.data;
   } else {
     // Fallback: extract unique slots from routineList
