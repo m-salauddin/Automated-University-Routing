@@ -237,11 +237,12 @@ function LoginContent() {
             </div>
             {errors.username && (
               <motion.p
-                className="text-red-600 dark:text-red-400 text-xs mt-1 ml-1 mb-0 font-medium"
+                className="text-red-600 dark:text-red-400 text-xs mt-1.5 ml-1 mb-0 font-medium flex items-center gap-1"
                 initial="hidden"
                 animate="visible"
                 variants={errorVariant}
               >
+                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
                 {errors.username.message}
               </motion.p>
             )}
@@ -282,11 +283,12 @@ function LoginContent() {
             </div>
             {errors.password && (
               <motion.p
-                className="text-red-600 dark:text-red-400 text-xs mt-1 ml-1 mb-0 font-medium"
+                className="text-red-600 dark:text-red-400 text-xs mt-1.5 ml-1 mb-0 font-medium flex items-center gap-1"
                 initial="hidden"
                 animate="visible"
                 variants={errorVariant}
               >
+                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
                 {errors.password.message}
               </motion.p>
             )}

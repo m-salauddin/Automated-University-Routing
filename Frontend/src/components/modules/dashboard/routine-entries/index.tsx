@@ -87,22 +87,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-type HistoryAction = 
+type HistoryAction =
   | {
-      type: "SWAP";
-      payload: { id1: number; id2: number; course1: string; course2: string };
-      description: string;
-    }
+    type: "SWAP";
+    payload: { id1: number; id2: number; course1: string; course2: string };
+    description: string;
+  }
   | {
-      type: "UPDATE";
-      payload: { id: number; fromDayId: number; fromSlotId: number; toDayId: number; toSlotId: number; course: string };
-      description: string;
-    }
+    type: "UPDATE";
+    payload: { id: number; fromDayId: number; fromSlotId: number; toDayId: number; toSlotId: number; course: string };
+    description: string;
+  }
   | {
-      type: "GENERATE";
-      payload: { departmentId: number; semesterId?: number; ignoreWarnings?: boolean };
-      description: string;
-    };
+    type: "GENERATE";
+    payload: { departmentId: number; semesterId?: number; ignoreWarnings?: boolean };
+    description: string;
+  };
 
 
 interface CancellationModalProps {
@@ -2177,20 +2177,25 @@ export default function AdminRoutinePage({
             color: black !important;
           }
 
-          /* Remove borders/outlines/shadows/rings from ALL elements */
-          * {
+          /* Remove borders/outlines/shadows/rings from ALL elements and pseudo-elements */
+          *, *::before, *::after {
             border: none !important;
             border-width: 0 !important;
             outline: none !important;
             box-shadow: none !important;
             --tw-ring-shadow: none !important;
             --tw-ring-offset-shadow: none !important;
+            --tw-ring-color: transparent !important;
             --tw-shadow: none !important;
           }
 
-          /* Explicitly clear div wrappers */
-          div, section, article, aside, main, header, footer, nav, figure {
+          /* Explicitly clear div wrappers and container elements */
+          div, section, article, aside, main, header, footer, nav, figure,
+          .print-page-container,
+          #print-container-wrapper,
+          [data-slot="table-container"] {
             border: none !important;
+            border-width: 0 !important;
             outline: none !important;
             box-shadow: none !important;
           }
@@ -2213,9 +2218,9 @@ export default function AdminRoutinePage({
           #print-container-wrapper,
           [data-slot="table-container"] {
             border: none !important;
+            border-width: 0 !important;
             outline: none !important;
             box-shadow: none !important;
-            ring: none !important;
           }
 
           tbody {

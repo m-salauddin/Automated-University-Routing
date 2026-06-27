@@ -124,6 +124,7 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -170,6 +171,7 @@
     0% {
       background-position: -120vw -120vh;
     }
+
     100% {
       background-position: 120vw 120vh;
     }
@@ -189,12 +191,10 @@
 
   .skeleton-sweep .skeleton-shimmer {
     background-color: var(--skeleton-base);
-    background-image: linear-gradient(
-      135deg,
-      transparent 42%,
-      var(--skeleton-sweep) 49%,
-      transparent 56%
-    );
+    background-image: linear-gradient(135deg,
+        transparent 42%,
+        var(--skeleton-sweep) 49%,
+        transparent 56%);
     background-attachment: fixed;
     background-repeat: no-repeat;
     background-size: 240vw 240vh;
@@ -222,6 +222,7 @@
 
 /* Print adjustments to ensure readable output in dark mode */
 @media print {
+
   :root,
   .dark {
     /* Force light theme colors for print */
@@ -235,26 +236,25 @@
     --muted-foreground: #1f2937;
     --border: #e5e7eb;
   }
-  html, body {
+
+  html,
+  body {
     background: #ffffff !important;
     color: #000000 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
   /* Remove sticky positioning and shadows when printing */
   .no-print-sticky {
     position: static !important;
     top: auto !important;
   }
+
   .no-print-shadow {
     box-shadow: none !important;
   }
 }
-
-/* ─── Drag & drop overlays (zero JS re-renders) ────────────────────────────── */
-/* When dragging, the wrapper gets data-dragging-semester="X".
-   Cells with matching data-cell-semester show the dashed overlay.
-   The hovered cell gets data-hovered="1" → solid overlay shown instead. */
 
 [data-cell-key][data-drag-target-valid] .drag-target-dashed,
 [data-dragging-semester="1st"] [data-cell-semester="1st"] .drag-target-dashed,
@@ -308,13 +308,40 @@
 
 /* ─── Rollback animation for failed swaps ───────────────────────────────── */
 @keyframes card-rollback {
-  0%   { transform: translateX(0)    scale(1);    box-shadow: 0 0 0 0   rgba(239,68,68,0);   }
-  10%  { transform: translateX(-6px) scale(1.03); box-shadow: 0 0 0 4px rgba(239,68,68,0.35); }
-  25%  { transform: translateX(5px)  scale(1.02); box-shadow: 0 0 0 6px rgba(239,68,68,0.25); }
-  40%  { transform: translateX(-4px) scale(1.01); box-shadow: 0 0 0 4px rgba(239,68,68,0.15); }
-  55%  { transform: translateX(3px)  scale(1);    box-shadow: 0 0 0 2px rgba(239,68,68,0.1);  }
-  70%  { transform: translateX(-2px) scale(1);    box-shadow: 0 0 0 0   rgba(239,68,68,0);   }
-  100% { transform: translateX(0)    scale(1);    box-shadow: 0 0 0 0   rgba(239,68,68,0);   }
+  0% {
+    transform: translateX(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+
+  10% {
+    transform: translateX(-6px) scale(1.03);
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.35);
+  }
+
+  25% {
+    transform: translateX(5px) scale(1.02);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.25);
+  }
+
+  40% {
+    transform: translateX(-4px) scale(1.01);
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+  }
+
+  55% {
+    transform: translateX(3px) scale(1);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+  }
+
+  70% {
+    transform: translateX(-2px) scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+
+  100% {
+    transform: translateX(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
 }
 
 .card-rollback {

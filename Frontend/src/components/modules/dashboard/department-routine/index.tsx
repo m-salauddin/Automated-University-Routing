@@ -1108,7 +1108,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                       });
                                     } else if (role === "teacher" && teacherSemesters.has(activeSemesterId)) {
                                       const isOwnClass = session.teacher?.toLowerCase() === auth?.username?.toLowerCase();
-                                      
+
                                       if (isOwnClass) {
                                         // Scenario A: PROXY (we click our own class to ask another teacher to take it)
                                         setSelectedRowForSwap(session);
@@ -1309,7 +1309,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
 
       {/* Swap Request Modal */}
       <Dialog open={isSwapModalOpen} onOpenChange={setIsSwapModalOpen}>
-        <DialogContent 
+        <DialogContent
           className="sm:max-w-md w-full font-lexend"
           onPointerDownOutside={(e) => {
             const target = e.target as HTMLElement;

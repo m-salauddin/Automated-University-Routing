@@ -617,6 +617,9 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
             box-shadow: none !important;
             background-color: transparent !important;
           }
+          .print-break-text-no-class {
+            font-size: 7.5px !important;
+          }
         }
       `}</style>
 
@@ -786,7 +789,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                             return (
                               <TableCell key={slot.id} className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border/60 !print:border-r !print:border-black">
                                 <div className="h-full flex items-center justify-center">
-                                  <span className="text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black">
+                                  <span className="text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black print-break-text-no-class">
                                     BREAK
                                   </span>
                                 </div>
@@ -860,9 +863,6 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                                   />
                                   <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden">
                                     <Utensils className="w-3 h-3 text-foreground/40" />
-                                  </div>
-                                  <div className="hidden print:flex h-full w-full items-center justify-center relative z-10">
-                                    <Utensils className="w-3 h-3 text-black" />
                                   </div>
                                 </TableCell>
                               );

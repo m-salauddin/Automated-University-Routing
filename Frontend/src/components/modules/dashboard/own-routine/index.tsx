@@ -1483,7 +1483,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
 
   return (
     <>
-      <style jsx global>{`
+      <style>{`
         @media print {
           @page {
             size: landscape;
@@ -1521,26 +1521,52 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
             color: black !important;
           }
 
-          /* Remove borders/outlines/shadows from ALL elements by default to remove layout frames */
-          * {
+          /* Remove borders/outlines/shadows/rings from ALL elements and pseudo-elements */
+          *, *::before, *::after {
+            border: none !important;
+            border-width: 0 !important;
+            outline: none !important;
+            box-shadow: none !important;
+            --tw-ring-shadow: none !important;
+            --tw-ring-offset-shadow: none !important;
+            --tw-ring-color: transparent !important;
+            --tw-shadow: none !important;
+          }
+
+          /* Explicitly clear div wrappers and container elements */
+          div, section, article, aside, main, header, footer, nav, figure,
+          .print-page-container,
+          #print-container-wrapper,
+          [data-slot="table-container"] {
             border: none !important;
             border-width: 0 !important;
             outline: none !important;
             box-shadow: none !important;
           }
 
-          /* Restore borders ONLY for the table and its cells */
-          table,
+          /* Restore borders ONLY for cells */
           th,
           td {
             border: 1px solid black !important;
             border-color: black !important;
-            border-collapse: collapse !important;
           }
           table {
+            border-collapse: collapse !important;
+            border: none !important;
             table-layout: fixed !important;
             width: 100% !important;
           }
+
+          /* Explicitly clear page and table container wrappers */
+          .print-page-container,
+          #print-container-wrapper,
+          [data-slot="table-container"] {
+            border: none !important;
+            border-width: 0 !important;
+            outline: none !important;
+            box-shadow: none !important;
+          }
+
           tbody {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
@@ -1603,6 +1629,9 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
 
           .print-cancelled-label {
             color: #dc2626 !important;
+          }
+          .print-break-text-no-class {
+            font-size: 7.5px !important;
           }
         }
       `}</style>
@@ -1881,20 +1910,52 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                                 Day
                               </span>
                             </TableCell>
-                            {sortedTimeSlots.map((slot) => (
-                              <TableCell
-                                key={slot.id}
-                                className="text-center align-middle h-[50px] border-r border-border/60 last:border-r-0 p-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto min-w-[100px] bg-muted/10 print:bg-white print:min-w-0"
-                              >
-                                <div className="flex flex-col items-center justify-center h-full w-full px-1">
-                                  <span className="font-bold text-xs whitespace-nowrap print:text-[11px] print:font-bold print:text-black">
-                                    {formatTimeSlotLabel(slot.start_time)}
-                                    <span className="mx-1">-</span>
-                                    {formatTimeSlotLabel(slot.end_time)}
-                                  </span>
-                                </div>
-                              </TableCell>
-                            ))}
+                            {sortedTimeSlots.map((slot, idx) => {
+                              const hasClass = gridSchedule.some(dayRow => dayRow.slots[idx] !== null);
+                              if (isBreakSlot(slot)) {
+                                if (!hasClass) {
+                                  return (
+                                    <TableCell
+                                      key={slot.id}
+                                      className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 border-r border-border last:border-r-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto"
+                                    >
+                                      <div className="h-full flex items-center justify-center">
+                                        <span className="text-[9.5px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black print-break-text-no-class">
+                                          BREAK
+                                        </span>
+                                      </div>
+                                    </TableCell>
+                                  );
+                                } else {
+                                  return (
+                                    <TableCell
+                                      key={slot.id}
+                                      className="bg-foreground text-background text-center align-middle p-0 border-r border-border last:border-r-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto min-w-[100px]"
+                                    >
+                                      <div className="h-full flex items-center justify-center">
+                                        <span className="text-xs font-black uppercase tracking-widest text-background whitespace-nowrap print:text-black">
+                                          BREAK
+                                        </span>
+                                      </div>
+                                    </TableCell>
+                                  );
+                                }
+                              }
+                              return (
+                                <TableCell
+                                  key={slot.id}
+                                  className="text-center align-middle h-[50px] border-r border-border last:border-r-0 p-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto min-w-[100px] bg-muted/10 print:bg-white print:min-w-0"
+                                >
+                                  <div className="flex flex-col items-center justify-center h-full w-full px-1">
+                                    <span className="font-bold text-xs whitespace-nowrap print:text-[11px] print:font-bold print:text-black">
+                                      {formatTimeSlotLabel(slot.start_time)}
+                                      <span className="mx-1">-</span>
+                                      {formatTimeSlotLabel(slot.end_time)}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                              );
+                            })}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1928,20 +1989,34 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                                 </TableCell>
                                 {rowItem.slots.map((session, index) => {
                                   const slot = sortedTimeSlots[index];
+                                  if (isBreakSlot(slot) && !session) {
+                                    return (
+                                      <TableCell key={index} className="p-0 h-px align-middle border-r border-border/60 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black">
+                                        <div
+                                          className="absolute inset-0 opacity-10 print:hidden"
+                                          style={{
+                                            backgroundImage:
+                                              "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
+                                            backgroundSize: "4px 4px",
+                                          }}
+                                        />
+                                        <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden text-muted-foreground/35">
+                                          <Utensils className="w-3.5 h-3.5" />
+                                        </div>
+                                      </TableCell>
+                                    );
+                                  }
+
                                   return (
                                     <TableCell
                                       key={index}
                                       className={cn(
                                         "align-middle border-r border-border/60 last:border-r-0 transition-all duration-200 relative p-2 print:p-1 print:border-black",
-                                        (!session && isBreakSlot(slot)) ? "bg-muted/20" : "bg-transparent print:bg-white"
+                                        "bg-transparent print:bg-white"
                                       )}
                                     >
                                       {session ? (
                                         <GridCellCard row={session} />
-                                      ) : isBreakSlot(slot) ? (
-                                        <div className="h-full w-full min-h-[50px] flex items-center justify-center relative z-10 print:hidden text-muted-foreground/35">
-                                          <Utensils className="w-3.5 h-3.5" />
-                                        </div>
                                       ) : (
                                         <div className="h-full w-full flex items-center justify-center min-h-[50px]">
                                           <div className="w-1 h-1 rounded-full bg-border print:hidden" />
@@ -2054,20 +2129,52 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                       Day
                     </span>
                   </TableCell>
-                  {sortedTimeSlots.map((slot) => (
-                    <TableCell
-                      key={slot.id}
-                      className="text-center align-middle h-[45px] border-r border-b border-black p-0 print:border-black bg-white"
-                    >
-                      <div className="flex flex-col items-center justify-center h-full w-full px-1">
-                        <span className="font-bold text-[10px] text-black whitespace-nowrap">
-                          {formatTimeSlotLabel(slot.start_time)}
-                          <span className="mx-0.5">-</span>
-                          {formatTimeSlotLabel(slot.end_time)}
-                        </span>
-                      </div>
-                    </TableCell>
-                  ))}
+                  {sortedTimeSlots.map((slot, idx) => {
+                    const hasClass = gridSchedule.some(dayRow => dayRow.slots[idx] !== null);
+                    if (isBreakSlot(slot)) {
+                      if (!hasClass) {
+                        return (
+                          <TableCell
+                            key={slot.id}
+                            className="w-10 min-w-10 text-center align-middle h-[45px] border-r border-b border-black p-0 print:border-black bg-white print:w-6 print:min-w-0"
+                          >
+                            <div className="flex flex-col items-center justify-center h-full w-full px-1">
+                              <span className="font-bold text-[10px] text-black -rotate-90 whitespace-nowrap print-break-text-no-class">
+                                BREAK
+                              </span>
+                            </div>
+                          </TableCell>
+                        );
+                      } else {
+                        return (
+                          <TableCell
+                            key={slot.id}
+                            className="text-center align-middle h-[45px] border-r border-b border-black p-0 print:border-black bg-white min-w-[100px]"
+                          >
+                            <div className="flex flex-col items-center justify-center h-full w-full px-1">
+                              <span className="font-bold text-[10px] text-black whitespace-nowrap">
+                                BREAK
+                              </span>
+                            </div>
+                          </TableCell>
+                        );
+                      }
+                    }
+                    return (
+                      <TableCell
+                        key={slot.id}
+                        className="text-center align-middle h-[45px] border-r border-b border-black p-0 print:border-black bg-white"
+                      >
+                        <div className="flex flex-col items-center justify-center h-full w-full px-1">
+                          <span className="font-bold text-[10px] text-black whitespace-nowrap">
+                            {formatTimeSlotLabel(slot.start_time)}
+                            <span className="mx-0.5">-</span>
+                            {formatTimeSlotLabel(slot.end_time)}
+                          </span>
+                        </div>
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -2102,9 +2209,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                             {session ? (
                               <GridCellCard row={session} />
                             ) : isBreakSlot(slot) ? (
-                              <div className="h-full w-full flex items-center justify-center">
-                                <Utensils className="w-3.5 h-3.5 text-black opacity-80" />
-                              </div>
+                              <div className="h-full w-full flex items-center justify-center" />
                             ) : (
                               <div className="h-full w-full flex items-center justify-center">
                                 <div className="w-0.5 h-0.5 rounded-full bg-gray-400" />
