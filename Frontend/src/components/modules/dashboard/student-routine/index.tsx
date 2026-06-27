@@ -569,11 +569,11 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
               flex-direction: column !important;
               justify-content: center !important;
               align-items: center !important;
-              height: 100vh !important;
+              height: calc(100vh - 10mm) !important;
               page-break-inside: avoid !important;
               break-inside: avoid !important;
               box-sizing: border-box !important;
-              padding: 5mm !important;
+              padding: 0 !important;
             }
           }
           th, td {

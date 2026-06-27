@@ -2139,14 +2139,38 @@ export default function AdminRoutinePage({
 
   return (
     <>
-      <style>{`
+      <style jsx global>{`
         @media print {
+          :root,
+          .dark,
+          body,
+          html {
+            --background: 0 0% 100% !important;
+            --foreground: 0 0% 3.9% !important;
+            --card: 0 0% 100% !important;
+            --card-foreground: 0 0% 3.9% !important;
+            --popover: 0 0% 100% !important;
+            --popover-foreground: 0 0% 3.9% !important;
+            --primary: 0 0% 9% !important;
+            --primary-foreground: 0 0% 98% !important;
+            --secondary: 0 0% 96.1% !important;
+            --secondary-foreground: 0 0% 9% !important;
+            --muted: 0 0% 96.1% !important;
+            --muted-foreground: 0 0% 45.1% !important;
+            --accent: 0 0% 96.1% !important;
+            --accent-foreground: 0 0% 9% !important;
+            --destructive: 0 84.2% 60.2% !important;
+            --destructive-foreground: 0 0% 98% !important;
+            --border: 0 0% 100% !important;
+            --input: 0 0% 89.8% !important;
+            --ring: 0 0% 3.9% !important;
+            color-scheme: light !important;
+          }
           @page {
             size: landscape;
             margin: 5mm;
           }
-
-          /* Hide sidebar, header, and all non-print UI */
+          /* Hide sidebar, header, nav entirely */
           [data-slot="sidebar"],
           [data-slot="sidebar-container"],
           [data-slot="sidebar-gap"],
@@ -2156,7 +2180,7 @@ export default function AdminRoutinePage({
             display: none !important;
           }
 
-          /* Reset the outer layout wrappers so nothing wraps the table */
+          /* Reset outer layout wrappers to plain block */
           html,
           body,
           main,
@@ -2171,58 +2195,32 @@ export default function AdminRoutinePage({
             margin: 0 !important;
             background: white !important;
           }
-
           body {
             background-color: white !important;
+            background: white !important;
             color: black !important;
+            width: 100% !important;
           }
-
-          /* Remove borders/outlines/shadows/rings from ALL elements and pseudo-elements */
-          *, *::before, *::after {
-            border: none !important;
-            border-width: 0 !important;
-            outline: none !important;
-            box-shadow: none !important;
-            --tw-ring-shadow: none !important;
-            --tw-ring-offset-shadow: none !important;
-            --tw-ring-color: transparent !important;
-            --tw-shadow: none !important;
-          }
-
-          /* Explicitly clear div wrappers and container elements */
-          div, section, article, aside, main, header, footer, nav, figure,
-          .print-page-container,
-          #print-container-wrapper,
-          [data-slot="table-container"] {
+          /* Remove borders/outlines/shadows from ALL elements by default to remove layout frames */
+          * {
             border: none !important;
             border-width: 0 !important;
             outline: none !important;
             box-shadow: none !important;
           }
 
-          /* Restore borders ONLY for table cells */
+          /* Restore borders ONLY for the table and its cells */
+          table,
           th,
           td {
             border: 1px solid black !important;
             border-color: black !important;
+            border-collapse: collapse !important;
           }
           table {
-            border-collapse: collapse !important;
-            border: none !important;
             table-layout: fixed !important;
             width: 100% !important;
           }
-
-          /* Explicitly clear page and table container wrappers */
-          .print-page-container,
-          #print-container-wrapper,
-          [data-slot="table-container"] {
-            border: none !important;
-            border-width: 0 !important;
-            outline: none !important;
-            box-shadow: none !important;
-          }
-
           tbody {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
@@ -2237,13 +2235,13 @@ export default function AdminRoutinePage({
               flex-direction: column !important;
               justify-content: center !important;
               align-items: center !important;
-              height: 100vh !important;
+              height: calc(100vh - 10mm) !important;
               page-break-inside: avoid !important;
               break-inside: avoid !important;
               page-break-after: always !important;
               break-after: page !important;
               box-sizing: border-box !important;
-              padding: 5mm !important;
+              padding: 0 !important;
             }
             .print-page-container:last-child {
               page-break-after: avoid !important;
@@ -2262,6 +2260,16 @@ export default function AdminRoutinePage({
             line-height: 1.2 !important;
           }
 
+          .print-header-border {
+            border: 2px double black !important;
+            border-color: black !important;
+          }
+
+          .print-header-table {
+            border: 1px solid black !important;
+            border-color: black !important;
+          }
+
           /* Ensure clear text and transparent backgrounds for print */
           table, th, td, tr, div, span, p {
             background-color: transparent !important;
@@ -2269,20 +2277,20 @@ export default function AdminRoutinePage({
           }
 
           /* Keep print-specific background colors if defined, like the break column */
-          .print\\:bg-gray-200 {
+          .print\\:bg-gray-200, .bg-gray-200 {
             background-color: #e5e7eb !important;
           }
 
+          svg line {
+            stroke: black !important;
+          }
+
           #print-container-wrapper {
-            background: transparent !important;
+            box-shadow: none !important;
+            background-color: transparent !important;
           }
-
-          .print\\:hidden {
-            display: none !important;
-          }
-
-          .print-cancelled-label {
-            color: #dc2626 !important;
+          .print-break-text-no-class {
+            font-size: 7.5px !important;
           }
         }
       `}</style>
@@ -2291,7 +2299,7 @@ export default function AdminRoutinePage({
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="min-h-screen font-lexend w-full max-w-[1600px] mx-auto bg-background text-foreground p-5 overflow-x-hidden print:p-0 print:max-w-none print:bg-white print:text-black"
+        className="min-h-screen font-lexend w-full max-w-[1600px] mx-auto bg-background text-foreground p-5 overflow-x-hidden print:p-0 print:m-0 print:max-w-none print:w-full print:bg-white print:text-black print:overflow-visible"
       >
         <div className="space-y-8 print:space-y-0 print:w-full">
           <div className="flex flex-col lg:flex-row justify-between lg:items-end gap-6 print:hidden">
