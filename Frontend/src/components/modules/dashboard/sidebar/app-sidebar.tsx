@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   CalendarCheck,
   ChartColumnBig,
@@ -105,6 +105,13 @@ export function AppSidebar() {
       icon: Users,
     },
   ];
+
+  const visibleGlobalItems = useMemo(() => {
+    if (role?.toLowerCase() === "student") {
+      return globalItems.filter((item) => item.title !== "Activity Logs");
+    }
+    return globalItems;
+  }, [role]);
 
   let panelItems = studentPanel;
   let panelTitle = "Student Panel";
@@ -212,7 +219,7 @@ export function AppSidebar() {
       <SidebarContent className="transition-opacity overflow-hidden duration-200">
         <SidebarGroup>
           <SidebarGroupLabel className="pl-2">Application</SidebarGroupLabel>
-          {renderGroupContent(globalItems)}
+          {renderGroupContent(visibleGlobalItems)}
 
           <div className="mt-6" />
 

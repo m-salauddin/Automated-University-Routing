@@ -63,6 +63,8 @@ type ClassSession = {
   department: string;
   semester: string;
   day: string;
+  is_cancelled?: boolean;
+  cancel_message?: string | null;
 };
 
 type DayRow = {
@@ -286,6 +288,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
           department: item.department_name,
           semester: item.semester_name,
           day: item.day_name,
+          is_cancelled: (item as any).is_cancelled ?? false,
+          cancel_message: (item as any).cancel_message ?? null,
         };
       }
     });
@@ -888,9 +892,9 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
 
                             const isClassOffToday = Boolean(
                               classOffData?.status
-                            );
+                            ) || Boolean(session?.is_cancelled);
                             const cancellationReason =
-                              classOffData?.reason || "No reason provided.";
+                              classOffData?.reason || session?.cancel_message || "No reason provided.";
                             const isTeacherOff =
                               (!!teacherKey &&
                                 availabilityMap[teacherKey] === false) ||
@@ -942,11 +946,21 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                                           {session.course}
                                         </span>
                                         {isLab ? (
-                                          <span className="text-[9px] font-black uppercase tracking-wider bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-1 py-0.2 rounded border border-violet-200/50 dark:border-violet-800/40">
+                                          <span className={cn(
+                                            "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                            isTeacherOff
+                                              ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                              : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                          )}>
                                             Lab
                                           </span>
                                         ) : (
-                                          <span className="text-[9px] font-black uppercase tracking-wider bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 px-1 py-0.2 rounded border border-teal-200/50 dark:border-teal-800/40">
+                                          <span className={cn(
+                                            "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                            isTeacherOff
+                                              ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                              : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                          )}>
                                             Theory
                                           </span>
                                         )}

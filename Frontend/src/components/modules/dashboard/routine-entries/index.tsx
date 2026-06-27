@@ -827,16 +827,16 @@ const MemoizedRoutineTable = React.memo(
       const renderTable = (groupSchedule: typeof schedule, isPrint: boolean) => {
         return (
           <Table className={cn(
-            "w-full overflow-hidden min-w-[1000px] border border-border/60 border-collapse text-sm",
+            "w-full overflow-hidden min-w-[1000px] border border-border border-collapse text-sm",
             isPrint ? "print:min-w-0 print:w-full print:border-collapse !print:border-black" : ""
           )}>
             <TableHeader>
               <TableRow className={cn(
-                "border-b border-border/60 hover:bg-transparent",
+                "border-b border-border hover:bg-transparent",
                 isPrint ? "print:border-black print:border-b" : ""
               )}>
                 <TableCell className={cn(
-                  "p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40",
+                  "p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border relative bg-muted/40",
                   isPrint ? "print:bg-white !print:border-r !print:border-black print:w-16 print:min-w-0" : ""
                 )}>
                   <svg
@@ -848,7 +848,7 @@ const MemoizedRoutineTable = React.memo(
                       y1="0"
                       x2="100%"
                       y2="100%"
-                      className={cn("stroke-border/60", isPrint ? "print:stroke-black" : "")}
+                      className={cn("stroke-border", isPrint ? "print:stroke-black" : "")}
                       strokeWidth="1"
                     />
                   </svg>
@@ -868,7 +868,7 @@ const MemoizedRoutineTable = React.memo(
 
                 {isAllSemestersMode && (
                   <TableCell className={cn(
-                    "w-20 min-w-20 text-center font-bold bg-muted/40 border-r border-border/60 text-xs uppercase",
+                    "w-20 min-w-20 text-center font-bold bg-muted/40 border-r border-border text-xs uppercase",
                     isPrint ? "!print:border-r !print:border-black" : ""
                   )}>
                     Sem
@@ -881,8 +881,8 @@ const MemoizedRoutineTable = React.memo(
                     if (!hasClass) {
                       return (
                         <TableCell key={slot.id} className={cn(
-                          "w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 border-r border-border/60",
-                          isPrint ? "print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border/60 !print:border-r !print:border-black" : ""
+                          "w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 border-r border-border",
+                          isPrint ? "print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border !print:border-r !print:border-black" : ""
                         )}>
                           <div className="h-full flex items-center justify-center">
                             <span className={cn(
@@ -897,7 +897,7 @@ const MemoizedRoutineTable = React.memo(
                     } else {
                       return (
                         <TableCell key={slot.id} className={cn(
-                          "bg-foreground text-background text-center align-middle p-0 border-r border-border/60 min-w-[100px]",
+                          "bg-foreground text-background text-center align-middle p-0 border-r border-border min-w-[100px]",
                           isPrint ? "print:bg-white print:text-black !print:border-r !print:border-black" : ""
                         )}>
                           <div className="h-full flex items-center justify-center">
@@ -916,7 +916,7 @@ const MemoizedRoutineTable = React.memo(
                     <TableCell
                       key={slot.id}
                       className={cn(
-                        "text-center align-middle h-[60px] border-r border-border/60 last:border-r-0 p-0 min-w-[100px] bg-muted/10",
+                        "text-center align-middle h-[60px] border-r border-border last:border-r-0 p-0 min-w-[100px] bg-muted/10",
                         isPrint ? "!print:border-r !print:border-black print:last:border-r-0 print:h-auto print:bg-white print:min-w-0" : ""
                       )}
                     >
@@ -959,7 +959,7 @@ const MemoizedRoutineTable = React.memo(
                           key={`${rowItem.day}-${rowItem.semester}`}
                           variants={itemVariants}
                           className={cn(
-                            "border-b border-border/60 hover:bg-muted/5 h-[85px]",
+                            "border-b border-border hover:bg-muted/5 h-[85px]",
                             isPrint ? "!print:border-black print:border-b print:h-auto" : ""
                           )}
                         >
@@ -968,7 +968,7 @@ const MemoizedRoutineTable = React.memo(
                             <TableCell
                               rowSpan={rowSpan}
                               className={cn(
-                                "font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60",
+                                "font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border",
                                 isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black print:font-bold" : ""
                               )}
                             >
@@ -986,7 +986,7 @@ const MemoizedRoutineTable = React.memo(
                           {/* Semester Label */}
                           {isAllSemestersMode && (
                             <TableCell className={cn(
-                              "font-bold text-xs text-center border-r border-border/60 bg-muted/10",
+                              "font-bold text-xs text-center border-r border-border bg-muted/10",
                               isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black" : ""
                             )}>
                               {rowItem.semester}
@@ -1043,7 +1043,7 @@ const MemoizedRoutineTable = React.memo(
                                 data-cell-index={index}
                                 data-cell-semester={rowItem.semester}
                                 className={cn(
-                                  "align-middle border-r border-border/60 relative",
+                                  "align-middle border-r border-border relative",
                                   isPrint ? "!print:border-r !print:border-black" : "",
                                   (!session && isBreakSlot(slot))
                                     ? "p-0 overflow-hidden"
@@ -2139,7 +2139,7 @@ export default function AdminRoutinePage({
 
   return (
     <>
-      <style jsx global>{`
+      <style>{`
         @media print {
           @page {
             size: landscape;
@@ -2177,26 +2177,47 @@ export default function AdminRoutinePage({
             color: black !important;
           }
 
-          /* Remove borders/outlines/shadows from ALL elements by default to remove layout frames */
+          /* Remove borders/outlines/shadows/rings from ALL elements */
           * {
             border: none !important;
             border-width: 0 !important;
             outline: none !important;
             box-shadow: none !important;
+            --tw-ring-shadow: none !important;
+            --tw-ring-offset-shadow: none !important;
+            --tw-shadow: none !important;
           }
 
-          /* Restore borders ONLY for the table and its cells */
-          table,
+          /* Explicitly clear div wrappers */
+          div, section, article, aside, main, header, footer, nav, figure {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+          }
+
+          /* Restore borders ONLY for table cells */
           th,
           td {
             border: 1px solid black !important;
             border-color: black !important;
-            border-collapse: collapse !important;
           }
           table {
+            border-collapse: collapse !important;
+            border: none !important;
             table-layout: fixed !important;
             width: 100% !important;
           }
+
+          /* Explicitly clear page and table container wrappers */
+          .print-page-container,
+          #print-container-wrapper,
+          [data-slot="table-container"] {
+            border: none !important;
+            outline: none !important;
+            box-shadow: none !important;
+            ring: none !important;
+          }
+
           tbody {
             page-break-inside: avoid !important;
             break-inside: avoid !important;
@@ -2445,11 +2466,11 @@ export default function AdminRoutinePage({
           {isLoadingRoutine ? (
             <div className="skeleton-sweep rounded-xl overflow-hidden bg-card/35 font-lexend w-full grid grid-cols-1">
               <div className="overflow-x-auto w-full">
-                <Table className="w-full min-w-[1000px] border border-border/60 border-collapse text-sm">
+                <Table className="w-full min-w-[1000px] border border-border border-collapse text-sm">
                   <TableHeader>
-                    <TableRow className="border-b border-border/60 hover:bg-transparent">
+                    <TableRow className="border-b border-border hover:bg-transparent">
                       {/* Time/Day corner cell */}
-                      <TableCell className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40">
+                      <TableCell className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border relative bg-muted/40">
                         <svg
                           className="absolute inset-0 w-full h-full pointer-events-none"
                           preserveAspectRatio="none"
@@ -2459,7 +2480,7 @@ export default function AdminRoutinePage({
                             y1="0"
                             x2="100%"
                             y2="100%"
-                            className="stroke-border/60"
+                            className="stroke-border"
                             strokeWidth="1"
                           />
                         </svg>
@@ -2472,7 +2493,7 @@ export default function AdminRoutinePage({
                       </TableCell>
 
                       {currentRoutineSchedule.isAllSemestersMode && (
-                        <TableCell className="w-20 min-w-20 text-center font-bold bg-muted/40 border-r border-border/60 text-xs uppercase">
+                        <TableCell className="w-20 min-w-20 text-center font-bold bg-muted/40 border-r border-border text-xs uppercase">
                           <Skeleton className="w-10 h-3.5 mx-auto" />
                         </TableCell>
                       )}
@@ -2483,7 +2504,7 @@ export default function AdminRoutinePage({
                           return (
                             <TableCell
                               key={slot.id}
-                              className="w-10 min-w-10 bg-muted/5 text-center align-middle p-0 border-r border-border/60"
+                              className="w-10 min-w-10 bg-muted/5 text-center align-middle p-0 border-r border-border"
                             >
                               <div className="h-full flex items-center justify-center" />
                             </TableCell>
@@ -2492,7 +2513,7 @@ export default function AdminRoutinePage({
                         return (
                           <TableCell
                             key={slot.id}
-                            className="text-center align-middle h-[50px] border-r border-border/60 last:border-r-0 p-0 min-w-[100px] bg-muted/5"
+                            className="text-center align-middle h-[50px] border-r border-border last:border-r-0 p-0 min-w-[100px] bg-muted/5"
                           >
                             <div className="flex items-center justify-center w-full px-1">
                               <Skeleton className="w-16 h-3 mx-auto" />
@@ -2506,10 +2527,10 @@ export default function AdminRoutinePage({
                     {DAYS_ORDER.map((day, rowIndex) => (
                       <TableRow
                         key={day}
-                        className="border-b border-border/60 hover:bg-muted/5 h-[80px]"
+                        className="border-b border-border hover:bg-muted/5 h-[80px]"
                       >
                         {/* Day Label */}
-                        <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/10 border-r border-border/60 w-[90px] min-w-[90px]">
+                        <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/10 border-r border-border w-[90px] min-w-[90px]">
                           <div className="flex items-center justify-center h-full w-full py-4">
                             <span>
                               {day.slice(0, 3).toUpperCase()}
@@ -2518,7 +2539,7 @@ export default function AdminRoutinePage({
                         </TableCell>
 
                         {currentRoutineSchedule.isAllSemestersMode && (
-                          <TableCell className="font-bold text-xs text-center border-r border-border/60 bg-muted/5">
+                          <TableCell className="font-bold text-xs text-center border-r border-border bg-muted/5">
                             <Skeleton className="w-8 h-3.5 mx-auto" />
                           </TableCell>
                         )}
@@ -2529,7 +2550,7 @@ export default function AdminRoutinePage({
                             return (
                               <TableCell
                                 key={slot.id}
-                                className="p-0 align-middle border-r border-border/60 bg-muted/5"
+                                className="p-0 align-middle border-r border-border bg-muted/5"
                               >
                                 <div className="h-full w-full flex items-center justify-center" />
                               </TableCell>
@@ -2541,7 +2562,7 @@ export default function AdminRoutinePage({
                           return (
                             <TableCell
                               key={slot.id}
-                              className="p-2 h-px align-middle border-r border-border/60 last:border-r-0 min-w-[100px]"
+                              className="p-2 h-px align-middle border-r border-border last:border-r-0 min-w-[100px]"
                             >
                               {hasClass ? (
                                 <div className="h-[55px] w-full rounded bg-muted/15 flex flex-col justify-center gap-2 p-2.5">
