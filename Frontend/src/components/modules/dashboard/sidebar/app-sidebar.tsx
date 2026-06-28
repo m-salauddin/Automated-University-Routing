@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   CalendarCheck,
   ChartColumnBig,
@@ -11,6 +11,7 @@ import {
   Building2,
   CalendarRange,
   Users,
+  History,
 } from "lucide-react";
 
 import {
@@ -40,6 +41,7 @@ import { initializeAuth } from "@/store/authSlice";
 const globalItems = [
   { title: "Analytics", url: "/dashboard/analytics", icon: ChartColumnBig },
   { title: "Curriculum", url: "/dashboard/course-curriculum", icon: ListTodo },
+  { title: "Activity Logs", url: "/dashboard/activity-logs", icon: History },
 ];
 
 export function AppSidebar() {
@@ -74,6 +76,11 @@ export function AppSidebar() {
       url: "/dashboard/own-routine",
       icon: CalendarCheck,
     },
+    {
+      title: "Department Routine",
+      url: "/dashboard/department-routine",
+      icon: View,
+    },
   ];
 
   const adminPanel = [
@@ -98,6 +105,13 @@ export function AppSidebar() {
       icon: Users,
     },
   ];
+
+  const visibleGlobalItems = useMemo(() => {
+    if (role?.toLowerCase() === "student") {
+      return globalItems.filter((item) => item.title !== "Activity Logs");
+    }
+    return globalItems;
+  }, [role]);
 
   let panelItems = studentPanel;
   let panelTitle = "Student Panel";
@@ -205,7 +219,7 @@ export function AppSidebar() {
       <SidebarContent className="transition-opacity overflow-hidden duration-200">
         <SidebarGroup>
           <SidebarGroupLabel className="pl-2">Application</SidebarGroupLabel>
-          {renderGroupContent(globalItems)}
+          {renderGroupContent(visibleGlobalItems)}
 
           <div className="mt-6" />
 

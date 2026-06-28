@@ -457,7 +457,7 @@ export default function AcademicSettingsPage({
     if (!editingSlot) return true;
     const isStartDiff = newSlotStart !== (editingSlot.start_time || "");
     const isEndDiff = newSlotEnd !== (editingSlot.end_time || "");
-    const isBreakDiff = newSlotIsLaunchBreak !== (editingSlot.is_launch_break || false);
+    const isBreakDiff = newSlotIsLaunchBreak !== (editingSlot.is_lunch_break || false);
     return isStartDiff || isEndDiff || isBreakDiff;
   }, [editingSlot, newSlotStart, newSlotEnd, newSlotIsLaunchBreak]);
 
@@ -917,8 +917,12 @@ export default function AcademicSettingsPage({
     setIsMounted(true);
   }, []);
 
-  if (!isMounted) {
-    return null;
+  if (!isMounted || user?.isLoading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
   }
 
   if (user?.role !== "admin") {

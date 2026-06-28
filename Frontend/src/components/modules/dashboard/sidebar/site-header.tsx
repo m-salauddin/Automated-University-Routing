@@ -3,6 +3,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { ModeToggle } from "@/components/mode-toggle"
 import { FaGithub } from "react-icons/fa";
+import { NotificationBell } from "./notification-bell";
 
 export function SiteHeader() {
     return (
@@ -14,16 +15,17 @@ export function SiteHeader() {
                     className="mx-2 data-[orientation=vertical]:h-4"
                 />
                 <h1 className="text-base font-medium font-lexend">Dashboard</h1>
-                <div className="ml-auto flex items-center sm:gap-2">
+                <div className="ml-auto flex items-center gap-2 sm:gap-3">
+                    <NotificationBell />
                     <ModeToggle />
-                    <Button variant="ghost" asChild size="sm" className="flex">
+                    <Button variant="ghost" asChild size="icon" className="h-9 w-9 cursor-pointer">
                         <a
                             href="https://github.com/m-salauddin/Automated-University-Routing/tree/main"
                             rel="noopener noreferrer"
                             target="_blank"
                             className="dark:text-foreground"
                         >
-                            <FaGithub />
+                            <FaGithub className="h-[1.1rem] w-[1.1rem]" />
                         </a>
                     </Button>
                 </div>

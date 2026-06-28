@@ -124,8 +124,45 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Custom compact scrollbar globally */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.35);
+    border-radius: 9999px;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.2);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.55);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(156, 163, 175, 0.35);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.35) transparent;
+  }
+
+  .dark * {
+    scrollbar-color: rgba(156, 163, 175, 0.2) transparent;
   }
 }
 
@@ -134,6 +171,7 @@
     0% {
       background-position: -120vw -120vh;
     }
+
     100% {
       background-position: 120vw 120vh;
     }
@@ -153,12 +191,10 @@
 
   .skeleton-sweep .skeleton-shimmer {
     background-color: var(--skeleton-base);
-    background-image: linear-gradient(
-      135deg,
-      transparent 42%,
-      var(--skeleton-sweep) 49%,
-      transparent 56%
-    );
+    background-image: linear-gradient(135deg,
+        transparent 42%,
+        var(--skeleton-sweep) 49%,
+        transparent 56%);
     background-attachment: fixed;
     background-repeat: no-repeat;
     background-size: 240vw 240vh;
@@ -186,6 +222,7 @@
 
 /* Print adjustments to ensure readable output in dark mode */
 @media print {
+
   :root,
   .dark {
     /* Force light theme colors for print */
@@ -199,18 +236,115 @@
     --muted-foreground: #1f2937;
     --border: #e5e7eb;
   }
-  html, body {
+
+  html,
+  body {
     background: #ffffff !important;
     color: #000000 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
   /* Remove sticky positioning and shadows when printing */
   .no-print-sticky {
     position: static !important;
     top: auto !important;
   }
+
   .no-print-shadow {
     box-shadow: none !important;
   }
+}
+
+[data-cell-key][data-drag-target-valid] .drag-target-dashed,
+[data-dragging-semester="1st"] [data-cell-semester="1st"] .drag-target-dashed,
+[data-dragging-semester="2nd"] [data-cell-semester="2nd"] .drag-target-dashed,
+[data-dragging-semester="3rd"] [data-cell-semester="3rd"] .drag-target-dashed,
+[data-dragging-semester="4th"] [data-cell-semester="4th"] .drag-target-dashed,
+[data-dragging-semester="5th"] [data-cell-semester="5th"] .drag-target-dashed,
+[data-dragging-semester="6th"] [data-cell-semester="6th"] .drag-target-dashed,
+[data-dragging-semester="7th"] [data-cell-semester="7th"] .drag-target-dashed,
+[data-dragging-semester="8th"] [data-cell-semester="8th"] .drag-target-dashed,
+[data-dragging-semester="1"] [data-cell-semester="1"] .drag-target-dashed,
+[data-dragging-semester="2"] [data-cell-semester="2"] .drag-target-dashed,
+[data-dragging-semester="3"] [data-cell-semester="3"] .drag-target-dashed,
+[data-dragging-semester="4"] [data-cell-semester="4"] .drag-target-dashed,
+[data-dragging-semester="5"] [data-cell-semester="5"] .drag-target-dashed,
+[data-dragging-semester="6"] [data-cell-semester="6"] .drag-target-dashed,
+[data-dragging-semester="7"] [data-cell-semester="7"] .drag-target-dashed,
+[data-dragging-semester="8"] [data-cell-semester="8"] .drag-target-dashed {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+}
+
+[data-cell-key][data-drag-target-valid][data-hovered] .drag-target-dashed,
+[data-dragging-semester="1st"] [data-cell-semester="1st"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="2nd"] [data-cell-semester="2nd"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="3rd"] [data-cell-semester="3rd"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="4th"] [data-cell-semester="4th"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="5th"] [data-cell-semester="5th"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="6th"] [data-cell-semester="6th"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="7th"] [data-cell-semester="7th"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="8th"] [data-cell-semester="8th"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="1"] [data-cell-semester="1"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="2"] [data-cell-semester="2"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="3"] [data-cell-semester="3"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="4"] [data-cell-semester="4"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="5"] [data-cell-semester="5"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="6"] [data-cell-semester="6"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="7"] [data-cell-semester="7"][data-hovered] .drag-target-dashed,
+[data-dragging-semester="8"] [data-cell-semester="8"][data-hovered] .drag-target-dashed {
+  opacity: 0 !important;
+}
+
+[data-cell-key][data-hovered] .drag-target-hovered {
+  opacity: 1 !important;
+}
+
+/* Dim the card being dragged */
+[data-drag-source] {
+  opacity: 0.35 !important;
+}
+
+/* ─── Rollback animation for failed swaps ───────────────────────────────── */
+@keyframes card-rollback {
+  0% {
+    transform: translateX(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+
+  10% {
+    transform: translateX(-6px) scale(1.03);
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.35);
+  }
+
+  25% {
+    transform: translateX(5px) scale(1.02);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.25);
+  }
+
+  40% {
+    transform: translateX(-4px) scale(1.01);
+    box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+  }
+
+  55% {
+    transform: translateX(3px) scale(1);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+  }
+
+  70% {
+    transform: translateX(-2px) scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+
+  100% {
+    transform: translateX(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.card-rollback {
+  animation: card-rollback 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+  will-change: transform, box-shadow;
 }

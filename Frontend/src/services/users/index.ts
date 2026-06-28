@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
-import { cookies } from "next/headers";
+import { getValidToken } from "../auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_BASE_API;
 
@@ -14,8 +14,7 @@ type ActionResponse = {
 
 
 const getAuthHeaders = async () => {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("accessToken")?.value;
+    const token = await getValidToken();
 
     if (!token) return null;
 
@@ -63,7 +62,7 @@ export const getAllUsers = async (): Promise<ActionResponse> => {
         const headers = await getAuthHeaders();
         if (!headers) return { success: false, message: "No access token found", data: null };
 
-        const res = await fetch(`${API_BASE}/users/`, {
+        const res = await fetch(`${API_BASE}/users/?limit=1000`, {
             method: "GET",
             headers,
             cache: "no-store",

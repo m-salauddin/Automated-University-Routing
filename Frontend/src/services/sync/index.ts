@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
-import { cookies } from "next/headers";
+import { getValidToken } from "../auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_BASE_API;
 
@@ -32,10 +32,9 @@ const handleResponse = async (res: Response) => {
 
 export const exportExcel = async (modelName: string) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/export-excel/?model_name=${modelName}`, {
             method: "GET",
@@ -61,10 +60,9 @@ export const exportExcel = async (modelName: string) => {
 
 export const importExcel = async (formData: FormData) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/import-excel/`, {
             method: "POST",
@@ -85,10 +83,9 @@ export const importExcel = async (formData: FormData) => {
 
 export const syncExcelSnapshot = async (formData: FormData) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/sync/excel//`, {
             method: "POST",
@@ -108,10 +105,9 @@ export const syncExcelSnapshot = async (formData: FormData) => {
 
 export const getSyncExcelSnapshot = async () => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/sync/excel/`, {
             method: "GET",
@@ -131,10 +127,9 @@ export const getSyncExcelSnapshot = async () => {
 
 export const manageSnapshot = async (action: "backup" | "restore", name?: string, backupId?: number) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const bodyData: Record<string, any> = { action };
         if (name !== undefined) bodyData.name = name;

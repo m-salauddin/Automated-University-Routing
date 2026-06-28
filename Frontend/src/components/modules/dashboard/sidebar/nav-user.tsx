@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronsUpDown, LogOut, User, Sparkles } from "lucide-react"; 
+import { ChevronsUpDown, LogOut, User, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -14,6 +14,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -42,6 +51,7 @@ export function NavUser() {
   const role = useSelector((s: RootState) => s.auth.role);
 
   const [isMounted, setIsMounted] = useState(false);
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -50,20 +60,16 @@ export function NavUser() {
     return () => clearTimeout(timer);
   }, []);
 
-  
+
   const displayName = username || "Guest User";
   const secondary = role ? String(role) : "";
   const initials = getInitials(displayName);
 
-  
+
   const isAdmin = String(role).toLowerCase() === "admin";
 
   const handleLogout = async () => {
     try {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("isLoggingOut", "true");
-      }
-
       await logout();
       dispatch(resetAuth());
 
@@ -73,7 +79,6 @@ export function NavUser() {
       });
 
       router.push("/login");
-      router.refresh();
     } catch (error) {
       console.error("Logout failed:", error);
       toast.error("Logout failed", {
@@ -177,7 +182,7 @@ export function NavUser() {
 
             {isAdmin && (
               <>
-                <a target="1" href="https://routineproject-s6dh.onrender.com/admin/">
+                <a target="1" href="https://routine-nvxe.onrender.com/admin/">
                   <DropdownMenuItem
                     className="cursor-pointer animate-in fade-in slide-in-from-left-8 duration-500 fill-mode-backwards"
                     style={{ animationDelay: "100ms" }}
@@ -192,7 +197,7 @@ export function NavUser() {
             <DropdownMenuSeparator />
 
             <DropdownMenuItem
-              onClick={handleLogout}
+              onClick={() => setIsLogoutDialogOpen(true)}
               className="cursor-pointer animate-in hover:text-red-400! text-red-400 fade-in slide-in-from-left-8 duration-500 fill-mode-backwards"
               style={{ animationDelay: "200ms" }}
             >
@@ -202,6 +207,46 @@ export function NavUser() {
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog open={isLogoutDialogOpen} onOpenChange={setIsLogoutDialogOpen}>
+        <DialogContent className="sm:max-w-md w-full bg-background/95 backdrop-blur-md shadow-2xl rounded-2xl p-6 font-lexend overflow-hidden">
+          <div className="flex flex-col items-center text-center space-y-4 pt-2">
+            {/* Premium warning icon circle */}
+            <div className="flex items-center justify-center w-14 h-14 rounded-full bg-[#ca2a30] shadow-lg shadow-[#ca2a30]/30 animate-in fade-in zoom-in-75 duration-300">
+              <LogOut className="w-6 h-6 text-white" />
+            </div>
+
+            <div className="space-y-2">
+              <DialogTitle className="text-xl font-bold tracking-tight text-foreground text-center">
+                Secure Logout
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground max-w-[300px] leading-relaxed text-center">
+                Are you sure you want to end your session? Unsaved changes in your scheduler might be lost.
+              </DialogDescription>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setIsLogoutDialogOpen(false)}
+              className="flex-1 h-10 font-semibold border-border/80 hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl transition-all duration-200 cursor-pointer"
+            >
+              Stay Logged In
+            </Button>
+            <Button
+              onClick={async () => {
+                setIsLogoutDialogOpen(false);
+                await handleLogout();
+              }}
+              className="flex-1 h-10 font-semibold bg-[#ca2a30] hover:bg-[#b4252a] text-white rounded-xl shadow-lg shadow-[#ca2a30]/15 hover:shadow-[#ca2a30]/25 transition-all duration-200 hover:-translate-y-0.5 cursor-pointer"
+            >
+              Log Out
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </SidebarMenu>
   );
 }

@@ -1,4 +1,5 @@
 import DepartmentDetailPage from "@/components/modules/dashboard/academic-config/detail";
+export const dynamic = "force-dynamic";
 import { getDepartment } from "@/services/departments";
 import { getAllSemesters } from "@/services/semesters";
 import { getAllCourses } from "@/services/courses";

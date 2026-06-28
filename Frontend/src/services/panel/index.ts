@@ -1,11 +1,10 @@
 "use server";
-import { cookies } from "next/headers";
+import { getValidToken } from "../auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_BASE_API;
 
 const getAuthHeaders = async () => {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("accessToken")?.value;
+    const token = await getValidToken();
     if (!token) return null;
     return {
         Authorization: `Bearer ${token}`,

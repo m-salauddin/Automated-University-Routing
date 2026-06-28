@@ -93,6 +93,15 @@ export type Semester = {
   name: string;
 };
 
+export type Batch = {
+  id: number;
+  name: string;
+  department_id?: number | null;
+  semester_id?: number | null;
+};
+
+
+
 export type User = {
   id: number;
   username: string;
@@ -105,6 +114,8 @@ export type User = {
   department_id?: number | null;
   semester_name: string | null;
   semester_id?: number | null;
+  batch?: number | null;
+  batch_name?: string | null;
   date_joined: string;
 };
 
@@ -112,6 +123,7 @@ interface UsersPageClientProps {
   initialUsers: User[];
   departments: Department[];
   semesters: Semester[];
+  batches: Batch[];
 }
 
 const pageVariants: Variants = {
@@ -132,6 +144,8 @@ const pageItemVariants: Variants = {
 };
 
 
+const DEPARTMENTS_WITH_BATCHES = ["3", "4", "5", "6"];
+
 const userSchema = z
   .object({
     first_name: z.string().min(1, "First name is required"),
@@ -141,6 +155,7 @@ const userSchema = z
     role: z.enum(["ADMIN", "TEACHER", "STUDENT"]),
     department_id: z.string().optional(),
     semester_id: z.string().optional(),
+    batch_id: z.string().optional(),
     password: z.string().optional(),
     confirmPassword: z.string().optional(),
   })
@@ -152,12 +167,26 @@ const userSchema = z
         path: ["department_id"],
       });
     }
-    if (data.role === "STUDENT" && !data.semester_id) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Semester is required",
-        path: ["semester_id"],
-      });
+
+    if (data.role === "STUDENT") {
+      const hasBatches = DEPARTMENTS_WITH_BATCHES.includes(data.department_id || "");
+      if (hasBatches) {
+        if (!data.batch_id) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Batch is required",
+            path: ["batch_id"],
+          });
+        }
+      } else {
+        if (!data.semester_id) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Semester is required",
+            path: ["semester_id"],
+          });
+        }
+      }
     }
 
     if (data.password && data.password !== data.confirmPassword) {
@@ -231,7 +260,9 @@ export default function UsersPageClient({
   initialUsers,
   departments,
   semesters,
+  batches,
 }: UsersPageClientProps) {
+  console.log("Triggering layout reload 4");
   const user = useSelector((state: RootState) => state.auth);
 
 
@@ -249,6 +280,20 @@ export default function UsersPageClient({
   useEffect(() => {
     setCurrentDate(new Date().toLocaleString());
   }, []);
+
+  useEffect(() => {
+    const batches: Record<string, string> = {};
+    initialUsers.forEach((u: any) => {
+      if (u.batch || u.batch_name) {
+        batches[String(u.batch)] = u.batch_name;
+      }
+    });
+    fetch("/api/debug-batches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(batches),
+    }).catch((err) => console.error("Failed to post debug batches", err));
+  }, [initialUsers]);
 
   
   useEffect(() => {
@@ -289,6 +334,7 @@ export default function UsersPageClient({
       role: "STUDENT",
       department_id: "",
       semester_id: "",
+      batch_id: "",
       password: "",
       confirmPassword: "",
     },
@@ -324,6 +370,34 @@ export default function UsersPageClient({
       setValue("confirmPassword", watchedPassword);
     }
   }, [watchedPassword, editingUser, setValue]);
+
+  const watchedDepartmentId = useWatch({ control, name: "department_id" });
+  const watchedBatchId = useWatch({ control, name: "batch_id" });
+
+  // Reset values on department change
+  useEffect(() => {
+    if (watchedDepartmentId) {
+      const hasBatches = DEPARTMENTS_WITH_BATCHES.includes(String(watchedDepartmentId));
+      if (hasBatches) {
+        setValue("semester_id", "");
+      } else {
+        setValue("batch_id", "");
+      }
+    } else {
+      setValue("semester_id", "");
+      setValue("batch_id", "");
+    }
+  }, [watchedDepartmentId, setValue]);
+
+  // Set semester automatically based on the selected batch
+  useEffect(() => {
+    if (watchedBatchId) {
+      const selectedBatch = batches.find(b => String(b.id) === String(watchedBatchId));
+      if (selectedBatch?.semester_id) {
+        setValue("semester_id", String(selectedBatch.semester_id));
+      }
+    }
+  }, [watchedBatchId, batches, setValue]);
 
   
   const uniqueDepartmentNames = useMemo(() => {
@@ -402,6 +476,7 @@ export default function UsersPageClient({
       role: "STUDENT",
       department_id: "",
       semester_id: "",
+      batch_id: "",
       password: "",
       confirmPassword: "",
     });
@@ -428,6 +503,13 @@ export default function UsersPageClient({
         if (found) semId = String(found.id);
       }
 
+      let batchId = "";
+      if (user.batch) batchId = String(user.batch);
+      else if (user.batch_name) {
+        const found = batches.find((b) => b.name === user.batch_name);
+        if (found) batchId = String(found.id);
+      }
+
       reset({
         first_name: user.first_name || user.name.split(" ")[0] || "",
         last_name:
@@ -437,13 +519,14 @@ export default function UsersPageClient({
         role: user.role as "ADMIN" | "TEACHER" | "STUDENT",
         department_id: deptId,
         semester_id: semId,
+        batch_id: batchId,
         password: "",
         confirmPassword: "",
       });
 
       setIsEditModalOpen(true);
     },
-    [reset, departments, semesters]
+    [reset, departments, semesters, batches]
   );
 
   const openDeleteUser = useCallback((user: User) => {
@@ -486,6 +569,10 @@ export default function UsersPageClient({
             data.role === "STUDENT" && data.semester_id
               ? Number(data.semester_id)
               : null,
+          batch:
+            data.role === "STUDENT" && data.batch_id
+              ? Number(data.batch_id)
+              : null,
         };
 
         const result = await updateUser(String(editingUser.id), payload);
@@ -495,6 +582,7 @@ export default function UsersPageClient({
             (d) => d.id === payload.department
           );
           const foundSem = semesters.find((s) => s.id === payload.semester);
+          const foundBatch = batches.find((b) => b.id === payload.batch);
 
           setUsersList((prev) =>
             prev.map((u) => {
@@ -509,6 +597,8 @@ export default function UsersPageClient({
                     : u.department_name,
                   semester_id: payload.semester,
                   semester_name: foundSem ? foundSem.name : u.semester_name,
+                  batch: payload.batch,
+                  batch_name: foundBatch ? foundBatch.name : u.batch_name,
                 } as User;
               }
               return u;
@@ -533,6 +623,10 @@ export default function UsersPageClient({
             data.role === "STUDENT" && data.semester_id
               ? Number(data.semester_id)
               : null,
+          batch_id:
+            data.role === "STUDENT" && data.batch_id
+              ? Number(data.batch_id)
+              : null,
         };
 
         const result = await createUser(payload);
@@ -542,6 +636,7 @@ export default function UsersPageClient({
             (d) => d.id === payload.department_id
           );
           const foundSem = semesters.find((s) => s.id === payload.semester_id);
+          const foundBatch = batches.find((b) => b.id === payload.batch_id);
 
           const newUser: User = {
             ...result.data,
@@ -550,6 +645,8 @@ export default function UsersPageClient({
             department_name: foundDept ? foundDept.name : null,
             semester_id: payload.semester_id,
             semester_name: foundSem ? foundSem.name : null,
+            batch: payload.batch_id,
+            batch_name: foundBatch ? foundBatch.name : null,
           };
 
           setUsersList((prev) => [newUser, ...prev]);
@@ -691,16 +788,23 @@ export default function UsersPageClient({
                       )}
                       {roleFilter === "STUDENT" && (
                         <TableCell className="print:py-1 print:text-black">
-                          {user.semester_name ? (
-                            <Badge
-                              variant="outline"
-                              className="print:border-black print:text-black"
-                            >
-                              {user.semester_name}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground/50">-</span>
-                          )}
+                          <div className="flex flex-col gap-1">
+                            {user.semester_name ? (
+                              <Badge
+                                variant="outline"
+                                className="print:border-black print:text-black w-fit"
+                              >
+                                {user.semester_name}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground/50">-</span>
+                            )}
+                            {user.batch_name && (
+                              <span className="text-xs text-muted-foreground">
+                                {user.batch_name}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                       )}
                       <TableCell className="print:py-1">
@@ -751,8 +855,12 @@ export default function UsersPageClient({
     setIsMounted(true);
   }, []);
 
-  if (!isMounted) {
-    return null;
+  if (!isMounted || user?.isLoading) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
   }
 
   if (user?.role !== "admin") {
@@ -1177,98 +1285,184 @@ export default function UsersPageClient({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-                <div className="space-y-2">
-                  <Label>
-                    Role <span className="text-red-500">*</span>
-                  </Label>
-                  <Controller
-                    control={control}
-                    name="role"
-                    render={({ field }) => (
-                      <CustomSelect
-                        value={field.value}
-                        onChange={field.onChange}
-                        options={[
-                          { value: "STUDENT", label: "Student" },
-                          { value: "TEACHER", label: "Teacher" },
-                          { value: "ADMIN", label: "Admin" },
-                        ]}
-                        placeholder="Select role"
-                        id="role"
-                      />
+              <div className="flex flex-col gap-4 w-full">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                  <div className="space-y-2">
+                    <Label>
+                      Role <span className="text-red-500">*</span>
+                    </Label>
+                    <Controller
+                      control={control}
+                      name="role"
+                      render={({ field }) => (
+                        <CustomSelect
+                          value={field.value}
+                          onChange={field.onChange}
+                          options={[
+                            { value: "STUDENT", label: "Student" },
+                            { value: "TEACHER", label: "Teacher" },
+                            { value: "ADMIN", label: "Admin" },
+                          ]}
+                          placeholder="Select role"
+                          id="role"
+                        />
+                      )}
+                    />
+                    {errors.role && (
+                      <p className="text-xs text-red-500">
+                        {errors.role.message}
+                      </p>
                     )}
-                  />
-                  {errors.role && (
-                    <p className="text-xs text-red-500">
-                      {errors.role.message}
-                    </p>
-                  )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label
+                      className={
+                        watchedRole === "ADMIN" ? "text-muted-foreground" : ""
+                      }
+                    >
+                      Department{" "}
+                      {watchedRole !== "ADMIN" && (
+                        <span className="text-red-500">*</span>
+                      )}
+                    </Label>
+                    <Controller
+                      control={control}
+                      name="department_id"
+                      render={({ field }) => (
+                        <CustomSelect
+                          value={field.value}
+                          onChange={field.onChange}
+                          options={departments.map((dept) => ({ value: String(dept.id), label: dept.name }))}
+                          placeholder={watchedRole === "ADMIN" ? "N/A" : "Select Dept"}
+                          id="department_id"
+                          disabled={watchedRole === "ADMIN"}
+                        />
+                      )}
+                    />
+                    {errors.department_id && (
+                      <p className="text-xs text-red-500">
+                        {errors.department_id.message}
+                      </p>
+                    )}
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label
-                    className={
-                      watchedRole === "ADMIN" ? "text-muted-foreground" : ""
-                    }
-                  >
-                    Department{" "}
-                    {watchedRole !== "ADMIN" && (
-                      <span className="text-red-500">*</span>
-                    )}
-                  </Label>
-                  <Controller
-                    control={control}
-                    name="department_id"
-                    render={({ field }) => (
-                      <CustomSelect
-                        value={field.value}
-                        onChange={field.onChange}
-                        options={departments.map((dept) => ({ value: String(dept.id), label: dept.name }))}
-                        placeholder={watchedRole === "ADMIN" ? "N/A" : "Select Dept"}
-                        id="department_id"
-                        disabled={watchedRole === "ADMIN"}
-                      />
-                    )}
-                  />
-                  {errors.department_id && (
-                    <p className="text-xs text-red-500">
-                      {errors.department_id.message}
-                    </p>
-                  )}
-                </div>
+                {watchedRole === "STUDENT" && (
+                  <>
+                    {!watchedDepartmentId ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground">Semester <span className="text-red-500">*</span></Label>
+                          <CustomSelect
+                            disabled
+                            placeholder="Select Dept First"
+                            options={[]}
+                            value=""
+                            onChange={() => {}}
+                            id="semester_id"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-muted-foreground">Batch <span className="text-red-500">*</span></Label>
+                          <CustomSelect
+                            disabled
+                            placeholder="Select Dept First"
+                            options={[]}
+                            value=""
+                            onChange={() => {}}
+                            id="batch_id"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      (() => {
+                        const hasBatches = DEPARTMENTS_WITH_BATCHES.includes(String(watchedDepartmentId));
+                        const departmentBatches = batches.filter(
+                          (b) => String(b.department_id) === String(watchedDepartmentId)
+                        );
+                        
+                        if (hasBatches && departmentBatches.length > 0) {
+                          // Show Batch, hide Semester
+                          return (
+                            <div className="grid grid-cols-1 gap-4 w-full">
+                              <div className="space-y-2">
+                                <Label>
+                                  Batch <span className="text-red-500">*</span>
+                                </Label>
+                                <Controller
+                                  control={control}
+                                  name="batch_id"
+                                  render={({ field }) => (
+                                    <CustomSelect
+                                      value={field.value}
+                                      onChange={field.onChange}
+                                      options={departmentBatches.map((batch) => ({
+                                        value: String(batch.id),
+                                        label: batch.name,
+                                      }))}
+                                      placeholder="Select Batch"
+                                      id="batch_id"
+                                    />
+                                  )}
+                                />
+                                {errors.batch_id && (
+                                  <p className="text-xs text-red-500">
+                                    {errors.batch_id.message}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          // Show Semester, and show create batch helper / message in place of Batch
+                          return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full items-end">
+                              <div className="space-y-2">
+                                <Label>
+                                  Semester <span className="text-red-500">*</span>
+                                </Label>
+                                <Controller
+                                  control={control}
+                                  name="semester_id"
+                                  render={({ field }) => (
+                                    <CustomSelect
+                                      value={field.value}
+                                      onChange={field.onChange}
+                                      options={semesters.map((sem) => ({
+                                        value: String(sem.id),
+                                        label: sem.name,
+                                      }))}
+                                      placeholder="Select Sem"
+                                      id="semester_id"
+                                    />
+                                  )}
+                                />
+                                {errors.semester_id && (
+                                  <p className="text-xs text-red-500">
+                                    {errors.semester_id.message}
+                                  </p>
+                                )}
+                              </div>
 
-                <div className="space-y-2">
-                  <Label
-                    className={
-                      watchedRole !== "STUDENT" ? "text-muted-foreground" : ""
-                    }
-                  >
-                    Semester{" "}
-                    {watchedRole === "STUDENT" && (
-                      <span className="text-red-500">*</span>
+                              <div className="space-y-2 flex flex-col justify-end h-full">
+                                <Label>Batch</Label>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full text-xs border-dashed border-muted-foreground/50 text-muted-foreground hover:text-foreground h-9"
+                                  onClick={() => router.push("/dashboard/admin/academic-config")}
+                                >
+                                  No batches. Create a Batch
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        }
+                      })()
                     )}
-                  </Label>
-                  <Controller
-                    control={control}
-                    name="semester_id"
-                    render={({ field }) => (
-                      <CustomSelect
-                        value={field.value}
-                        onChange={field.onChange}
-                        options={semesters.map((sem) => ({ value: String(sem.id), label: sem.name }))}
-                        placeholder={watchedRole !== "STUDENT" ? "N/A" : "Select Sem"}
-                        id="semester_id"
-                        disabled={watchedRole !== "STUDENT"}
-                      />
-                    )}
-                  />
-                  {errors.semester_id && (
-                    <p className="text-xs text-red-500">
-                      {errors.semester_id.message}
-                    </p>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -1398,7 +1592,7 @@ export default function UsersPageClient({
           <tbody>
             {filteredUsers.map((user, index) => (
               <tr
-                key={user.id}
+                key={user.id ? `${user.id}-${index}` : `user-${index}`}
                 className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
               >
                 <td className="p-1.5 border border-gray-300">

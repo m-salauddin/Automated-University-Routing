@@ -1,15 +1,14 @@
 "use server";
 
-import { cookies } from 'next/headers';
+import { getValidToken } from '../auth';
 
 export const getAllDepartments = async () => {
     try {
         const DEPARTMENTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/departments/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get('accessToken')?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: 'No access token found' };
+            return { success: false, message: 'No access token found. Please log in.' };
         }
         const res = await fetch(DEPARTMENTS_URL, {
             method: 'GET',
@@ -43,11 +42,10 @@ export const getAllDepartments = async () => {
 export const updateDepartment = async (departmentId: number | string, updateData: Record<string, string>) => {
     try {
         const DEPARTMENTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/departments/${departmentId}/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get('accessToken')?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: 'No access token found' };
+            return { success: false, message: 'No access token found. Please log in.' };
         }
         const res = await fetch(DEPARTMENTS_URL, {
             method: 'PUT', 
@@ -82,11 +80,10 @@ export const updateDepartment = async (departmentId: number | string, updateData
 export const addNewDepartment = async (departmentData: Record<string, string>) => {
     try {
         const DEPARTMENTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/departments/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get('accessToken')?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: 'No access token found' };
+            return { success: false, message: 'No access token found. Please log in.' };
         }
         const res = await fetch(DEPARTMENTS_URL, {
             method: 'POST',
@@ -121,11 +118,10 @@ export const addNewDepartment = async (departmentData: Record<string, string>) =
 export const deleteDepartment = async (departmentId: number | string) => {
     try {
         const DEPARTMENTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/departments/${departmentId}/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get('accessToken')?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: 'No access token found' };
+            return { success: false, message: 'No access token found. Please log in.' };
         }
         const res = await fetch(DEPARTMENTS_URL, {
             method: 'DELETE',
@@ -159,11 +155,10 @@ export const deleteDepartment = async (departmentId: number | string) => {
 export const getDepartment = async (departmentId: number | string) => {
     try {
         const DEPARTMENTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/departments/${departmentId}/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get('accessToken')?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: 'No access token found' };
+            return { success: false, message: 'No access token found. Please log in.' };
         }
         const res = await fetch(DEPARTMENTS_URL, {
             method: 'GET',

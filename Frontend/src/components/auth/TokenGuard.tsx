@@ -25,7 +25,7 @@ function isTokenExpired(token: string) {
     if (!decoded.exp) return false;
     return decoded.exp * 1000 < Date.now();
   } catch (error) {
-    return true; 
+    return true;
   }
 }
 
@@ -43,7 +43,7 @@ function flushQueuedToast() {
     if (type === "error") toast.error(msg);
     else if (type === "warning") toast.warning(msg);
     else toast(msg);
-  } catch {}
+  } catch { }
 }
 
 export default function TokenGuard() {
@@ -76,8 +76,8 @@ export default function TokenGuard() {
       }
 
       if (hasToken && isTokenExpired(token)) {
-        await logout(); 
-        dispatch(resetAuth()); 
+        await logout();
+        dispatch(resetAuth());
 
         if (isProtectedPath(pathname)) {
           const redirect = encodeURIComponent(pathname);

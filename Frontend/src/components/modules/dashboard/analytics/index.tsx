@@ -43,7 +43,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export type APIRoutineItem = {
   id: number;
-  day: string;
+  day: string | number;
+  day_name?: string;
   start_time: string;
   end_time: string;
   course_name: string;
@@ -232,9 +233,8 @@ const ShadcnSelect: React.FC<ShadcnSelectProps> = ({
                   onChange(opt.value);
                   setIsOpen(false);
                 }}
-                className={`relative flex w-full cursor-pointer mb-1 text-nowrap select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 ${
-                  value === opt.value ? "bg-zinc-100 dark:bg-zinc-800" : ""
-                }`}
+                className={`relative flex w-full cursor-pointer mb-1 text-nowrap select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 ${value === opt.value ? "bg-zinc-100 dark:bg-zinc-800" : ""
+                  }`}
               >
                 {value === opt.value && (
                   <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
@@ -266,10 +266,10 @@ const MetricCard: React.FC<MetricCardProps> = ({
   const trendColor = color
     ? color
     : isPositive
-    ? "#10b981"
-    : trendDirection === "down"
-    ? "#f43f5e"
-    : "#71717a";
+      ? "#10b981"
+      : trendDirection === "down"
+        ? "#f43f5e"
+        : "#71717a";
 
   return (
     <Card className="p-6 dark:bg-[#111113]! hover:shadow-md transition-all duration-200 dark:hover:border-zinc-700 min-w-0">
@@ -487,8 +487,9 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
     daysOrder.forEach((day) => (dayGroups[day] = []));
 
     filteredData.forEach((item) => {
-      if (dayGroups[item.day]) {
-        dayGroups[item.day].push(item);
+      const dayKey = item.day_name || (typeof item.day === "string" ? item.day : "");
+      if (dayKey && dayGroups[dayKey]) {
+        dayGroups[dayKey].push(item);
       }
     });
 
@@ -657,7 +658,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
         initial="hidden"
         animate="visible"
       >
-        {}
+        { }
         <motion.div variants={itemVariants}>
           <Badge
             variant="outline"
@@ -684,22 +685,20 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
               <div className="flex bg-zinc-100 dark:bg-zinc-900 rounded-lg p-1 w-full sm:w-auto">
                 <button
                   onClick={() => handleTabChange("student")}
-                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                    viewMode === "student"
+                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${viewMode === "student"
                       ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-sm ring-1 ring-black/5 dark:ring-white/10"
                       : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-                  }`}
+                    }`}
                 >
                   <Users className="w-4 h-4" />
                   Students
                 </button>
                 <button
                   onClick={() => handleTabChange("teacher")}
-                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${
-                    viewMode === "teacher"
+                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-all duration-200 ${viewMode === "teacher"
                       ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-sm ring-1 ring-black/5 dark:ring-white/10"
                       : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200"
-                  }`}
+                    }`}
                 >
                   <User className="w-4 h-4" />
                   Teachers
@@ -724,13 +723,13 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
                   options={
                     viewMode === "student"
                       ? uniqueSemesters.map((sem) => ({
-                          value: sem,
-                          label: `${sem} Semester`,
-                        }))
+                        value: sem,
+                        label: `${sem} Semester`,
+                      }))
                       : uniqueTeachers.map((teacher) => ({
-                          value: teacher,
-                          label: teacher,
-                        }))
+                        value: teacher,
+                        label: teacher,
+                      }))
                   }
                 />
               </div>
@@ -749,7 +748,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
           </div>
         </motion.header>
 
-        {}
+        { }
         <motion.div
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
           variants={itemVariants}
@@ -757,13 +756,12 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
           <MetricCard
             title="Theory Classes"
             value={computed.theoryClasses}
-            trend={`${
-              computed.totalClasses
+            trend={`${computed.totalClasses
                 ? Math.round(
-                    (computed.theoryClasses / computed.totalClasses) * 100
-                  )
+                  (computed.theoryClasses / computed.totalClasses) * 100
+                )
                 : 0
-            }%`}
+              }%`}
             trendDirection="neutral"
             trendLabel="of total classes"
             icon={Library}
@@ -773,13 +771,12 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
           <MetricCard
             title="Lab Classes"
             value={computed.labClasses}
-            trend={`${
-              computed.totalClasses
+            trend={`${computed.totalClasses
                 ? Math.round(
-                    (computed.labClasses / computed.totalClasses) * 100
-                  )
+                  (computed.labClasses / computed.totalClasses) * 100
+                )
                 : 0
-            }%`}
+              }%`}
             trendDirection="neutral"
             trendLabel="of total classes"
             icon={FlaskConical}
@@ -810,12 +807,12 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
           />
         </motion.div>
 
-        {}
+        { }
         <motion.div
           className="grid grid-cols-1 xl:grid-cols-5 gap-6 mb-6"
           variants={itemVariants}
         >
-          {}
+          { }
           <Card className="xl:col-span-2 dark:bg-[#111113]! flex flex-col h-[420px] min-w-0 overflow-hidden">
             <CardHeader
               title={viewMode === "student" ? "Faculty Load" : "Course Dist."}
@@ -914,22 +911,20 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
                             }}
                           />
                           <span
-                            className={`text-sm font-medium truncate transition-colors ${
-                              isActive
+                            className={`text-sm font-medium truncate transition-colors ${isActive
                                 ? "dark:text-white text-black"
                                 : "text-zinc-600 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-zinc-300"
-                            }`}
+                              }`}
                           >
                             {item.name}
                           </span>
                         </div>
                         <div className="relative z-10 flex items-center gap-3 shrink-0">
                           <span
-                            className={`text-sm font-bold transition-colors ${
-                              isActive
+                            className={`text-sm font-bold transition-colors ${isActive
                                 ? "dark:text-white"
                                 : "text-zinc-900 dark:text-zinc-100"
-                            }`}
+                              }`}
                           >
                             {item.count}
                           </span>
@@ -949,7 +944,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
             </CardContent>
           </Card>
 
-          {}
+          { }
           <Card className="xl:col-span-3 h-[420px] dark:bg-[#111113]! flex flex-col min-w-0 overflow-hidden">
             <CardHeader
               title="Schedule Composition"
@@ -1040,7 +1035,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
           </Card>
         </motion.div>
 
-        {}
+        { }
         <motion.div
           className="grid grid-cols-1 lg:grid-cols-2 gap-6"
           variants={itemVariants}
@@ -1129,7 +1124,7 @@ export default function AutomatedRoutineDashboard({ routineList }: Props) {
             </CardContent>
           </Card>
 
-          {}
+          { }
           <Card className="h-[400px] dark:bg-[#111113]! flex flex-col min-w-0 overflow-hidden">
             <CardHeader
               title="Class Room Usage"

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, RefreshCw, ChevronLeft, Home, Terminal, Copy, Check } from "lucide-react";
+import { AlertTriangle, RefreshCw, ChevronLeft, Home, Terminal, Copy, Check, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ErrorProps {
@@ -60,7 +60,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
 
             <div className="space-y-2">
               <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">
-                This Page Couldn't Load
+                This Page Couldn&apos;t Load
               </h1>
               <p className="text-muted-foreground text-xs sm:text-sm max-w-sm leading-relaxed">
                 An unexpected execution error occurred while compiling or rendering this segment.
@@ -115,9 +115,9 @@ export default function GlobalError({ error, reset }: ErrorProps) {
               <motion.span
                 animate={{ rotate: showDetails ? 90 : 0 }}
                 transition={{ duration: 0.2 }}
-                className="font-bold text-[10px]"
+                className="flex items-center justify-center"
               >
-                ▶
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
               </motion.span>
             </button>
 

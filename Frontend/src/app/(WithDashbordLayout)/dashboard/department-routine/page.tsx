@@ -1,31 +1,40 @@
-import DepartmentRoutinePage from "@/components/modules/dashboard/student-routine";
+import DepartmentRoutinePage from "@/components/modules/dashboard/department-routine";
 export const dynamic = "force-dynamic";
-import { getRoutine } from "@/services/routine";
+import { getRoutine, getDepartmentRoutine } from "@/services/routine";
 import { getUserProfile } from "@/services/users";
 import { getAllTimeSlots } from "@/services/time-slots";
+import { getCurrentUser } from "@/services/auth";
 
-const StudentRoutine = async () => {
-  const [profileResponse, timeSlotsResponse] = await Promise.all([
+const DepartmentRoutine = async () => {
+  const [profileResponse, timeSlotsResponse, user] = await Promise.all([
     getUserProfile(),
     getAllTimeSlots(),
+    getCurrentUser(),
   ]);
 
+
+
+  const rawRole = user ? (user as any).role : null;
+  const role = rawRole ? rawRole.toLowerCase() : null;
+
   let routineList = [];
-  let studentSemester = null;
-
-  if (profileResponse.success && profileResponse.data) {
-    const data = profileResponse.data;
-    const departmentId = data.department_id ?? data.department;
-    const semesterId = data.semester_id ?? data.semester;
-    studentSemester = data.semester_name ?? data.semesterName;
-
+  if (role === "teacher") {
+    const routineResponse = await getDepartmentRoutine();
+    console.log("department-routine debug [TEACHER]:", { role, routineResponse });
+    if (routineResponse.success && Array.isArray(routineResponse.data)) {
+      routineList = routineResponse.data;
+    }
+  } else if (profileResponse.success && profileResponse.data) {
+    const { department } = profileResponse.data;
     const routineResponse = await getRoutine({
-      department_id: departmentId,
+      department_id: department,
     });
+    console.log("department-routine debug [OTHER]:", { role, routineResponse });
     if (routineResponse.success && Array.isArray(routineResponse.data)) {
       routineList = routineResponse.data;
     }
   }
+
 
   let timeSlots = [];
   if (timeSlotsResponse.success && Array.isArray(timeSlotsResponse.data) && timeSlotsResponse.data.length > 0) {
@@ -64,13 +73,9 @@ const StudentRoutine = async () => {
 
   return (
     <>
-      <DepartmentRoutinePage
-        routineList={routineList}
-        timeSlots={timeSlots}
-        studentSemesterProp={studentSemester}
-      />
+      <DepartmentRoutinePage routineList={routineList} timeSlots={timeSlots} />
     </>
   );
 };
 
-export default StudentRoutine;
+export default DepartmentRoutine;

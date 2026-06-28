@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use server";
 
-import { cookies } from "next/headers";
+import { getValidToken } from "../auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_BASE_API;
 
@@ -32,10 +32,9 @@ const handleResponse = async (res: Response) => {
 
 export const getAllRooms = async (search?: string) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const queryParams = new URLSearchParams();
         if (search) {
@@ -61,10 +60,9 @@ export const getAllRooms = async (search?: string) => {
 
 export const createRoom = async (roomData: any) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/rooms/`, {
             method: "POST",
@@ -85,10 +83,9 @@ export const createRoom = async (roomData: any) => {
 
 export const getRoomDetails = async (roomId: number | string) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/rooms/${roomId}/`, {
             method: "GET",
@@ -108,10 +105,9 @@ export const getRoomDetails = async (roomId: number | string) => {
 
 export const updateRoom = async (roomId: number | string, roomData: any) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/rooms/${roomId}/`, {
             method: "PUT",
@@ -132,10 +128,9 @@ export const updateRoom = async (roomId: number | string, roomData: any) => {
 
 export const partialUpdateRoom = async (roomId: number | string, roomData: any) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/rooms/${roomId}/`, {
             method: "PATCH",
@@ -156,10 +151,9 @@ export const partialUpdateRoom = async (roomId: number | string, roomData: any) 
 
 export const deleteRoom = async (roomId: number | string) => {
     try {
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
-        if (!token) return { success: false, message: "No access token found", data: null };
+        if (!token) return { success: false, message: "No access token found. Please log in.", data: null };
 
         const res = await fetch(`${API_BASE}/academic/rooms/${roomId}/`, {
             method: "DELETE",

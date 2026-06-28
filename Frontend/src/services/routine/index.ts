@@ -1,5 +1,6 @@
 "use server";
-import { cookies } from "next/headers";
+import { getValidToken } from "../auth";
+import { jwtDecode } from "jwt-decode";
 
 export interface GetRoutineParams {
     day?: number | string;
@@ -29,11 +30,10 @@ const getRoutine = async (params?: GetRoutineParams) => {
         const queryString = queryParams.toString();
         const ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/view-routine/${queryString ? `?${queryString}` : ""}`;
 
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(ROUTINE_URL, {
@@ -64,12 +64,13 @@ const getRoutine = async (params?: GetRoutineParams) => {
         }
 
         const rawResult = await res.json();
-        console.log("[Routine] API Response:", JSON.stringify(rawResult, null, 2));
 
-        
+
         let normalizedData = rawResult;
         if (!Array.isArray(rawResult) && rawResult !== null && typeof rawResult === "object") {
-            if (Array.isArray(rawResult.results)) {
+            if (Array.isArray(rawResult.data)) {
+                normalizedData = rawResult.data;
+            } else if (Array.isArray(rawResult.results)) {
                 normalizedData = rawResult.results;
             }
         }
@@ -81,14 +82,68 @@ const getRoutine = async (params?: GetRoutineParams) => {
     }
 };
 
+const getDepartmentRoutine = async () => {
+    try {
+        const ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/department-routine/`;
+
+        const token = await getValidToken();
+
+        if (!token) {
+            return { success: false, message: "No access token found. Please log in." };
+        }
+
+        const res = await fetch(ROUTINE_URL, {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            let errorMessage = `Routine failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage =
+                    errorJson.detail ||
+                    errorJson.non_field_errors?.[0] ||
+                    errorJson.message ||
+                    errorMessage;
+            } catch {
+                console.error(
+                    `[Routine] Non-JSON Error Body: ${errorText.slice(0, 200)}`
+                );
+            }
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+
+        let normalizedData = rawResult;
+        if (!Array.isArray(rawResult) && rawResult !== null && typeof rawResult === "object") {
+            if (Array.isArray(rawResult.data)) {
+                normalizedData = rawResult.data;
+            } else if (Array.isArray(rawResult.results)) {
+                normalizedData = rawResult.results;
+            }
+        }
+
+        return { success: true, data: normalizedData };
+    } catch (error) {
+        console.error("[Routine] Failed to fetch department routine:", error);
+        return { success: false, message: "Failed to fetch department routine" };
+    }
+};
+
 const generateRoutine = async (params: GenerateRoutineParams) => {
     try {
         const GENERATE_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/generate-routine/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(GENERATE_ROUTINE_URL, {
@@ -120,7 +175,6 @@ const generateRoutine = async (params: GenerateRoutineParams) => {
         }
 
         const rawResult = await res.json();
-        console.log("[Routine] API Response:", JSON.stringify(rawResult, null, 2));
 
         return { success: true, data: rawResult };
     } catch (error) {
@@ -132,11 +186,10 @@ const generateRoutine = async (params: GenerateRoutineParams) => {
 const rollbackRoutine = async (params: { department_id: number }) => {
     try {
         const ROLLBACK_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/rollback-routine/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(ROLLBACK_ROUTINE_URL, {
@@ -177,13 +230,27 @@ const rollbackRoutine = async (params: { department_id: number }) => {
 
 const cancelClass = async (routineId: number, cancelMessage: string) => {
     try {
-        const CANCEL_CLASS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
+
+        let isAdmin = false;
+        try {
+            const decoded = jwtDecode<{ role?: string }>(token);
+            isAdmin = decoded.role?.toLowerCase() === "admin";
+        } catch {}
+
+        const CANCEL_CLASS_URL = isAdmin
+            ? `${process.env.NEXT_PUBLIC_BASE_API}/academic/admin/routine/${routineId}/cancel/`
+            : `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
+
+        const body = { 
+            action: "cancel", 
+            cancel_message: cancelMessage 
+        };
+        console.log("[CancelClass] POST", CANCEL_CLASS_URL, "body:", JSON.stringify(body));
 
         const res = await fetch(CANCEL_CLASS_URL, {
             method: "POST",
@@ -191,13 +258,127 @@ const cancelClass = async (routineId: number, cancelMessage: string) => {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ routine_id: routineId, cancel_message: cancelMessage }),
+            body: JSON.stringify(body),
             cache: "no-store",
         });
 
+        console.log("[CancelClass] Response status:", res.status);
+
         if (!res.ok) {
             const errorText = await res.text();
+            console.error("[CancelClass] Error body:", errorText);
             let errorMessage = `Cancellation failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
+            } catch {}
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+        console.log("[CancelClass] Success:", JSON.stringify(rawResult));
+        return { success: true, data: rawResult };
+    } catch (error) {
+        console.error("[Routine] Failed to cancel class:", error);
+        return { success: false, message: "Failed to cancel class" };
+    }
+};
+
+const reactivateClass = async (routineId: number) => {
+    try {
+        const token = await getValidToken();
+
+        if (!token) {
+            return { success: false, message: "No access token found. Please log in." };
+        }
+
+        let isAdmin = false;
+        try {
+            const decoded = jwtDecode<{ role?: string }>(token);
+            isAdmin = decoded.role?.toLowerCase() === "admin";
+        } catch {}
+
+        const CANCEL_CLASS_URL = isAdmin
+            ? `${process.env.NEXT_PUBLIC_BASE_API}/academic/admin/routine/${routineId}/cancel/`
+            : `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
+
+        const body = { 
+            action: "reactivate" 
+        };
+        console.log("[ReactivateClass] POST", CANCEL_CLASS_URL, JSON.stringify(body));
+
+        const res = await fetch(CANCEL_CLASS_URL, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+            cache: "no-store",
+        });
+
+        console.log("[ReactivateClass] Response status:", res.status);
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("[ReactivateClass] Error body:", errorText);
+            let errorMessage = `Reactivation failed (${res.status})`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
+            } catch {}
+            return { success: false, message: errorMessage };
+        }
+
+        const rawResult = await res.json();
+        console.log("[ReactivateClass] Success:", JSON.stringify(rawResult));
+        return { success: true, data: rawResult };
+    } catch (error) {
+        console.error("[Routine] Failed to activate class:", error);
+        return { success: false, message: "Failed to activate class" };
+    }
+};
+
+const updateCancelMessage = async (routineId: number, cancelMessage: string) => {
+    try {
+        const token = await getValidToken();
+
+        if (!token) {
+            return { success: false, message: "No access token found. Please log in." };
+        }
+
+        let isAdmin = false;
+        try {
+            const decoded = jwtDecode<{ role?: string }>(token);
+            isAdmin = decoded.role?.toLowerCase() === "admin";
+        } catch {}
+
+        const CANCEL_CLASS_URL = isAdmin
+            ? `${process.env.NEXT_PUBLIC_BASE_API}/academic/admin/routine/${routineId}/cancel/`
+            : `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
+
+        const body = { 
+            action: "update", 
+            cancel_message: cancelMessage 
+        };
+        console.log("[UpdateCancelMsg] POST", CANCEL_CLASS_URL, JSON.stringify(body));
+
+        const res = await fetch(CANCEL_CLASS_URL, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+            cache: "no-store",
+        });
+
+        console.log("[UpdateCancelMsg] Response status:", res.status);
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error("[UpdateCancelMsg] Error body:", errorText);
+            let errorMessage = `Updating cancellation message failed (${res.status})`;
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
@@ -208,19 +389,18 @@ const cancelClass = async (routineId: number, cancelMessage: string) => {
         const rawResult = await res.json();
         return { success: true, data: rawResult };
     } catch (error) {
-        console.error("[Routine] Failed to cancel class:", error);
-        return { success: false, message: "Failed to cancel class" };
+        console.error("[Routine] Failed to update cancellation message:", error);
+        return { success: false, message: "Failed to update cancellation message" };
     }
 };
 
 const swapRoutineEntries = async (entry1Id: number, entry2Id: number) => {
     try {
         const SWAP_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/routine/swap/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(SWAP_ROUTINE_URL, {
@@ -239,7 +419,7 @@ const swapRoutineEntries = async (entry1Id: number, entry2Id: number) => {
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -259,11 +439,10 @@ const updateRoutineEntry = async (
 ) => {
     try {
         const UPDATE_ROUTINE_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/routine/update/${entryId}/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const bodyData: Record<string, any> = {
@@ -290,7 +469,7 @@ const updateRoutineEntry = async (
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -304,7 +483,7 @@ const updateRoutineEntry = async (
 
 export interface RequestSwapParams {
     swap_type: "PROXY" | "MUTUAL";
-    target_teacher_id: number;
+    target_teacher_id: number | string;
     requester_routine_id: number;
     target_routine_id?: number | null;
     swap_date: string;
@@ -314,11 +493,10 @@ export interface RequestSwapParams {
 const requestSwap = async (params: RequestSwapParams) => {
     try {
         const SWAP_REQUEST_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/swap-request/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(SWAP_REQUEST_URL, {
@@ -341,7 +519,7 @@ const requestSwap = async (params: RequestSwapParams) => {
                 } else {
                     errorMessage = errorJson.detail || errorJson.message || errorMessage;
                 }
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -361,11 +539,10 @@ export interface RespondSwapParams {
 const respondSwap = async (params: RespondSwapParams) => {
     try {
         const SWAP_REQUEST_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/swap-request/`;
-        const cookieStore = await cookies();
-        const token = cookieStore.get("accessToken")?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: "No access token found" };
+            return { success: false, message: "No access token found. Please log in." };
         }
 
         const res = await fetch(SWAP_REQUEST_URL, {
@@ -384,7 +561,7 @@ const respondSwap = async (params: RespondSwapParams) => {
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -396,12 +573,15 @@ const respondSwap = async (params: RespondSwapParams) => {
     }
 };
 
-export { 
-    getRoutine, 
-    generateRoutine, 
-    rollbackRoutine, 
-    cancelClass, 
-    swapRoutineEntries, 
+export {
+    getRoutine,
+    getDepartmentRoutine,
+    generateRoutine,
+    rollbackRoutine,
+    cancelClass,
+    reactivateClass,
+    updateCancelMessage,
+    swapRoutineEntries,
     updateRoutineEntry,
     requestSwap,
     respondSwap

@@ -1,13 +1,12 @@
 "use server"
-import { cookies } from "next/headers";
+import { getValidToken } from "../auth";
 
 export const getAllTimeSlots = async () => {
     try {
         const TIME_SLOTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/timeslots/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get('accessToken')?.value;
+        const token = await getValidToken();
         if (!token) {
-            return { success: false, message: 'No access token found' };
+            return { success: false, message: 'No access token found. Please log in.' };
         }
         const res = await fetch(TIME_SLOTS_URL, {
             method: 'GET',
@@ -39,10 +38,9 @@ export const getAllTimeSlots = async () => {
 export const createTimeSlot = async (timeSlotData: Record<string, any>) => {
     try {
         const TIME_SLOTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/timeslots/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get('accessToken')?.value;
+        const token = await getValidToken();
         if (!token) {
-            return { success: false, message: 'No access token found' };
+            return { success: false, message: 'No access token found. Please log in.' };
         }
         const res = await fetch(TIME_SLOTS_URL, {
             method: 'POST',
@@ -75,10 +73,9 @@ export const createTimeSlot = async (timeSlotData: Record<string, any>) => {
 export const updateTimeSlot = async (id: string, timeSlotData: Record<string, any>) => {
     try {
         const TIME_SLOTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/timeslots/${id}/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get('accessToken')?.value;
+        const token = await getValidToken();
         if (!token) {
-            return { success: false, message: 'No access token found' };
+            return { success: false, message: 'No access token found. Please log in.' };
         }
         const res = await fetch(TIME_SLOTS_URL, {
             method: 'PUT',
@@ -111,11 +108,10 @@ export const updateTimeSlot = async (id: string, timeSlotData: Record<string, an
 export const deleteTimeSlot = async (id: string) => {
     try {
         const TIME_SLOTS_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/timeslots/${id}/`;
-        const cookiesStore = await cookies();
-        const token = cookiesStore.get('accessToken')?.value;
+        const token = await getValidToken();
 
         if (!token) {
-            return { success: false, message: 'No access token found' };
+            return { success: false, message: 'No access token found. Please log in.' };
         }
 
         const res = await fetch(TIME_SLOTS_URL, {

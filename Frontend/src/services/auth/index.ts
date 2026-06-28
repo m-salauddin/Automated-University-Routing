@@ -9,8 +9,6 @@ export const loginUser = async (userData: FieldValues) => {
     try {
         const LOGIN_URL = `${process.env.NEXT_PUBLIC_BASE_API}/login/`;
 
-        console.log(`[Auth] Attempting login to: ${LOGIN_URL}`);
-
         const res = await fetch(LOGIN_URL, {
             method: "POST",
             headers: {
@@ -40,10 +38,6 @@ export const loginUser = async (userData: FieldValues) => {
         }
 
         const rawResult = await res.json();
-        console.log(
-            "[Auth] API Response:",
-            JSON.stringify(rawResult, null, 2)
-        );
 
         let standardizedResult;
 
@@ -84,12 +78,14 @@ export const loginUser = async (userData: FieldValues) => {
             const cookieStore = await cookies();
             cookieStore.set(
                 "accessToken",
-                standardizedResult.data.accessToken
+                standardizedResult.data.accessToken,
+                { httpOnly: false, secure: process.env.NODE_ENV === "production", path: "/" }
             );
             if (standardizedResult.data.refreshToken) {
                 cookieStore.set(
                     "refreshToken",
-                    standardizedResult.data.refreshToken
+                    standardizedResult.data.refreshToken,
+                    { httpOnly: false, secure: process.env.NODE_ENV === "production", path: "/" }
                 );
             }
         }
@@ -105,6 +101,51 @@ export const logout = async () => {
     const cookieStore = await cookies();
     cookieStore.delete("accessToken");
     cookieStore.delete("refreshToken");
+};
+
+export const getValidToken = async (): Promise<string | null> => {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("accessToken")?.value;
+
+    if (!token) return null;
+
+    try {
+        const decoded = jwtDecode<{ exp?: number; token_type?: string }>(token);
+        const isExpired = decoded.exp ? decoded.exp * 1000 < Date.now() : false;
+        if (!isExpired) return token; // Token is valid — use it directly
+    } catch {
+        console.warn("[Auth] Could not decode token — will try refresh");
+    }
+
+    const refreshToken = cookieStore.get("refreshToken")?.value;
+    if (refreshToken) {
+        try {
+            const refreshRes = await fetch(
+                `${process.env.NEXT_PUBLIC_BASE_API}/token/refresh/`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ refresh: refreshToken }),
+                    cache: "no-store",
+                }
+            );
+            if (refreshRes.ok) {
+                const data = await refreshRes.json();
+                const newToken = data.access;
+                if (newToken) {
+                    cookieStore.set("accessToken", newToken, { httpOnly: false, secure: process.env.NODE_ENV === "production", path: "/" });
+                    return newToken;
+                }
+            } else {
+                console.warn("[Auth] Token refresh failed:", refreshRes.status);
+            }
+        } catch (e) {
+            console.warn("[Auth] Token refresh error:", e);
+        }
+    }
+
+    console.warn("[Auth] Falling back to original token");
+    return token;
 };
 
 export const getCurrentUser = async () => {

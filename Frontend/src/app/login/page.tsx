@@ -44,7 +44,7 @@ function LoginContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isForgotOpen, setIsForgotOpen] = useState(false);
-  
+
   useEffect(() => {
     const redirectPath = searchParams.get("redirect");
     router.prefetch(redirectPath || "/dashboard/analytics");
@@ -102,11 +102,14 @@ function LoginContent() {
             student_id: user?.student_id || null,
           })
         );
-        
+
         toast.success("Login successful!", {
           description: `Welcome back, ${finalUsername}`,
           duration: 3000,
         });
+
+        const redirectPath = searchParams.get("redirect") || "/dashboard/analytics";
+        router.push(redirectPath);
 
       } else {
         toast.error("Login Failed", {
@@ -123,7 +126,7 @@ function LoginContent() {
     }
   };
 
-  
+
   const cardVariants = {
     hidden: { scale: 0.96, opacity: 0, y: 16 },
     visible: {
@@ -234,11 +237,12 @@ function LoginContent() {
             </div>
             {errors.username && (
               <motion.p
-                className="text-red-600 dark:text-red-400 text-xs mt-1 ml-1 mb-0 font-medium"
+                className="text-red-600 dark:text-red-400 text-xs mt-1.5 ml-1 mb-0 font-medium flex items-center gap-1"
                 initial="hidden"
                 animate="visible"
                 variants={errorVariant}
               >
+                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
                 {errors.username.message}
               </motion.p>
             )}
@@ -279,11 +283,12 @@ function LoginContent() {
             </div>
             {errors.password && (
               <motion.p
-                className="text-red-600 dark:text-red-400 text-xs mt-1 ml-1 mb-0 font-medium"
+                className="text-red-600 dark:text-red-400 text-xs mt-1.5 ml-1 mb-0 font-medium flex items-center gap-1"
                 initial="hidden"
                 animate="visible"
                 variants={errorVariant}
               >
+                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
                 {errors.password.message}
               </motion.p>
             )}
