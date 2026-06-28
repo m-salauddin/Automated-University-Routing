@@ -97,13 +97,36 @@ During print previews, a thick solid black frame/border appeared around the enti
 
 ---
 
+## 4. Framer Motion Opacity/Animation Print Override
+
+### The Issue
+- In print previews or printed pages, the entire schedule table and its slots sometimes appeared completely blank (opacity 0) or invisible.
+- This occurred because print-only layout blocks are set to `display: none` (`hidden`) on-screen by default. When the browser triggers the print view rendering, Framer Motion elements (such as `<motion.div>`, `<motion.tbody>`, and `<motion.tr>`) are not animated yet. Thus, their initial state inline CSS remains at `opacity: 0` and `transform: translateY(...)`.
+
+### The Fix
+- Added global print media query overrides targeting all elements (`*`) to explicitly force `opacity: 1 !important` and `transform: none !important` during print, overriding any unresolved Framer Motion animation states:
+  ```css
+  @media print {
+    * {
+      border: none !important;
+      border-width: 0 !important;
+      outline: none !important;
+      box-shadow: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
+  ```
+
+---
+
 ## Files Updated
 
 - **Student Routine Module**: 
-  - [student-routine/index.tsx](file:///c:/Users/Shuvo%20Debnath/VsCode/University%20Project%20Frontend/Frontend/src/components/modules/dashboard/student-routine/index.tsx) *(Reduced break text, removed utensils, centered container vertically/horizontally in print)*
+  - [student-routine/index.tsx](file:///c:/Users/Shuvo%20Debnath/VsCode/University%20Project%20Frontend/Frontend/src/components/modules/dashboard/student-routine/index.tsx) *(Reduced break text, removed utensils, centered container vertically/horizontally, added Framer Motion opacity/transform override in print)*
 - **Teacher Own Routine Module**:
-  - [own-routine/index.tsx](file:///c:/Users/Shuvo%20Debnath/VsCode/University%20Project%20Frontend/Frontend/src/components/modules/dashboard/own-routine/index.tsx) *(Reduced break text, removed utensils, converted style scope to jsx global, synced print CSS & container wrapper classes, centered container vertically/horizontally in print)*
+  - [own-routine/index.tsx](file:///c:/Users/Shuvo%20Debnath/VsCode/University%20Project%20Frontend/Frontend/src/components/modules/dashboard/own-routine/index.tsx) *(Reduced break text, removed utensils, converted style scope to jsx global, synced print CSS & container wrapper classes, centered container vertically/horizontally, added Framer Motion opacity/transform override in print)*
 - **Admin/Entries Routine Module**:
-  - [routine-entries/index.tsx](file:///c:/Users/Shuvo%20Debnath/VsCode/University%20Project%20Frontend/Frontend/src/components/modules/dashboard/routine-entries/index.tsx) *(Converted style scope to jsx global, synced print CSS & container wrapper classes, centered container vertically/horizontally in print)*
+  - [routine-entries/index.tsx](file:///c:/Users/Shuvo%20Debnath/VsCode/University%20Project%20Frontend/Frontend/src/components/modules/dashboard/routine-entries/index.tsx) *(Converted style scope to jsx global, synced print CSS & container wrapper classes, centered container vertically/horizontally, added Framer Motion opacity/transform override in print)*
 - **Department Routine Module**:
-  - [department-routine/index.tsx](file:///c:/Users/Shuvo%20Debnath/VsCode/University%20Project%20Frontend/Frontend/src/components/modules/dashboard/department-routine/index.tsx) *(Added 'All Semesters' view option, removed print border layout, enabled print button for teachers, formatted layout for print-centering and break elements)*
+  - [department-routine/index.tsx](file:///c:/Users/Shuvo%20Debnath/VsCode/University%20Project%20Frontend/Frontend/src/components/modules/dashboard/department-routine/index.tsx) *(Added 'All Semesters' view option, removed print border layout, enabled print button for teachers, formatted layout for print-centering and break elements, split screen/print tables, added Framer Motion opacity/transform override in print)*

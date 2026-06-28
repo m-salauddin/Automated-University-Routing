@@ -83,6 +83,8 @@ type ClassSession = {
   department: string;
   semester: string;
   day: string;
+  is_cancelled?: boolean;
+  cancel_message?: string | null;
 };
 
 type DayRow = {
@@ -464,6 +466,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
           department: item.department_name,
           semester: item.semester_name,
           day: item.day_name,
+          is_cancelled: Boolean(item.is_cancelled),
+          cancel_message: item.cancel_message || null,
         };
       }
     });
@@ -684,8 +688,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             </TableCell>
 
             {isAllSemesters && (
-              <TableCell className="w-20 min-w-20 text-center font-bold bg-muted/40 border-r border-border/60 text-xs uppercase print:bg-white print:text-black !print:border-r !print:border-black print:w-16 print:min-w-0">
-                Semester
+              <TableCell className="w-12 min-w-[48px] text-center font-bold bg-muted/40 border-r border-border/60 text-xs uppercase print:bg-white print:text-black !print:border-r !print:border-black print-sem-cell">
+                SEM
               </TableCell>
             )}
 
@@ -781,7 +785,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                           </TableCell>
                         )}
 
-                        <TableCell className="font-bold text-xs text-center border-r border-border/60 bg-muted/10 print:bg-white print:text-black !print:border-r !print:border-black">
+                        <TableCell className="font-bold text-xs text-center border-r border-border/60 bg-muted/10 print:bg-white print:text-black !print:border-r !print:border-black print-sem-cell w-12 min-w-[48px]">
                           {rowItem.semester}
                         </TableCell>
 
@@ -828,8 +832,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                           const classOffData =
                             teacherKey && startTimeRaw && key ? classOffMap[key] : undefined;
 
-                          const isClassOffToday = Boolean(classOffData?.status);
-                          const cancellationReason = classOffData?.reason || "No reason provided.";
+                          const isClassOffToday = Boolean(classOffData?.status) || Boolean(session?.is_cancelled);
+                          const cancellationReason = classOffData?.reason || session?.cancel_message || "No reason provided.";
                           const isTeacherOff =
                             (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
 
@@ -940,11 +944,21 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                         {session.course}
                                       </span>
                                       {isLab ? (
-                                        <span className="text-[9px] font-black uppercase tracking-wider bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-1 py-0.2 rounded border border-violet-200/50 dark:border-violet-800/40">
+                                        <span className={cn(
+                                          "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                          isTeacherOff
+                                            ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                            : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                        )}>
                                           Lab
                                         </span>
                                       ) : (
-                                        <span className="text-[9px] font-black uppercase tracking-wider bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 px-1 py-0.2 rounded border border-teal-200/50 dark:border-teal-800/40">
+                                        <span className={cn(
+                                          "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                          isTeacherOff
+                                            ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                            : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                        )}>
                                           Theory
                                         </span>
                                       )}
@@ -965,6 +979,11 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                       {session.course}, T-{getTeacherInitials(session.teacher)}
                                     </span>
                                     <span className="font-bold text-[11px]">{session.room}</span>
+                                    {isTeacherOff && (
+                                      <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">
+                                        (Cancelled)
+                                      </span>
+                                    )}
                                   </div>
                                 </>
                               ) : (
@@ -1047,8 +1066,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                     const classOffData =
                       teacherKey && startTimeRaw && key ? classOffMap[key] : undefined;
 
-                    const isClassOffToday = Boolean(classOffData?.status);
-                    const cancellationReason = classOffData?.reason || "No reason provided.";
+                    const isClassOffToday = Boolean(classOffData?.status) || Boolean(session?.is_cancelled);
+                    const cancellationReason = classOffData?.reason || session?.cancel_message || "No reason provided.";
                     const isTeacherOff =
                       (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
 
@@ -1157,11 +1176,21 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                   {session.course}
                                 </span>
                                 {isLab ? (
-                                  <span className="text-[9px] font-black uppercase tracking-wider bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 px-1 py-0.2 rounded border border-violet-200/50 dark:border-violet-800/40">
+                                  <span className={cn(
+                                    "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                    isTeacherOff
+                                      ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                      : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                  )}>
                                     Lab
                                   </span>
                                 ) : (
-                                  <span className="text-[9px] font-black uppercase tracking-wider bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 px-1 py-0.2 rounded border border-teal-200/50 dark:border-teal-800/40">
+                                  <span className={cn(
+                                    "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                    isTeacherOff
+                                      ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                      : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                  )}>
                                     Theory
                                   </span>
                                 )}
@@ -1182,6 +1211,11 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                 {session.course}, T-{getTeacherInitials(session.teacher)}
                               </span>
                               <span className="font-bold text-[11px]">{session.room}</span>
+                              {isTeacherOff && (
+                                <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">
+                                  (Cancelled)
+                                </span>
+                              )}
                             </div>
                           </>
                         ) : (
@@ -1358,6 +1392,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             border-width: 0 !important;
             outline: none !important;
             box-shadow: none !important;
+            opacity: 1 !important;
+            transform: none !important;
           }
 
           /* Restore borders ONLY for the table and its cells */
@@ -1370,7 +1406,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
           }
           table {
             table-layout: fixed !important;
-            width: 100% !important;
+            width: calc(100% - 2px) !important;
+            margin: 0 auto !important;
           }
           tbody {
             page-break-inside: avoid !important;
@@ -1419,6 +1456,9 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
           .print-header-table {
             border: 1px solid black !important;
             border-color: black !important;
+            width: calc(100% - 2px) !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
           }
 
           /* Ensure clear text and transparent backgrounds for print */
@@ -1441,7 +1481,18 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             background-color: transparent !important;
           }
           .print-break-text-no-class {
-            font-size: 7.5px !important;
+            font-size: 5.5px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.5px !important;
+          }
+          .print-cancelled-label {
+            color: #ef4444 !important;
+          }
+          .print-sem-cell {
+            font-size: 8px !important;
+            width: 35px !important;
+            min-width: 35px !important;
+            max-width: 35px !important;
           }
         }
       `}</style>
@@ -1579,22 +1630,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                         </h1>
                         <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
                           <h2 className="text-base font-bold uppercase text-black tracking-wide">
-                            Class Routine
+                            All Routine
                           </h2>
-                        </div>
-                        <div className="w-full flex border! border-black! font-bold text-xs mt-3 print-header-table">
-                          <div className="bg-gray-200 border-r! border-black! px-6 py-1">
-                            Semester
-                          </div>
-                          <div className="flex-1 text-center py-1 border-r! border-black!">
-                            All Semesters
-                          </div>
-                          <div className="bg-gray-200 border-r! border-black! px-6 py-1">
-                            Total Credit
-                          </div>
-                          <div className="px-10 py-1 text-center">
-                            {Object.values(formattedRoutineData).reduce((sum, r) => sum + r.credits, 0)}
-                          </div>
                         </div>
                       </div>
                     )}
@@ -1612,42 +1649,46 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
               </div>
             </>
           ) : (
-            <div className="print-page-container w-full">
-              <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-3 pt-0 text-center w-full font-serif text-black">
-                <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
-                  Department of {auth.department_name || "Department"}
-                </h1>
-                <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
-                  <h2 className="text-base font-bold uppercase text-black tracking-wide">
-                    Class Routine
-                  </h2>
-                </div>
-                <div className="w-full flex border! border-black! font-bold text-xs mt-3 print-header-table">
-                  <div className="bg-gray-200 border-r! border-black! px-6 py-1">
-                    Semester
+            <>
+              {/* Screen view: single table */}
+              <div className="w-full print:hidden">
+                <motion.div
+                  id="print-container-wrapper"
+                  variants={itemVariants}
+                  className="rounded-xl font-lexend bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1"
+                >
+                  <div className="overflow-x-auto w-full">
+                    {renderTable(currentRoutine.schedule, false, false)}
                   </div>
-                  <div className="flex-1 text-center py-1 border-r! border-black!">
-                    {currentRoutine.label}
-                  </div>
-                  <div className="bg-gray-200 border-r! border-black! px-6 py-1">
-                    Total Credit
-                  </div>
-                  <div className="px-10 py-1 text-center">
-                    {currentRoutine.credits > 0 ? currentRoutine.credits : "-"}
-                  </div>
-                </div>
+                </motion.div>
               </div>
 
-              <motion.div
-                id="print-container-wrapper"
-                variants={itemVariants}
-                className="rounded-xl font-lexend bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:shadow-none print:bg-transparent print:overflow-visible"
-              >
-                <div className="overflow-x-auto w-full print:overflow-visible">
-                  {renderTable(currentRoutine.schedule, false, false)}
+              {/* Print view: single page table */}
+              <div className="hidden print:block print:w-full print:gap-0">
+                <div className="print-page-container w-full">
+                  <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-3 pt-0 text-center w-full font-serif text-black">
+                    <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
+                      Department of {auth.department_name || "Department"}
+                    </h1>
+                    <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
+                      <h2 className="text-base font-bold uppercase text-black tracking-wide">
+                        Class Routine
+                      </h2>
+                    </div>
+                  </div>
+
+                  <motion.div
+                    id="print-container-wrapper"
+                    variants={itemVariants}
+                    className="rounded-xl font-lexend bg-card/50 shadow-sm overflow-hidden w-full grid grid-cols-1 print:rounded-none print:shadow-none print:bg-transparent print:overflow-visible"
+                  >
+                    <div className="overflow-x-auto w-full print:overflow-visible">
+                      {renderTable(currentRoutine.schedule, true, false)}
+                    </div>
+                  </motion.div>
                 </div>
-              </motion.div>
-            </div>
+              </div>
+            </>
           )}
           <div className="text-center mt-6 print:hidden sm:hidden">
             <Button

@@ -1551,6 +1551,8 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
             border-width: 0 !important;
             outline: none !important;
             box-shadow: none !important;
+            opacity: 1 !important;
+            transform: none !important;
           }
 
           /* Restore borders ONLY for the table and its cells */
@@ -1563,7 +1565,8 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           }
           table {
             table-layout: fixed !important;
-            width: 100% !important;
+            width: calc(100% - 2px) !important;
+            margin: 0 auto !important;
           }
           tbody {
             page-break-inside: avoid !important;
@@ -1629,6 +1632,9 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           }
           .print-break-text-no-class {
             font-size: 7.5px !important;
+          }
+          .print-cancelled-label {
+            color: #ef4444 !important;
           }
         }
       `}</style>

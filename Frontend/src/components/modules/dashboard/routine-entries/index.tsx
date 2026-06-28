@@ -868,10 +868,10 @@ const MemoizedRoutineTable = React.memo(
 
                 {isAllSemestersMode && (
                   <TableCell className={cn(
-                    "w-20 min-w-20 text-center font-bold bg-muted/40 border-r border-border text-xs uppercase",
+                    "w-12 min-w-[48px] text-center font-bold bg-muted/40 border-r border-border text-xs uppercase print-sem-cell",
                     isPrint ? "!print:border-r !print:border-black" : ""
                   )}>
-                    Sem
+                    SEM
                   </TableCell>
                 )}
 
@@ -886,7 +886,7 @@ const MemoizedRoutineTable = React.memo(
                         )}>
                           <div className="h-full flex items-center justify-center">
                             <span className={cn(
-                              "text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background",
+                              "text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print-break-text-no-class",
                               isPrint ? "print:text-black" : ""
                             )}>
                               BREAK
@@ -941,12 +941,18 @@ const MemoizedRoutineTable = React.memo(
                   rowItem.day.toLowerCase() === dayName.toLowerCase()
               );
               if (dayRows.length === 0) return null;
+
+              const TbodyComponent = isPrint ? ("tbody" as any) : motion.tbody;
+              const tbodyProps = isPrint ? {} : {
+                variants: containerVariants,
+                initial: "hidden",
+                animate: "visible"
+              };
+
               return (
-                <motion.tbody
+                <TbodyComponent
                   key={dayName}
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
+                  {...tbodyProps}
                   className={cn(isPrint ? "print:break-inside-avoid !print:break-inside-avoid" : "")}
                 >
                   <AnimatePresence mode="popLayout">
@@ -954,10 +960,15 @@ const MemoizedRoutineTable = React.memo(
                       const isFirstRowOfDay = rowIndex === 0;
                       const rowSpan = dayRows.length;
 
+                      const TrComponent = isPrint ? ("tr" as any) : motion.tr;
+                      const trProps = isPrint ? {} : {
+                        variants: itemVariants
+                      };
+
                       return (
-                        <motion.tr
+                        <TrComponent
                           key={`${rowItem.day}-${rowItem.semester}`}
-                          variants={itemVariants}
+                          {...trProps}
                           className={cn(
                             "border-b border-border hover:bg-muted/5 h-[85px]",
                             isPrint ? "!print:border-black print:border-b print:h-auto" : ""
@@ -986,7 +997,7 @@ const MemoizedRoutineTable = React.memo(
                           {/* Semester Label */}
                           {isAllSemestersMode && (
                             <TableCell className={cn(
-                              "font-bold text-xs text-center border-r border-border bg-muted/10",
+                              "font-bold text-xs text-center border-r border-border bg-muted/10 print-sem-cell w-12 min-w-[48px]",
                               isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black" : ""
                             )}>
                               {rowItem.semester}
@@ -1053,8 +1064,8 @@ const MemoizedRoutineTable = React.memo(
                                   isClassOffToday ? "cursor-pointer" : "cursor-default",
                                   highlighted
                                     ? "bg-emerald-100/50 dark:bg-emerald-900/20" + (isPrint ? " print:bg-transparent" : "")
-                                    : (!session && isBreakSlot(slot))
-                                      ? "bg-muted/20"
+                                    : isTeacherOff
+                                      ? "bg-red-100/30 dark:bg-red-950/10" + (isPrint ? " print:bg-transparent" : "")
                                       : "bg-transparent" + (isPrint ? " print:bg-white" : "")
                                 )}
                               >
@@ -1101,16 +1112,16 @@ const MemoizedRoutineTable = React.memo(
                                         <div className="flex items-center gap-0.5 shrink-0">
                                           {isLab ? (
                                             <span className={cn(
-                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
                                               isTeacherOff
                                                 ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                : "bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                                : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
                                             )}>
                                               Lab
                                             </span>
                                           ) : (
                                             <span className={cn(
-                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
                                               isTeacherOff
                                                 ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
                                                 : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
@@ -1201,6 +1212,11 @@ const MemoizedRoutineTable = React.memo(
                                       <span className="font-bold text-[11px]">
                                         {session.room}
                                       </span>
+                                      {isTeacherOff && (
+                                        <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">
+                                          (Cancelled)
+                                        </span>
+                                      )}
                                     </div>
                                   </>
                                 ) : isBreakSlot(slot) ? (
@@ -1216,23 +1232,20 @@ const MemoizedRoutineTable = React.memo(
                                     <div className="h-full w-full min-h-[48px] flex items-center justify-center relative z-10 print:hidden">
                                       <Utensils className="w-3 h-3 text-foreground/40" />
                                     </div>
-                                    <div className="hidden print:flex h-full w-full items-center justify-center relative z-10">
-                                      <Utensils className="w-3 h-3 text-black" />
-                                    </div>
                                   </>
                                 ) : (
-                                  <div className="h-full w-full flex items-center justify-center min-h-[48px]">
+                                  <div className="h-full w-full flex items-center justify-center min-h-[48px] print:min-h-0">
                                     <div className="w-1 h-1 rounded-full bg-border print:hidden" />
                                   </div>
                                 )}
                               </TableCell>
                             );
                           })}
-                        </motion.tr>
+                        </TrComponent>
                       );
                     })}
                   </AnimatePresence>
-                </motion.tbody>
+                </TbodyComponent>
               );
             })}
           </Table>
@@ -1401,6 +1414,10 @@ export default function AdminRoutinePage({
 
   const router = useRouter();
   const dispatch = useDispatch();
+
+  const viewReasonDialogRef = useRef<{
+    open: (data: { course: string; teacher: string; reason: string }) => void;
+  } | null>(null);
 
   const { role, isLoading: isAuthLoading } = useSelector(
     (s: RootState) => s.auth
@@ -1580,17 +1597,7 @@ export default function AdminRoutinePage({
     setLocalRoutineList(routineList);
   }, [routineList]);
 
-  const [viewReasonModal, setViewReasonModal] = useState<{
-    isOpen: boolean;
-    course: string;
-    teacher: string;
-    reason: string;
-  }>({
-    isOpen: false,
-    course: "",
-    teacher: "",
-    reason: "",
-  });
+
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(inputValue), 150);
@@ -1908,10 +1915,7 @@ export default function AdminRoutinePage({
 
   const handleCellClick = useCallback(
     (data: { course: string; teacher: string; reason: string }) => {
-      setViewReasonModal({
-        isOpen: true,
-        ...data,
-      });
+      viewReasonDialogRef.current?.open(data);
     },
     []
   );
@@ -2046,18 +2050,10 @@ export default function AdminRoutinePage({
       <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
         Department of {currentRoutineSchedule.label}
       </h1>
-      <div className="border-2 border-black! border-double px-8 py-0.5 mb-2">
+      <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
         <h2 className="text-base font-bold uppercase text-black tracking-wide">
-          Class Routine{" "}
-          {currentRoutineSchedule.subLabel &&
-            `– ${currentRoutineSchedule.subLabel}`}
+          {currentRoutineSchedule.isAllSemestersMode ? "All Routine" : "Class Routine"}
         </h2>
-      </div>
-      <div className="flex justify-between w-full px-4 mb-2 font-bold text-xs uppercase border-b border-black">
-        <span>Semester: {currentRoutineSchedule.subLabel}</span>
-        <span>
-          Total Credit: {currentRoutineSchedule.totalCredits}
-        </span>
       </div>
     </div>
   ), [currentRoutineSchedule]);
@@ -2207,6 +2203,8 @@ export default function AdminRoutinePage({
             border-width: 0 !important;
             outline: none !important;
             box-shadow: none !important;
+            opacity: 1 !important;
+            transform: none !important;
           }
 
           /* Restore borders ONLY for the table and its cells */
@@ -2219,7 +2217,8 @@ export default function AdminRoutinePage({
           }
           table {
             table-layout: fixed !important;
-            width: 100% !important;
+            width: calc(100% - 2px) !important;
+            margin: 0 auto !important;
           }
           tbody {
             page-break-inside: avoid !important;
@@ -2268,6 +2267,9 @@ export default function AdminRoutinePage({
           .print-header-table {
             border: 1px solid black !important;
             border-color: black !important;
+            width: calc(100% - 2px) !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
           }
 
           /* Ensure clear text and transparent backgrounds for print */
@@ -2290,7 +2292,18 @@ export default function AdminRoutinePage({
             background-color: transparent !important;
           }
           .print-break-text-no-class {
-            font-size: 7.5px !important;
+            font-size: 8px !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.5px !important;
+          }
+          .print-sem-cell {
+            font-size: 8px !important;
+            width: 35px !important;
+            min-width: 35px !important;
+            max-width: 35px !important;
+          }
+          .print-cancelled-label {
+            color: #ef4444 !important;
           }
         }
       `}</style>
@@ -2654,56 +2667,7 @@ export default function AdminRoutinePage({
       </motion.div>
 
       { }
-      <Dialog
-        open={viewReasonModal.isOpen}
-        onOpenChange={(open) =>
-          setViewReasonModal((prev) => ({ ...prev, isOpen: open }))
-        }
-      >
-        <DialogContent>
-          <AnimatePresence mode="wait">
-            {viewReasonModal.isOpen && (
-              <motion.div
-                variants={modalContentVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="flex flex-col gap-1"
-              >
-                <motion.div variants={modalItemVariants}>
-                  <DialogHeader>
-                    <div className="flex items-center gap-2 text-red-500 mb-2">
-                      <Info className="h-5 w-5" />
-                      <DialogTitle>Class Cancelled</DialogTitle>
-                    </div>
-                    <DialogDescription className="text-foreground text-base">
-                      <span className="font-semibold">
-                        {viewReasonModal.course}
-                      </span>{" "}
-                      with{" "}
-                      <span className="font-semibold">
-                        {viewReasonModal.teacher}
-                      </span>{" "}
-                      has been cancelled for today.
-                    </DialogDescription>
-                  </DialogHeader>
-                </motion.div>
-
-                <motion.div variants={modalItemVariants}>
-                  <div className="bg-muted/50 p-4 rounded-md border mt-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">
-                      Teacher&apos;s Reason
-                    </p>
-                    <p className="text-sm italic text-foreground/90 whitespace-pre-wrap break-all">
-                      &quot;{viewReasonModal.reason}&quot;
-                    </p>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </DialogContent>
-      </Dialog>
+      <ViewReasonDialog ref={viewReasonDialogRef} />
 
       { }
       <Dialog
@@ -2992,3 +2956,73 @@ export default function AdminRoutinePage({
     </>
   );
 }
+
+interface ViewReasonDialogRef {
+  open: (data: { course: string; teacher: string; reason: string }) => void;
+}
+
+const ViewReasonDialog = React.forwardRef<ViewReasonDialogRef, {}>((props, ref) => {
+  const [state, setState] = useState<{
+    isOpen: boolean;
+    course: string;
+    teacher: string;
+    reason: string;
+  }>({
+    isOpen: false,
+    course: "",
+    teacher: "",
+    reason: "",
+  });
+
+  React.useImperativeHandle(ref, () => ({
+    open: (data) => {
+      setState({
+        isOpen: true,
+        ...data,
+      });
+    },
+  }));
+
+  return (
+    <Dialog
+      open={state.isOpen}
+      onOpenChange={(open) =>
+        setState((prev) => ({ ...prev, isOpen: open }))
+      }
+    >
+      <DialogContent className="sm:max-w-[425px]">
+        {state.isOpen && (
+          <div className="flex flex-col gap-1">
+            <DialogHeader>
+              <div className="flex items-center gap-2 text-red-500 mb-2">
+                <Info className="h-5 w-5" />
+                <DialogTitle>Class Cancelled</DialogTitle>
+              </div>
+              <DialogDescription className="text-foreground text-base">
+                <span className="font-semibold">
+                  {state.course}
+                </span>{" "}
+                with{" "}
+                <span className="font-semibold">
+                  {state.teacher}
+                </span>{" "}
+                has been cancelled for today.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="bg-muted/50 p-4 rounded-md border mt-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest mb-2">
+                Teacher&apos;s Reason
+              </p>
+              <p className="text-sm italic text-foreground/90 whitespace-pre-wrap break-all">
+                &quot;{state.reason}&quot;
+              </p>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+});
+
+ViewReasonDialog.displayName = "ViewReasonDialog";

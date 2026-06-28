@@ -541,6 +541,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
             border-width: 0 !important;
             outline: none !important;
             box-shadow: none !important;
+            opacity: 1 !important;
+            transform: none !important;
           }
 
           /* Restore borders ONLY for the table and its cells */
@@ -553,7 +555,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
           }
           table {
             table-layout: fixed !important;
-            width: 100% !important;
+            width: calc(100% - 2px) !important;
+            margin: 0 auto !important;
           }
           tbody {
             page-break-inside: avoid !important;
@@ -596,6 +599,9 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
           .print-header-table {
             border: 1px solid black !important;
             border-color: black !important;
+            width: calc(100% - 2px) !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
           }
 
           /* Ensure clear text and transparent backgrounds for print */
@@ -618,7 +624,9 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
             background-color: transparent !important;
           }
           .print-break-text-no-class {
-            font-size: 7.5px !important;
+            font-size: 5.5px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0.5px !important;
           }
         }
       `}</style>
@@ -733,22 +741,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
               </h1>
               <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
                 <h2 className="text-base font-bold uppercase text-black tracking-wide">
-                  Class Routine – {currentRoutine.session}
+                  Class Routine
                 </h2>
-              </div>
-              <div className="w-full flex border! border-black! font-bold text-xs mt-3 print-header-table">
-                <div className="bg-gray-200 border-r! border-black! px-6 py-1">
-                  Semester
-                </div>
-                <div className="flex-1 text-center py-1 border-r! border-black!">
-                  {currentRoutine.label}
-                </div>
-                <div className="bg-gray-200 border-r! border-black! px-6 py-1">
-                  Total Credit
-                </div>
-                <div className="px-10 py-1 text-center">
-                  {currentRoutine.credits > 0 ? currentRoutine.credits : "-"}
-                </div>
               </div>
             </div>
 
