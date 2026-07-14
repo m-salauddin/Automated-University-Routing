@@ -45,6 +45,7 @@ import {
   MoreVertical,
   Undo2,
   Redo2,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -240,6 +241,7 @@ export type APIRoutineItem = {
   department_name: string;
   semester_name: string;
   room_number: string;
+  group_name?: string | null;
   is_cancelled?: boolean;
   cancel_message?: string | null;
 };
@@ -263,6 +265,7 @@ type ClassSession = {
   day: string;
   is_cancelled?: boolean;
   cancel_message?: string | null;
+  group_name?: string | null;
 };
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
@@ -445,6 +448,7 @@ const MemoizedRoutineTable = React.memo(
         source?: ClassSession;
         target?: ClassSession;
       }>({ isOpen: false });
+      const [selectedSwapSource, setSelectedSwapSource] = useState<ClassSession | null>(null);
 
       // All drag state lives in refs — zero React re-renders during drag
       const ghostRef = useRef<HTMLDivElement | null>(null);
@@ -460,6 +464,30 @@ const MemoizedRoutineTable = React.memo(
         hoveredCellIndex: null,
       });
       const dragScheduleRef = useRef<typeof schedule>([]);
+      // Edge-scroll refs — track pointer Y position and the running RAF id
+      const pointerYRef = useRef<number>(0);
+      const scrollRafRef = useRef<number | null>(null);
+
+      // Auto-scroll the page when pointer is within EDGE_ZONE px of the top/bottom
+      const startEdgeScroll = useCallback(() => {
+        const EDGE_ZONE = 80; // px from viewport edge to start scrolling
+        const MAX_SPEED = 18; // max px per frame
+        const loop = () => {
+          const y = pointerYRef.current;
+          const vh = window.innerHeight;
+          let speed = 0;
+          if (y < EDGE_ZONE) {
+            // Near top — scroll up
+            speed = -MAX_SPEED * (1 - y / EDGE_ZONE);
+          } else if (y > vh - EDGE_ZONE) {
+            // Near bottom — scroll down
+            speed = MAX_SPEED * (1 - (vh - y) / EDGE_ZONE);
+          }
+          if (speed !== 0) window.scrollBy({ top: speed, behavior: 'instant' });
+          scrollRafRef.current = requestAnimationFrame(loop);
+        };
+        scrollRafRef.current = requestAnimationFrame(loop);
+      }, []);
 
       const pageGroups = useMemo(() => {
         if (!isAllSemestersMode) return [schedule];
@@ -631,21 +659,43 @@ const MemoizedRoutineTable = React.memo(
       }, [timeSlots, refreshRoutine, setLocalRoutineList, triggerRollbackAnimation, onHistoryAction]);
 
       // Pointer-based drag handlers
-      const startPointerDrag = useCallback((e: React.PointerEvent<HTMLDivElement>, session: ClassSession, isLab: boolean) => {
-        if (isSubmitting) return;
-        e.currentTarget.setPointerCapture(e.pointerId);
+      // We use a THRESHOLD approach instead of setPointerCapture so that
+      // normal scrolling is never blocked — drag only commits after 4px movement.
+      const pendingDragRef = useRef<{
+        session: ClassSession | null;
+        isLab: boolean;
+        startX: number;
+        startY: number;
+        sourceEl: HTMLDivElement | null;
+      }>({ session: null, isLab: false, startX: 0, startY: 0, sourceEl: null });
 
+      const clearDragDom = useCallback(() => {
+        hoveredCellRef.current?.removeAttribute('data-hovered');
+        hoveredCellRef.current = null;
+        tableWrapperRef.current?.removeAttribute('data-dragging-semester');
+        // Clear source card attribute
+        tableWrapperRef.current?.querySelector('[data-drag-source]')?.removeAttribute('data-drag-source');
+        // Clear drag target classes
+        const targets = tableWrapperRef.current?.querySelectorAll('[data-drag-target-valid]');
+        targets?.forEach(el => el.removeAttribute('data-drag-target-valid'));
+        if (ghostRef.current) ghostRef.current.style.display = 'none';
+        document.body.style.cursor = '';
+        // Stop edge-scroll loop
+        if (scrollRafRef.current !== null) {
+          cancelAnimationFrame(scrollRafRef.current);
+          scrollRafRef.current = null;
+        }
+      }, []);
+
+      const commitDrag = useCallback((session: ClassSession, isLab: boolean, clientX: number, clientY: number, sourceEl: HTMLDivElement) => {
         dragStateRef.current.session = session;
         dragScheduleRef.current = schedule;
         dragStateRef.current.hoveredRowKey = null;
         dragStateRef.current.hoveredCellIndex = null;
 
-        // Mark dragging source card via DOM
-        e.currentTarget.setAttribute('data-drag-source', '1');
-        // Mark wrapper so CSS can dim non-target cells
+        sourceEl.setAttribute('data-drag-source', '1');
         tableWrapperRef.current?.setAttribute('data-dragging-semester', session.semester);
 
-        // Highlight only cells belonging to the same semester
         const cells = tableWrapperRef.current?.querySelectorAll(`[data-cell-semester="${session.semester}"]`);
         cells?.forEach(cell => cell.setAttribute('data-drag-target-valid', '1'));
 
@@ -654,7 +704,6 @@ const MemoizedRoutineTable = React.memo(
           const typeSpan = ghostRef.current.querySelector('[data-ghost-type]');
           const teacherSpan = ghostRef.current.querySelector('[data-ghost-teacher]');
           const roomSpan = ghostRef.current.querySelector('[data-ghost-room]');
-
           if (courseSpan) courseSpan.textContent = session.course;
           if (teacherSpan) teacherSpan.textContent = getTeacherInitials(session.teacher);
           if (roomSpan) roomSpan.textContent = session.room;
@@ -664,34 +713,31 @@ const MemoizedRoutineTable = React.memo(
               ? "text-[9px] font-black uppercase tracking-wider px-1 rounded border shrink-0 bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border-violet-200/50"
               : "text-[9px] font-black uppercase tracking-wider px-1 rounded border shrink-0 bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50";
           }
-
           ghostRef.current.style.display = 'flex';
-          ghostRef.current.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%)) scale(1.06)`;
+          ghostRef.current.style.transform = `translate(calc(${clientX}px - 50%), calc(${clientY}px - 50%)) scale(1.06)`;
         }
         document.body.style.cursor = 'grabbing';
-      }, [isSubmitting, schedule]);
+        // Start edge-scroll loop
+        startEdgeScroll();
+      }, [schedule]);
 
-      const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+      // Window-level handlers — only attached once drag is committed
+      const windowPointerMove = useCallback((e: PointerEvent) => {
         if (!dragStateRef.current.session) return;
-        // Update ghost position directly on DOM — zero React re-render cost
+        // Track pointer Y for edge-scroll RAF
+        pointerYRef.current = e.clientY;
         if (ghostRef.current) {
           ghostRef.current.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%)) scale(1.06)`;
         }
-
-        // Detect hovered cell and toggle data-hovered attribute directly on DOM
         const el = document.elementFromPoint(e.clientX, e.clientY);
         const cell = el?.closest('[data-cell-key]') as HTMLElement | null;
-
         if (cell !== hoveredCellRef.current) {
-          // Clear previous
           hoveredCellRef.current?.removeAttribute('data-hovered');
           if (cell) {
-            // Only highlight cells matching dragged session's semester
             const sem = tableWrapperRef.current?.getAttribute('data-dragging-semester');
             if (sem && cell.getAttribute('data-cell-semester') === sem) {
               cell.setAttribute('data-hovered', '1');
               hoveredCellRef.current = cell;
-              // Track for drop
               dragStateRef.current.hoveredRowKey = cell.dataset.cellKey ?? null;
               dragStateRef.current.hoveredCellIndex = cell.dataset.cellIndex != null ? parseInt(cell.dataset.cellIndex) : null;
             } else {
@@ -707,31 +753,17 @@ const MemoizedRoutineTable = React.memo(
         }
       }, []);
 
-      const clearDragDom = useCallback(() => {
-        hoveredCellRef.current?.removeAttribute('data-hovered');
-        hoveredCellRef.current = null;
-        tableWrapperRef.current?.removeAttribute('data-dragging-semester');
-        // Clear source card attribute
-        tableWrapperRef.current?.querySelector('[data-drag-source]')?.removeAttribute('data-drag-source');
-
-        // Clear drag target classes
-        const targets = tableWrapperRef.current?.querySelectorAll('[data-drag-target-valid]');
-        targets?.forEach(el => el.removeAttribute('data-drag-target-valid'));
-
-        if (ghostRef.current) ghostRef.current.style.display = 'none';
-        document.body.style.cursor = '';
-      }, []);
-
-      const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+      const windowPointerUp = useCallback((e: PointerEvent) => {
         const src = dragStateRef.current.session;
-        if (!src) return;
-
-        e.currentTarget.releasePointerCapture(e.pointerId);
-        e.currentTarget.removeAttribute('data-drag-source');
+        window.removeEventListener('pointermove', windowPointerMove);
+        window.removeEventListener('pointerup', windowPointerUp);
+        window.removeEventListener('pointercancel', windowPointerUp);
+        pendingDragRef.current.session = null;
+        pendingDragRef.current.sourceEl = null;
+        if (!src) { clearDragDom(); return; }
 
         const rowKey = dragStateRef.current.hoveredRowKey;
         const cellIdx = dragStateRef.current.hoveredCellIndex;
-
         dragStateRef.current.session = null;
         dragStateRef.current.hoveredRowKey = null;
         dragStateRef.current.hoveredCellIndex = null;
@@ -743,15 +775,56 @@ const MemoizedRoutineTable = React.memo(
         );
         if (!targetRow) return;
         handleDropOnCell(targetRow, cellIdx, src);
-      }, [handleDropOnCell, clearDragDom]);
+      }, [windowPointerMove, handleDropOnCell, clearDragDom]);
 
-      const onPointerCancel = useCallback(() => {
-        dragStateRef.current.session = null;
-        dragStateRef.current.hoveredRowKey = null;
-        dragStateRef.current.hoveredCellIndex = null;
-        clearDragDom();
-        document.body.style.cursor = '';
-      }, [clearDragDom]);
+      // Window-level pending move — checks threshold before committing drag
+      const windowPendingMove = useCallback((e: PointerEvent) => {
+        const pending = pendingDragRef.current;
+        if (!pending.session || !pending.sourceEl) return;
+        const dx = e.clientX - pending.startX;
+        const dy = e.clientY - pending.startY;
+        if (Math.sqrt(dx * dx + dy * dy) < 4) return; // threshold not reached yet
+        // Threshold crossed — commit drag and switch to drag handlers
+        window.removeEventListener('pointermove', windowPendingMove);
+        window.removeEventListener('pointerup', windowPendingCancel);
+        window.removeEventListener('pointercancel', windowPendingCancel);
+        commitDrag(pending.session, pending.isLab, e.clientX, e.clientY, pending.sourceEl);
+        window.addEventListener('pointermove', windowPointerMove, { passive: true });
+        window.addEventListener('pointerup', windowPointerUp);
+        window.addEventListener('pointercancel', windowPointerUp);
+      }, [commitDrag, windowPointerMove, windowPointerUp]);
+
+      const windowPendingCancel = useCallback(() => {
+        window.removeEventListener('pointermove', windowPendingMove);
+        window.removeEventListener('pointerup', windowPendingCancel);
+        window.removeEventListener('pointercancel', windowPendingCancel);
+        pendingDragRef.current.session = null;
+        pendingDragRef.current.sourceEl = null;
+      }, [windowPendingMove]);
+
+      const startPointerDrag = useCallback((e: React.PointerEvent<HTMLDivElement>, session: ClassSession, isLab: boolean) => {
+        if (isSubmitting) return;
+        // Only trigger on primary pointer (left mouse / first touch)
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        // Record pending drag start — do NOT capture pointer so scrolling stays free
+        pendingDragRef.current = {
+          session,
+          isLab,
+          startX: e.clientX,
+          startY: e.clientY,
+          sourceEl: e.currentTarget,
+        };
+        dragScheduleRef.current = schedule;
+        // Attach pending-move listener — will commit drag once threshold crossed
+        window.addEventListener('pointermove', windowPendingMove, { passive: true });
+        window.addEventListener('pointerup', windowPendingCancel);
+        window.addEventListener('pointercancel', windowPendingCancel);
+      }, [isSubmitting, schedule, windowPendingMove, windowPendingCancel]);
+
+      // Dummy no-op handlers kept on the card element for compatibility
+      const onPointerMove = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {}, []);
+      const onPointerUp = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {}, []);
+      const onPointerCancel = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {}, []);
 
       const confirmSwap = async () => {
         const { source, target } = swapConfirmModal;
@@ -959,6 +1032,7 @@ const MemoizedRoutineTable = React.memo(
                     {dayRows.map((rowItem, rowIndex) => {
                       const isFirstRowOfDay = rowIndex === 0;
                       const rowSpan = dayRows.length;
+                      const rowHasGroup = rowItem.slots.some((s) => s && s.group_name);
 
                       const TrComponent = isPrint ? ("tr" as any) : motion.tr;
                       const trProps = isPrint ? {} : {
@@ -1042,6 +1116,13 @@ const MemoizedRoutineTable = React.memo(
                               <TableCell
                                 key={index}
                                 onClick={() => {
+                                  if (selectedSwapSource) {
+                                    if (rowItem.semester === selectedSwapSource.semester) {
+                                      handleDropOnCell(rowItem, index, selectedSwapSource);
+                                      setSelectedSwapSource(null);
+                                    }
+                                    return;
+                                  }
                                   if (session && isClassOffToday) {
                                     onCellClick({
                                       course: session.course,
@@ -1061,7 +1142,11 @@ const MemoizedRoutineTable = React.memo(
                                     : isPrint
                                       ? "p-0.5"
                                       : "p-2",
-                                  isClassOffToday ? "cursor-pointer" : "cursor-default",
+                                  (selectedSwapSource && rowItem.semester === selectedSwapSource.semester)
+                                    ? "cursor-pointer hover:bg-primary/5 transition-colors"
+                                    : isClassOffToday
+                                      ? "cursor-pointer"
+                                      : "cursor-default",
                                   highlighted
                                     ? "bg-emerald-100/50 dark:bg-emerald-900/20" + (isPrint ? " print:bg-transparent" : "")
                                     : isTeacherOff
@@ -1083,6 +1168,7 @@ const MemoizedRoutineTable = React.memo(
                                     {/* Draggable card — NOT wrapped in DropdownMenuTrigger */}
                                     <motion.div
                                       data-session-id={session.id}
+                                      data-drag-source={selectedSwapSource?.id === session.id ? "1" : undefined}
                                       onPointerDown={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? (e) => startPointerDrag(e, session, isLab) : undefined}
                                       onPointerMove={onPointerMove}
                                       onPointerUp={onPointerUp}
@@ -1110,25 +1196,25 @@ const MemoizedRoutineTable = React.memo(
                                           </span>
                                         </div>
                                         <div className="flex items-center gap-0.5 shrink-0">
-                                          {isLab ? (
-                                            <span className={cn(
-                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
-                                              isTeacherOff
-                                                ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
-                                            )}>
-                                              Lab
-                                            </span>
-                                          ) : (
-                                            <span className={cn(
-                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
-                                              isTeacherOff
-                                                ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
-                                            )}>
-                                              Theory
-                                            </span>
-                                          )}
+                                           {isLab ? (
+                                             <span className={cn(
+                                               "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
+                                               isTeacherOff
+                                                 ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                 : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                             )}>
+                                               Lab
+                                             </span>
+                                           ) : (
+                                             <span className={cn(
+                                               "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
+                                               isTeacherOff
+                                                 ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                 : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                             )}>
+                                               Theory
+                                             </span>
+                                           )}
                                           {/* Three-dot menu button — sole dropdown trigger, does NOT interfere with drag */}
                                           {!isRoutineLocked && !isSubmitting && (
                                             <DropdownMenu>
@@ -1151,6 +1237,16 @@ const MemoizedRoutineTable = React.memo(
                                                 onMouseDown={(e) => e.stopPropagation()}
                                               >
                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                  className="cursor-pointer font-medium"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedSwapSource(session);
+                                                  }}
+                                                >
+                                                  <ArrowLeftRight className="size-4 mr-2" /> Swap / Move Class
+                                                </DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 {!isClassOffToday ? (
                                                   <DropdownMenuItem
@@ -1189,7 +1285,7 @@ const MemoizedRoutineTable = React.memo(
                                               </DropdownMenuContent>
                                             </DropdownMenu>
                                           )}
-                                        </div>
+                                           </div>
                                       </div>
                                       <div className="flex flex-col gap-0.5 mt-1">
                                         <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
@@ -1202,6 +1298,15 @@ const MemoizedRoutineTable = React.memo(
                                           <MapPin className="w-3 h-3 opacity-70" />
                                           <span>{session.room}</span>
                                         </div>
+                                        {rowHasGroup && (
+                                           <div className={cn(
+                                             "flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80",
+                                             !session.group_name && "invisible pointer-events-none select-none"
+                                           )}>
+                                             <Users className="w-3 h-3 opacity-70" />
+                                             <span>{session.group_name || "Placeholder"}</span>
+                                           </div>
+                                         )}
                                       </div>
                                     </motion.div>
                                     <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
@@ -1210,7 +1315,7 @@ const MemoizedRoutineTable = React.memo(
                                         {getTeacherInitials(session.teacher)}
                                       </span>
                                       <span className="font-bold text-[11px]">
-                                        {session.room}
+                                        {session.room}{session.group_name ? ` - ${session.group_name}` : ""}
                                       </span>
                                       {isTeacherOff && (
                                         <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">
@@ -1255,7 +1360,11 @@ const MemoizedRoutineTable = React.memo(
       return (
         <div className="w-full flex flex-col gap-6 print:gap-0 print:block">
           {/* Screen view: single table */}
-          <div ref={tableWrapperRef} className="w-full print:hidden">
+          <div
+            ref={tableWrapperRef}
+            className="w-full print:hidden"
+            data-dragging-semester={selectedSwapSource?.semester || undefined}
+          >
             {renderTable(schedule, false)}
           </div>
 
@@ -1268,6 +1377,34 @@ const MemoizedRoutineTable = React.memo(
               </div>
             ))}
           </div>
+
+          {/* Floating Swap Mode Bar */}
+          {selectedSwapSource && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md bg-background/80 backdrop-blur-md border border-primary/20 shadow-2xl rounded-2xl p-4 flex items-center justify-between gap-4 animate-in slide-in-from-bottom duration-200 print:hidden">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                  <ArrowLeftRight className="h-5 w-5 animate-pulse" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs uppercase font-extrabold tracking-wider text-muted-foreground">Swap/Move Mode</span>
+                  <span className="text-sm font-bold text-foreground">
+                    Selected: {selectedSwapSource.course}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Tap target slot for {selectedSwapSource.semester} Semester
+                  </span>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedSwapSource(null)}
+                className="hover:bg-muted font-bold text-xs"
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
 
           {/* Swap Confirmation Modal */}
           <Dialog
@@ -2012,6 +2149,7 @@ export default function AdminRoutinePage({
               day: item.day_name,
               is_cancelled: Boolean(item.is_cancelled),
               cancel_message: item.cancel_message || null,
+              group_name: item.group_name || null,
             };
             uniqueCourses.add(item.course_code);
             hasContent = true;

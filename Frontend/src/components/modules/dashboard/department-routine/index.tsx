@@ -23,6 +23,7 @@ import {
   ArrowUpDown,
   Calendar as CalendarIcon,
   ChevronDown,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -85,6 +86,7 @@ type ClassSession = {
   day: string;
   is_cancelled?: boolean;
   cancel_message?: string | null;
+  group_name?: string | null;
 };
 
 type DayRow = {
@@ -468,6 +470,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
           day: item.day_name,
           is_cancelled: Boolean(item.is_cancelled),
           cancel_message: item.cancel_message || null,
+          group_name: item.group_name || null,
         };
       }
     });
@@ -765,6 +768,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                   {dayRows.map((rowItem, rowIndex) => {
                     const isFirstRowOfDay = rowIndex === 0;
                     const rowSpan = dayRows.length;
+                    const rowHasGroup = rowItem.slots.some((s: any) => s && s.group_name);
 
                     return (
                       <motion.tr
@@ -972,13 +976,24 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                         <MapPin className="w-3 h-3 opacity-70" />
                                         <span>{session.room}</span>
                                       </div>
+                                      {rowHasGroup && (
+                                        <div className={cn(
+                                          "flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80",
+                                          !session.group_name && "invisible pointer-events-none select-none"
+                                        )}>
+                                          <Users className="w-3 h-3 opacity-70" />
+                                          <span>{session.group_name || "Placeholder"}</span>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
                                     <span className="font-bold text-[11px]">
                                       {session.course}, T-{getTeacherInitials(session.teacher)}
                                     </span>
-                                    <span className="font-bold text-[11px]">{session.room}</span>
+                                    <span className="font-bold text-[11px]">
+                                      {session.room}{session.group_name ? ` - ${session.group_name}` : ""}
+                                    </span>
                                     {isTeacherOff && (
                                       <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">
                                         (Cancelled)
@@ -1010,12 +1025,14 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             exit="hidden"
           >
             <AnimatePresence mode="popLayout">
-              {scheduleToRender.map((dayRow) => (
-                <motion.tr
-                  key={dayRow.day}
-                  variants={itemVariants}
-                  className="border-b border-border/60 hover:bg-muted/5 !print:border-black print:border-b print:h-auto"
-                >
+              {scheduleToRender.map((dayRow) => {
+                const rowHasGroup = dayRow.slots.some((s: any) => s && s.group_name);
+                return (
+                  <motion.tr
+                    key={dayRow.day}
+                    variants={itemVariants}
+                    className="border-b border-border/60 hover:bg-muted/5 !print:border-black print:border-b print:h-auto"
+                  >
                   <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 !print:border-r !print:border-black print:bg-white print:text-black print:font-bold">
                     <div className="flex items-center justify-center h-full w-full py-4 print:py-2">
                       <span className="writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0 print:rotate-0 print:text-[12px]">
@@ -1175,25 +1192,25 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                 <span className="text-xs font-extrabold tracking-tight leading-tight text-foreground">
                                   {session.course}
                                 </span>
-                                {isLab ? (
-                                  <span className={cn(
-                                    "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
-                                    isTeacherOff
-                                      ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                      : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
-                                  )}>
-                                    Lab
-                                  </span>
-                                ) : (
-                                  <span className={cn(
-                                    "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
-                                    isTeacherOff
-                                      ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                      : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
-                                  )}>
-                                    Theory
-                                  </span>
-                                )}
+                                  {isLab ? (
+                                    <span className={cn(
+                                      "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                      isTeacherOff
+                                        ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                        : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                    )}>
+                                      Lab
+                                    </span>
+                                  ) : (
+                                    <span className={cn(
+                                      "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                      isTeacherOff
+                                        ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                        : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                    )}>
+                                      Theory
+                                    </span>
+                                  )}
                               </div>
                               <div className="flex flex-col gap-0.5 mt-1">
                                 <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
@@ -1204,13 +1221,24 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                                   <MapPin className="w-3 h-3 opacity-70" />
                                   <span>{session.room}</span>
                                 </div>
+                                {rowHasGroup && (
+                                  <div className={cn(
+                                    "flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80",
+                                    !session.group_name && "invisible pointer-events-none select-none"
+                                  )}>
+                                    <Users className="w-3 h-3 opacity-70" />
+                                    <span>{session.group_name || "Placeholder"}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                             <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
                               <span className="font-bold text-[11px]">
                                 {session.course}, T-{getTeacherInitials(session.teacher)}
                               </span>
-                              <span className="font-bold text-[11px]">{session.room}</span>
+                              <span className="font-bold text-[11px]">
+                                {session.room}{session.group_name ? ` - ${session.group_name}` : ""}
+                              </span>
                               {isTeacherOff && (
                                 <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">
                                   (Cancelled)
@@ -1227,7 +1255,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                     );
                   })}
                 </motion.tr>
-              ))}
+              );
+            })}
             </AnimatePresence>
           </motion.tbody>
         )}

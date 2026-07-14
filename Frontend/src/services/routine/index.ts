@@ -573,6 +573,36 @@ const respondSwap = async (params: RespondSwapParams) => {
     }
 };
 
+const getSwapRequests = async () => {
+    try {
+        const SWAP_REQUEST_URL = `${process.env.NEXT_PUBLIC_BASE_API}/academic/swap-request/`;
+        const token = await getValidToken();
+
+        if (!token) {
+            return { success: false, message: "No access token found. Please log in." };
+        }
+
+        const res = await fetch(SWAP_REQUEST_URL, {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            },
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            return { success: false, message: `Failed to fetch swap requests: ${res.status}` };
+        }
+
+        const data = await res.json();
+        return { success: true, data };
+    } catch (error) {
+        console.error("[Routine] Failed to fetch swap requests:", error);
+        return { success: false, message: "Failed to fetch swap requests" };
+    }
+};
+
 export {
     getRoutine,
     getDepartmentRoutine,
@@ -584,5 +614,6 @@ export {
     swapRoutineEntries,
     updateRoutineEntry,
     requestSwap,
-    respondSwap
+    respondSwap,
+    getSwapRequests
 };

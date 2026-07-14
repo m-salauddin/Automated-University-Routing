@@ -89,6 +89,7 @@ import {
   Loader2,
   Utensils,
   Pencil,
+  Users,
 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { markOff, markOn, generateClassKey, normalizeTime } from "@/store/classOffSlice";
@@ -122,6 +123,7 @@ export type APIRoutineItem = {
   department_name: string;
   semester_name: string;
   room_number: string;
+  group_name?: string | null;
   is_cancelled?: boolean;
   cancel_message?: string | null;
   is_temporary_proxy?: boolean;
@@ -151,6 +153,7 @@ type RoutineRowState = {
   teacherId: string;
   is_cancelled: boolean;
   cancel_message: string | null;
+  group_name?: string | null;
   is_temporary_proxy?: boolean;
   is_temporary_mutual?: boolean;
   date?: string;
@@ -642,6 +645,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           teacherId: item.teacher_name,
           is_cancelled: Boolean(item.is_cancelled),
           cancel_message: item.cancel_message || null,
+          group_name: item.group_name || null,
           is_temporary_proxy: Boolean(item.is_temporary_proxy),
           is_temporary_mutual: Boolean(item.is_temporary_mutual),
           date: item.date || "",
@@ -1004,7 +1008,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
   );
 
 
-  function GridCellCard({ row }: { row: RoutineRowState }) {
+  function GridCellCard({ row, rowHasGroup }: { row: RoutineRowState; rowHasGroup?: boolean }) {
     const key = generateClassKey(
       row.department,
       row.semester,
@@ -1149,6 +1153,15 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                   <GraduationCap className="w-3 h-3 opacity-70" />
                   <span>{row.semester} Sem</span>
                 </div>
+                {rowHasGroup && (
+                  <div className={cn(
+                    "flex items-center gap-1",
+                    !row.group_name && "invisible pointer-events-none select-none"
+                  )}>
+                    <Users className="w-3 h-3 opacity-70" />
+                    <span>{row.group_name || "Placeholder"}</span>
+                  </div>
+                )}
               </div>
             </div>
           </DropdownMenuTrigger>
@@ -1194,10 +1207,13 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Print View Card */}
         <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
-          <span className="font-extrabold text-[11px] text-black">{row.course}</span>
-          <span className="text-[10px] font-bold text-black">Room {row.room}</span>
+          <span className="font-extrabold text-[11px] text-black">
+            {row.course}
+          </span>
+          <span className="text-[10px] font-bold text-black">
+            Room {row.room}{row.group_name ? ` - ${row.group_name}` : ""}
+          </span>
           <span className="text-[9px] font-semibold text-gray-800">{row.semester} Sem</span>
           {currentStatus === "off" && (
             <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">(Cancelled)</span>
@@ -1982,15 +1998,17 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                               </TableCell>
                             </TableRow>
                           ) : (
-                            gridSchedule.map((rowItem) => (
-                              <TableRow
-                                key={rowItem.day}
-                                className="border-b border-border/60 hover:bg-muted/5 h-[95px] print:h-auto animate-in fade-in duration-200"
-                              >
-                                <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 print:bg-white print:text-black print:font-bold">
-                                  {rowItem.day}
-                                </TableCell>
-                                {rowItem.slots.map((session, index) => {
+                            gridSchedule.map((rowItem) => {
+                              const rowHasGroup = rowItem.slots.some((s) => s && s.group_name);
+                              return (
+                                <TableRow
+                                  key={rowItem.day}
+                                  className="border-b border-border/60 hover:bg-muted/5 h-[95px] print:h-auto animate-in fade-in duration-200"
+                                >
+                                  <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 print:bg-white print:text-black print:font-bold">
+                                    {rowItem.day}
+                                  </TableCell>
+                                  {rowItem.slots.map((session, index) => {
                                   const slot = sortedTimeSlots[index];
                                   if (isBreakSlot(slot) && !session) {
                                     return (
@@ -2019,7 +2037,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                                       )}
                                     >
                                       {session ? (
-                                        <GridCellCard row={session} />
+                                        <GridCellCard row={session} rowHasGroup={rowHasGroup} />
                                       ) : (
                                         <div className="h-full w-full flex items-center justify-center min-h-[50px]">
                                           <div className="w-1 h-1 rounded-full bg-border print:hidden" />
@@ -2028,8 +2046,9 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                                     </TableCell>
                                   );
                                 })}
-                              </TableRow>
-                            ))
+                                </TableRow>
+                              );
+                            })
                           )}
                         </TableBody>
                       </Table>
@@ -2191,38 +2210,41 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                     </TableCell>
                   </TableRow>
                 ) : (
-                  gridSchedule.map((rowItem) => (
-                    <TableRow
-                      key={rowItem.day}
-                      className="hover:bg-transparent print:border-black"
-                    >
-                      <TableCell className="font-bold text-[11px] uppercase p-0 align-middle text-center bg-white border-r border-b border-black print:border-black text-black">
-                        {rowItem.day}
-                      </TableCell>
-                      {rowItem.slots.map((session, index) => {
-                        const slot = sortedTimeSlots[index];
-                        return (
-                          <TableCell
-                            key={index}
-                            className={cn(
-                              "align-middle border-r border-b border-black p-1 bg-white print:border-black text-center h-[70px]",
-                              (!session && isBreakSlot(slot)) ? "bg-gray-100" : ""
-                            )}
-                          >
-                            {session ? (
-                              <GridCellCard row={session} />
-                            ) : isBreakSlot(slot) ? (
-                              <div className="h-full w-full flex items-center justify-center" />
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center">
-                                <div className="w-0.5 h-0.5 rounded-full bg-gray-400" />
-                              </div>
-                            )}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))
+                  gridSchedule.map((rowItem) => {
+                    const rowHasGroup = rowItem.slots.some((s) => s && s.group_name);
+                    return (
+                      <TableRow
+                        key={rowItem.day}
+                        className="hover:bg-transparent print:border-black"
+                      >
+                        <TableCell className="font-bold text-[11px] uppercase p-0 align-middle text-center bg-white border-r border-b border-black print:border-black text-black">
+                          {rowItem.day}
+                        </TableCell>
+                        {rowItem.slots.map((session, index) => {
+                          const slot = sortedTimeSlots[index];
+                          return (
+                            <TableCell
+                              key={index}
+                              className={cn(
+                                "align-middle border-r border-b border-black p-1 bg-white print:border-black text-center h-[70px]",
+                                (!session && isBreakSlot(slot)) ? "bg-gray-100" : ""
+                              )}
+                            >
+                              {session ? (
+                                <GridCellCard row={session} rowHasGroup={rowHasGroup} />
+                              ) : isBreakSlot(slot) ? (
+                                <div className="h-full w-full flex items-center justify-center" />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center">
+                                  <div className="w-0.5 h-0.5 rounded-full bg-gray-400" />
+                                </div>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

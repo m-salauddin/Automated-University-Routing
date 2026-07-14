@@ -8,6 +8,7 @@ import {
   Search,
   Printer,
   User,
+  Users,
   MapPin,
   GraduationCap,
   Utensils,
@@ -46,6 +47,7 @@ export type APIRoutineItem = {
   department_name: string;
   semester_name: string;
   room_number: string;
+  group_name?: string | null;
 };
 
 export type TimeSlot = {
@@ -65,6 +67,7 @@ type ClassSession = {
   day: string;
   is_cancelled?: boolean;
   cancel_message?: string | null;
+  group_name?: string | null;
 };
 
 type DayRow = {
@@ -290,6 +293,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
           day: item.day_name,
           is_cancelled: (item as any).is_cancelled ?? false,
           cancel_message: (item as any).cancel_message ?? null,
+          group_name: item.group_name ?? null,
         };
       }
     });
@@ -829,7 +833,9 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                     exit="hidden"
                   >
                     <AnimatePresence mode="popLayout">
-                      {currentRoutine.schedule.map((dayRow) => (
+                      {currentRoutine.schedule.map((dayRow) => {
+                         const rowHasGroup = dayRow.slots.some((s) => s && s.group_name);
+                         return (
                         <motion.tr
                           key={dayRow.day}
                           variants={itemVariants}
@@ -940,24 +946,24 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                                           {session.course}
                                         </span>
                                         {isLab ? (
-                                          <span className={cn(
-                                            "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
-                                            isTeacherOff
-                                              ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                              : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
-                                          )}>
-                                            Lab
-                                          </span>
-                                        ) : (
-                                          <span className={cn(
-                                            "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
-                                            isTeacherOff
-                                              ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                              : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
-                                          )}>
-                                            Theory
-                                          </span>
-                                        )}
+                                            <span className={cn(
+                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                              isTeacherOff
+                                                ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                            )}>
+                                              Lab
+                                            </span>
+                                          ) : (
+                                            <span className={cn(
+                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                                              isTeacherOff
+                                                ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                            )}>
+                                              Theory
+                                            </span>
+                                          )}
                                       </div>
                                       <div className="flex flex-col gap-0.5 mt-1">
                                         <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
@@ -972,6 +978,15 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                                           <MapPin className="w-3 h-3 opacity-70" />
                                           <span>{session.room}</span>
                                         </div>
+                                        {rowHasGroup && (
+                                          <div className={cn(
+                                            "flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80",
+                                            !session.group_name && "invisible pointer-events-none select-none"
+                                          )}>
+                                            <Users className="w-3 h-3 opacity-70" />
+                                            <span>{session.group_name || "Placeholder"}</span>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                     <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
@@ -980,7 +995,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                                         {getTeacherInitials(session.teacher)}
                                       </span>
                                       <span className="font-bold text-[11px]">
-                                        {session.room}
+                                        {session.room}{session.group_name ? ` - ${session.group_name}` : ""}
                                       </span>
                                     </div>
                                   </>
@@ -993,7 +1008,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                             );
                           })}
                         </motion.tr>
-                      ))}
+                         );
+                      })}
                     </AnimatePresence>
                   </motion.tbody>
                 </Table>
