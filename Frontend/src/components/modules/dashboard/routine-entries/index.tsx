@@ -657,10 +657,6 @@ const MemoizedRoutineTable = React.memo(
           }
         }
       }, [timeSlots, refreshRoutine, setLocalRoutineList, triggerRollbackAnimation, onHistoryAction]);
-
-      // Pointer-based drag handlers
-      // We use a THRESHOLD approach instead of setPointerCapture so that
-      // normal scrolling is never blocked — drag only commits after 4px movement.
       const pendingDragRef = useRef<{
         session: ClassSession | null;
         isLab: boolean;
@@ -822,9 +818,9 @@ const MemoizedRoutineTable = React.memo(
       }, [isSubmitting, schedule, windowPendingMove, windowPendingCancel]);
 
       // Dummy no-op handlers kept on the card element for compatibility
-      const onPointerMove = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {}, []);
-      const onPointerUp = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {}, []);
-      const onPointerCancel = useCallback((_e: React.PointerEvent<HTMLDivElement>) => {}, []);
+      const onPointerMove = useCallback((_e: React.PointerEvent<HTMLDivElement>) => { }, []);
+      const onPointerUp = useCallback((_e: React.PointerEvent<HTMLDivElement>) => { }, []);
+      const onPointerCancel = useCallback((_e: React.PointerEvent<HTMLDivElement>) => { }, []);
 
       const confirmSwap = async () => {
         const { source, target } = swapConfirmModal;
@@ -1196,25 +1192,25 @@ const MemoizedRoutineTable = React.memo(
                                           </span>
                                         </div>
                                         <div className="flex items-center gap-0.5 shrink-0">
-                                           {isLab ? (
-                                             <span className={cn(
-                                               "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
-                                               isTeacherOff
-                                                 ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                 : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
-                                             )}>
-                                               Lab
-                                             </span>
-                                           ) : (
-                                             <span className={cn(
-                                               "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
-                                               isTeacherOff
-                                                 ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                 : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
-                                             )}>
-                                               Theory
-                                             </span>
-                                           )}
+                                          {isLab ? (
+                                            <span className={cn(
+                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
+                                              isTeacherOff
+                                                ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                            )}>
+                                              Lab
+                                            </span>
+                                          ) : (
+                                            <span className={cn(
+                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
+                                              isTeacherOff
+                                                ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                            )}>
+                                              Theory
+                                            </span>
+                                          )}
                                           {/* Three-dot menu button — sole dropdown trigger, does NOT interfere with drag */}
                                           {!isRoutineLocked && !isSubmitting && (
                                             <DropdownMenu>
@@ -1285,7 +1281,7 @@ const MemoizedRoutineTable = React.memo(
                                               </DropdownMenuContent>
                                             </DropdownMenu>
                                           )}
-                                           </div>
+                                        </div>
                                       </div>
                                       <div className="flex flex-col gap-0.5 mt-1">
                                         <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
@@ -1299,14 +1295,14 @@ const MemoizedRoutineTable = React.memo(
                                           <span>{session.room}</span>
                                         </div>
                                         {rowHasGroup && (
-                                           <div className={cn(
-                                             "flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80",
-                                             !session.group_name && "invisible pointer-events-none select-none"
-                                           )}>
-                                             <Users className="w-3 h-3 opacity-70" />
-                                             <span>{session.group_name || "Placeholder"}</span>
-                                           </div>
-                                         )}
+                                          <div className={cn(
+                                            "flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80",
+                                            !session.group_name && "invisible pointer-events-none select-none"
+                                          )}>
+                                            <Users className="w-3 h-3 opacity-70" />
+                                            <span>{session.group_name || "Placeholder"}</span>
+                                          </div>
+                                        )}
                                       </div>
                                     </motion.div>
                                     <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
