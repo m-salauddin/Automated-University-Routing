@@ -2446,12 +2446,15 @@ export default function AdminRoutinePage({
     <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-3 pt-0 text-center w-full font-serif text-black">
       <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
         Department of {currentRoutineSchedule.label}
+        {currentRoutineSchedule.isAllSemestersMode && " (All Routine)"}
       </h1>
-      <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
-        <h2 className="text-base font-bold uppercase text-black tracking-wide">
-          {currentRoutineSchedule.isAllSemestersMode ? "All Routine" : "Class Routine"}
-        </h2>
-      </div>
+      {!currentRoutineSchedule.isAllSemestersMode && (
+        <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
+          <h2 className="text-base font-bold uppercase text-black tracking-wide">
+            Class Routine
+          </h2>
+        </div>
+      )}
     </div>
   ), [currentRoutineSchedule]);
 
