@@ -210,7 +210,9 @@ export function NotificationBell() {
             const swapRes = await getSwapRequests();
             if (swapRes.success) {
                 const list = Array.isArray(swapRes.data) ? swapRes.data : (swapRes.data?.results ?? []);
-                console.log("[SwapRequests] Fetched", list.length, "swap requests:", list);
+                if (!(swapRes as any).isNotSupported) {
+                    console.log("[SwapRequests] Fetched", list.length, "swap requests:", list);
+                }
                 setSwapRequests(list);
             } else {
                 console.warn("[SwapRequests] Failed to fetch:", swapRes.message);

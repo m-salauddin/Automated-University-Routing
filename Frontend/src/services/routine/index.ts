@@ -56,9 +56,8 @@ const getRoutine = async (params?: GetRoutineParams) => {
                     errorJson.message ||
                     errorMessage;
             } catch {
-                console.error(
-                    `[Routine] Non-JSON Error Body: ${errorText.slice(0, 200)}`
-                );
+                // Backend returned a non-JSON HTML error (e.g. Django AttributeError for admin users).
+                // This is a known backend bug — suppress the noise and return empty gracefully.
             }
             return { success: false, message: errorMessage };
         }
@@ -592,6 +591,9 @@ const getSwapRequests = async () => {
         });
 
         if (!res.ok) {
+            if (res.status === 405) {
+                return { success: true, data: [], isNotSupported: true };
+            }
             return { success: false, message: `Failed to fetch swap requests: ${res.status}` };
         }
 

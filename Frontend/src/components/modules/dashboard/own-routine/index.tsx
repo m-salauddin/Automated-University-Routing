@@ -1096,7 +1096,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           <DropdownMenuTrigger asChild>
             <div
               className={cn(
-                "w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group text-left relative min-h-[75px] print:hidden cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.01]",
+                "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group text-left relative min-h-[75px] print:hidden cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.01]",
                 currentStatus === "off"
                   ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
                   : isLab
@@ -2032,12 +2032,14 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                                     <TableCell
                                       key={index}
                                       className={cn(
-                                        "align-middle border-r border-border/60 last:border-r-0 transition-all duration-200 relative p-2 print:p-1 print:border-black",
+                                        "h-px align-middle border-r border-border/60 last:border-r-0 transition-all duration-200 relative p-2 print:p-1 print:border-black",
                                         "bg-transparent print:bg-white"
                                       )}
                                     >
                                       {session ? (
-                                        <GridCellCard row={session} rowHasGroup={rowHasGroup} />
+                                        <div className="h-full">
+                                          <GridCellCard row={session} rowHasGroup={rowHasGroup} />
+                                        </div>
                                       ) : (
                                         <div className="h-full w-full flex items-center justify-center min-h-[50px]">
                                           <div className="w-1 h-1 rounded-full bg-border print:hidden" />
