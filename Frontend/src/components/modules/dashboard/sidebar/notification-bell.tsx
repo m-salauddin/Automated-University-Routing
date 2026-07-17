@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Check, CheckCheck, Inbox, Loader2, X, ArrowLeftRight, ArrowRight, UserCheck, Clock } from "lucide-react";
+import { Bell, Check, CheckCheck, Inbox, Loader2, X, ArrowLeftRight, ArrowRight, UserCheck, Clock, Megaphone } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import {
     Drawer,
     DrawerClose,
@@ -31,6 +32,7 @@ interface Notification {
 }
 
 export function NotificationBell() {
+    const router = useRouter();
     const { role, username } = useSelector((state: RootState) => state.auth);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -359,17 +361,44 @@ export function NotificationBell() {
                                     const backendStatus = matchedReq ? (matchedReq.status || matchedReq.action) : null;
                                     const currentStatus: string | null = respondedStatus[notification.id] || backendStatus;
 
-                                    const isAccepted = currentStatus === "ACCEPTED" || currentStatus === "APPROVED";
-                                    const isRejected = currentStatus === "REJECTED";
-                                    const isPending = !currentStatus || currentStatus === "PENDING";
+                                    const textLower = `${title} ${message} ${notification.verb || ""} ${notification.description || ""}`.toLowerCase();
+                                    const textImpliesAccepted = textLower.includes("accepted") || textLower.includes("approved");
+                                    const textImpliesRejected = textLower.includes("declined") || textLower.includes("rejected");
+                                    const textImpliesRequester = textLower.includes("your proxy") || textLower.includes("your swap") || textLower.includes("your mutual") || textLower.includes("you requested");
 
-                                    const showActions = isUnread && role === "teacher" && (isProxy || isMutual) && isPending && !isAccepted && !isRejected;
-                                    const isSwapNotification = isProxy || isMutual;
+                                    const isAccepted = currentStatus === "ACCEPTED" || currentStatus === "APPROVED" || textImpliesAccepted;
+                                    const isRejected = currentStatus === "REJECTED" || textImpliesRejected;
+                                    const isPending = !isAccepted && !isRejected;
+
+                                    const isCurrentUserRequester = matchedReq && (
+                                         (matchedReq.requester_username?.toLowerCase() === username?.toLowerCase()) ||
+                                         (matchedReq.requester_name?.toLowerCase() === username?.toLowerCase()) ||
+                                         (matchedReq.requester?.username?.toLowerCase() === username?.toLowerCase())
+                                     );
+
+                                     const showActions = isUnread && 
+                                                         role === "teacher" && 
+                                                         (isProxy || isMutual) && 
+                                                         isPending && 
+                                                         !isAccepted && 
+                                                         !isRejected && 
+                                                         !isCurrentUserRequester && 
+                                                         !textImpliesRequester;
+                                     const isSwapNotification = isProxy || isMutual;
+                                     const isNotice = textLower.includes("notice");
 
                                     return (
                                         <div
                                             key={notification.id}
-                                            onClick={() => !showActions && handleMarkAsRead(notification.id, !isUnread)}
+                                            onClick={() => {
+                                                if (isNotice) {
+                                                    router.push("/dashboard/notices");
+                                                    setIsOpen(false);
+                                                }
+                                                if (!showActions) {
+                                                    handleMarkAsRead(notification.id, !isUnread);
+                                                }
+                                            }}
                                             className={cn(
                                                 "relative px-5 py-4 transition-all duration-200 group",
                                                 !showActions && isUnread && "cursor-pointer",
@@ -382,6 +411,7 @@ export function NotificationBell() {
                                             {isUnread && (
                                                 <span className={cn(
                                                     "absolute left-0 top-0 bottom-0 w-[3px] rounded-r-full",
+                                                    isNotice ? "bg-sky-500" :
                                                     isAccepted ? "bg-emerald-500" :
                                                     isRejected ? "bg-red-500" :
                                                     "bg-amber-400"
@@ -393,7 +423,9 @@ export function NotificationBell() {
                                                 {/* Icon */}
                                                 <div className={cn(
                                                     "shrink-0 flex items-center justify-center w-8 h-8 rounded-lg mt-0.5",
-                                                    isAccepted
+                                                    isNotice
+                                                        ? "bg-sky-500/10 text-sky-500"
+                                                        : isAccepted
                                                         ? "bg-emerald-500/10 text-emerald-500"
                                                         : isRejected
                                                         ? "bg-red-500/10 text-red-500"
@@ -403,7 +435,9 @@ export function NotificationBell() {
                                                         ? "bg-blue-500/10 text-blue-500"
                                                         : "bg-amber-500/10 text-amber-500"
                                                 )}>
-                                                    {isAccepted ? (
+                                                    {isNotice ? (
+                                                        <Megaphone className="size-4" />
+                                                    ) : isAccepted ? (
                                                         <UserCheck className="size-4" />
                                                     ) : isRejected ? (
                                                         <X className="size-4" />

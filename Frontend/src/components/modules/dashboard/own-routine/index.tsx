@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -402,6 +402,70 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
 
 
   const [rows, setRows] = useState<RoutineRowState[]>([]);
+  const [colWidths, setColWidths] = useState<{ [key: string]: number }>({});
+  const [rowHeights, setRowHeights] = useState<{ [key: string]: number }>({});
+
+  const startColResize = useCallback((e: React.MouseEvent, colKey: string, defaultWidth: number, minWidth: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const cellElement = e.currentTarget.parentElement as HTMLElement;
+    if (!cellElement) return;
+
+    const startWidth = cellElement.offsetWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(minWidth, startWidth + deltaX);
+      cellElement.style.width = `${newWidth}px`;
+      cellElement.style.minWidth = `${newWidth}px`;
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+
+      const finalWidth = cellElement.offsetWidth;
+      setColWidths((prev) => ({
+        ...prev,
+        [colKey]: finalWidth
+      }));
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, []);
+
+  const startRowResize = useCallback((e: React.MouseEvent, rowKey: string, defaultHeight: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startY = e.clientY;
+    const trElement = e.currentTarget.closest("tr") as HTMLElement;
+    if (!trElement) return;
+
+    const startHeight = trElement.offsetHeight;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = moveEvent.clientX - startY;
+      const newHeight = Math.max(60, startHeight + deltaY);
+      trElement.style.height = `${newHeight}px`;
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+
+      const finalHeight = trElement.offsetHeight;
+      setRowHeights((prev) => ({
+        ...prev,
+        [rowKey]: finalHeight
+      }));
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, []);
+
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [teacherInfo, setTeacherInfo] = useState<TeacherInfo | null>(null);
@@ -765,14 +829,18 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
     const slotStartTimes = sortedTimeSlots.map((ts) => normalizeTime(ts.start_time));
 
     return DAYS_ORDER_ABBR.map((dayName) => {
-      const daySlots = Array(sortedTimeSlots.length).fill(null) as (RoutineRowState | null)[];
+      const daySlots = Array(sortedTimeSlots.length).fill(null) as (RoutineRowState[] | null)[];
       const dayRows = processedRows.filter((r) => r.day === dayName);
 
       dayRows.forEach((r) => {
         const normalizedStartTime = normalizeTime(r.startTimeRaw);
         const slotIdx = slotStartTimes.indexOf(normalizedStartTime);
         if (slotIdx !== -1) {
-          daySlots[slotIdx] = r;
+          if (daySlots[slotIdx] === null) {
+            daySlots[slotIdx] = [r];
+          } else {
+            daySlots[slotIdx]!.push(r);
+          }
         }
       });
 
@@ -1008,7 +1076,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
   );
 
 
-  function GridCellCard({ row, rowHasGroup }: { row: RoutineRowState; rowHasGroup?: boolean }) {
+  function GridCellCard({ row, rowHasGroup, isMulti = false }: { row: RoutineRowState; rowHasGroup?: boolean; isMulti?: boolean }) {
     const key = generateClassKey(
       row.department,
       row.semester,
@@ -1096,7 +1164,8 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           <DropdownMenuTrigger asChild>
             <div
               className={cn(
-                "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group text-left relative min-h-[75px] print:hidden cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.01]",
+                "h-full w-full rounded-md border flex flex-col justify-between shadow-sm group text-left relative print:hidden cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.01]",
+                isMulti ? "p-1.5 min-h-[69px]" : "p-2 min-h-[75px]",
                 currentStatus === "off"
                   ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
                   : isLab
@@ -1109,7 +1178,8 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className={cn(
-                        "text-xs font-extrabold tracking-tight leading-tight text-foreground border-dotted border-muted-foreground/30",
+                        isMulti ? "text-[10px]" : "text-xs",
+                        "font-extrabold tracking-tight leading-tight text-foreground border-dotted border-muted-foreground/30",
                         currentStatus === "off" && "opacity-70"
                       )}>
                         {row.course}
@@ -1124,7 +1194,8 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                 <div className="flex items-center gap-1">
                   {isLab ? (
                     <span className={cn(
-                      "text-[8px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                      isMulti ? "text-[7px] px-0.5" : "text-[8px] px-1",
+                      "font-black uppercase tracking-wider py-0.2 rounded border",
                       currentStatus === "off"
                         ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
                         : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
@@ -1133,7 +1204,8 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                     </span>
                   ) : (
                     <span className={cn(
-                      "text-[8px] font-black uppercase tracking-wider px-1 py-0.2 rounded border",
+                      isMulti ? "text-[7px] px-0.5" : "text-[8px] px-1",
+                      "font-black uppercase tracking-wider py-0.2 rounded border",
                       currentStatus === "off"
                         ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
                         : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
@@ -1144,7 +1216,10 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                 </div>
               </div>
 
-              <div className="flex flex-col gap-0.5 mt-1 text-[10px] text-muted-foreground font-lexend">
+              <div className={cn(
+                "flex flex-col mt-1 text-muted-foreground font-lexend",
+                isMulti ? "text-[8.5px] gap-0" : "text-[10px] gap-0.5"
+              )}>
                 <div className="flex items-center gap-1">
                   <MapPin className="w-3 h-3 opacity-70" />
                   <span>Room {row.room}</span>
@@ -1922,7 +1997,10 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                       <Table className="w-full overflow-hidden min-w-[1000px] border border-border/60 border-collapse text-sm print:border-collapse !print:border-black">
                         <TableHeader>
                           <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b bg-muted/40">
-                            <TableCell className="p-0 w-[90px] min-w-[90px] h-[50px] border-r border-border/60 relative bg-muted/40 print:bg-white !print:border-r !print:border-black print:w-20 print:min-w-0">
+                            <TableCell 
+                              className="p-0 w-[90px] min-w-[90px] h-[50px] border-r border-border/60 relative bg-muted/40 print:bg-white !print:border-r !print:border-black print:w-20 print:min-w-0"
+                              style={{ width: colWidths["day"] || 90, minWidth: colWidths["day"] || 90 }}
+                            >
                               <svg
                                 className="absolute inset-0 w-full h-full pointer-events-none"
                                 preserveAspectRatio="none"
@@ -1942,34 +2020,52 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                               <span className="absolute bottom-2 left-2 text-[10px] font-bold print:text-black print:text-[10px] print:bottom-[2px] print:left-[2px]">
                                 Day
                               </span>
+                              <div
+                                onMouseDown={(e) => startColResize(e, "day", 90, 70)}
+                                className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 hover:w-1.5 transition-all z-30 print:hidden"
+                              />
                             </TableCell>
                             {sortedTimeSlots.map((slot, idx) => {
                               const hasClass = gridSchedule.some(dayRow => dayRow.slots[idx] !== null);
-                              if (isBreakSlot(slot)) {
+                              const isBreak = isBreakSlot(slot);
+                              const defaultColWidth = isBreak ? 100 : 180;
+                              const colWidth = colWidths[slot.id] || defaultColWidth;
+
+                              if (isBreak) {
                                 if (!hasClass) {
                                   return (
                                     <TableCell
                                       key={slot.id}
-                                      className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 border-r border-border last:border-r-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto"
+                                      className="w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 border-r border-border last:border-r-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto relative"
+                                      style={{ width: colWidth, minWidth: colWidth }}
                                     >
                                       <div className="h-full flex items-center justify-center">
                                         <span className="text-[9.5px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black print-break-text-no-class">
                                           BREAK
                                         </span>
                                       </div>
+                                      <div
+                                        onMouseDown={(e) => startColResize(e, String(slot.id), defaultColWidth, 40)}
+                                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 hover:w-1.5 transition-all z-30 print:hidden"
+                                      />
                                     </TableCell>
                                   );
                                 } else {
                                   return (
                                     <TableCell
                                       key={slot.id}
-                                      className="bg-foreground text-background text-center align-middle p-0 border-r border-border last:border-r-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto min-w-[100px]"
+                                      className="bg-foreground text-background text-center align-middle p-0 border-r border-border last:border-r-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto min-w-[100px] relative"
+                                      style={{ width: colWidth, minWidth: colWidth }}
                                     >
                                       <div className="h-full flex items-center justify-center">
                                         <span className="text-xs font-black uppercase tracking-widest text-background whitespace-nowrap print:text-black">
                                           BREAK
                                         </span>
                                       </div>
+                                      <div
+                                        onMouseDown={(e) => startColResize(e, String(slot.id), defaultColWidth, 40)}
+                                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 hover:w-1.5 transition-all z-30 print:hidden"
+                                      />
                                     </TableCell>
                                   );
                                 }
@@ -1977,7 +2073,8 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                               return (
                                 <TableCell
                                   key={slot.id}
-                                  className="text-center align-middle h-[50px] border-r border-border last:border-r-0 p-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto min-w-[100px] bg-muted/10 print:bg-white print:min-w-0"
+                                  className="text-center align-middle h-[50px] border-r border-border last:border-r-0 p-0 !print:border-r !print:border-black print:last:border-r-0 print:h-auto min-w-[100px] bg-muted/10 print:bg-white print:min-w-0 relative"
+                                  style={{ width: colWidth, minWidth: colWidth }}
                                 >
                                   <div className="flex flex-col items-center justify-center h-full w-full px-1">
                                     <span className="font-bold text-xs whitespace-nowrap print:text-[11px] print:font-bold print:text-black">
@@ -1986,6 +2083,10 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                                       {formatTimeSlotLabel(slot.end_time)}
                                     </span>
                                   </div>
+                                  <div
+                                    onMouseDown={(e) => startColResize(e, String(slot.id), defaultColWidth, 180)}
+                                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 hover:w-1.5 transition-all z-30 print:hidden"
+                                  />
                                 </TableCell>
                               );
                             })}
@@ -2013,55 +2114,112 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                             </TableRow>
                           ) : (
                             gridSchedule.map((rowItem) => {
-                              const rowHasGroup = rowItem.slots.some((s) => s && s.group_name);
+                              const rowHasGroup = rowItem.slots.some((s) => s && s.some(sess => sess.group_name));
                               return (
                                 <TableRow
                                   key={rowItem.day}
-                                  className="border-b border-border/60 hover:bg-muted/5 h-[95px] print:h-auto animate-in fade-in duration-200"
+                                  className="border-b border-border/60 hover:bg-muted/5 print:h-auto animate-in fade-in duration-200"
+                                  style={{ height: rowHeights[rowItem.day] || 95 }}
                                 >
-                                  <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 print:bg-white print:text-black print:font-bold">
+                                  <TableCell className="font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border/60 print:bg-white print:text-black print:font-bold relative">
                                     {rowItem.day}
+                                    <div
+                                      onMouseDown={(e) => startRowResize(e, rowItem.day, 95)}
+                                      className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize hover:bg-primary/50 hover:h-1.5 transition-all z-30 print:hidden"
+                                    />
                                   </TableCell>
-                                  {rowItem.slots.map((session, index) => {
-                                  const slot = sortedTimeSlots[index];
-                                  if (isBreakSlot(slot) && !session) {
+                                  {rowItem.slots.map((sessionList, index) => {
+                                    const slot = sortedTimeSlots[index];
+                                    const sessions = sessionList && sessionList.length > 0 ? sessionList : null;
+                                    const isMulti = sessions ? sessions.length > 1 : false;
+
+                                    if (isBreakSlot(slot) && !sessions) {
+                                      return (
+                                        <TableCell key={index} className="p-0 h-px align-middle border-r border-border/60 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black">
+                                          <div
+                                            className="absolute inset-0 opacity-10 print:hidden"
+                                            style={{
+                                              backgroundImage:
+                                                "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
+                                              backgroundSize: "4px 4px",
+                                            }}
+                                          />
+                                          <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden text-muted-foreground/35">
+                                            <Utensils className="w-3.5 h-3.5" />
+                                          </div>
+                                        </TableCell>
+                                      );
+                                    }
+
+                                    const colWidth = colWidths[slot.id] || (isBreakSlot(slot) ? 100 : 180);
+
                                     return (
-                                      <TableCell key={index} className="p-0 h-px align-middle border-r border-border/60 relative overflow-hidden bg-muted/20 print:bg-gray-200 !print:border-r !print:border-black">
-                                        <div
-                                          className="absolute inset-0 opacity-10 print:hidden"
-                                          style={{
-                                            backgroundImage:
-                                              "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
-                                            backgroundSize: "4px 4px",
-                                          }}
-                                        />
-                                        <div className="h-full w-full flex items-center justify-center relative z-10 print:hidden text-muted-foreground/35">
-                                          <Utensils className="w-3.5 h-3.5" />
-                                        </div>
+                                      <TableCell
+                                        key={index}
+                                        className={cn(
+                                          "h-px align-middle border-r border-border/60 last:border-r-0 transition-all duration-200 relative p-2 print:p-0.5 print:border-black",
+                                          "bg-transparent print:bg-white"
+                                        )}
+                                        style={{ width: colWidth, minWidth: colWidth }}
+                                      >
+                                        {sessions ? (
+                                          <div className="h-full flex flex-col justify-between">
+                                            <div className={cn(
+                                              "print:hidden w-full h-full flex gap-1",
+                                              isMulti ? "flex-row items-stretch min-h-[69px]" : "flex-col"
+                                            )}>
+                                              {sessions.map((session, sIdx) => (
+                                                <React.Fragment key={session.id}>
+                                                  <div className="flex-1 h-full">
+                                                    <GridCellCard row={session} rowHasGroup={rowHasGroup} isMulti={isMulti} />
+                                                  </div>
+                                                  {isMulti && sIdx < sessions.length - 1 && (
+                                                    <div className="w-[1px] bg-border/40 self-stretch my-1 shrink-0" />
+                                                  )}
+                                                </React.Fragment>
+                                              ))}
+                                            </div>
+                                            
+                                            <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-0.5 gap-0.5">
+                                              {sessions.map((session, sIdx) => {
+                                                const key = generateClassKey(
+                                                  session.department,
+                                                  session.semester,
+                                                  session.day,
+                                                  session.teacherId,
+                                                  session.startTimeRaw
+                                                );
+                                                const offRecord = classOffMap[key];
+                                                const isOffSlot = Boolean(offRecord?.status);
+                                                const isTeacherOff = availabilityMap[session.teacherId] === false;
+                                                const isCancelled = isOffSlot || isTeacherOff || session.is_cancelled;
+
+                                                return (
+                                                  <div key={`print-${session.id}`} className={cn(
+                                                    "w-full text-center",
+                                                    sessions.length > 1 && sIdx < sessions.length - 1 && "border-b border-black/20 pb-0.5 mb-0.5"
+                                                  )}>
+                                                    <span className="font-bold text-[11px] block">{session.course}</span>
+                                                    <span className="text-[10px] block">Room {session.room}{session.group_name ? ` - ${session.group_name}` : ""}</span>
+                                                    <span className="text-[9px] font-semibold text-gray-800 block">{session.semester} Sem</span>
+                                                    {isCancelled && (
+                                                      <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label block">
+                                                        (Cancelled)
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="h-full w-full flex items-center justify-center min-h-[50px]">
+                                            <div className="w-1 h-1 rounded-full bg-border print:hidden" />
+                                          </div>
+                                        )}
                                       </TableCell>
                                     );
-                                  }
-
-                                  return (
-                                    <TableCell
-                                      key={index}
-                                      className={cn(
-                                        "h-px align-middle border-r border-border/60 last:border-r-0 transition-all duration-200 relative p-2 print:p-1 print:border-black",
-                                        "bg-transparent print:bg-white"
-                                      )}
-                                    >
-                                      {session ? (
-                                        <div className="h-full">
-                                          <GridCellCard row={session} rowHasGroup={rowHasGroup} />
-                                        </div>
-                                      ) : (
-                                        <div className="h-full w-full flex items-center justify-center min-h-[50px]">
-                                          <div className="w-1 h-1 rounded-full bg-border print:hidden" />
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                  );
-                                })}
+                                  })}
                                 </TableRow>
                               );
                             })
@@ -2227,39 +2385,69 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                   </TableRow>
                 ) : (
                   gridSchedule.map((rowItem) => {
-                    const rowHasGroup = rowItem.slots.some((s) => s && s.group_name);
-                    return (
-                      <TableRow
-                        key={rowItem.day}
-                        className="hover:bg-transparent print:border-black"
-                      >
-                        <TableCell className="font-bold text-[11px] uppercase p-0 align-middle text-center bg-white border-r border-b border-black print:border-black text-black">
-                          {rowItem.day}
-                        </TableCell>
-                        {rowItem.slots.map((session, index) => {
-                          const slot = sortedTimeSlots[index];
-                          return (
-                            <TableCell
-                              key={index}
-                              className={cn(
-                                "align-middle border-r border-b border-black p-1 bg-white print:border-black text-center h-[70px]",
-                                (!session && isBreakSlot(slot)) ? "bg-gray-100" : ""
-                              )}
-                            >
-                              {session ? (
-                                <GridCellCard row={session} rowHasGroup={rowHasGroup} />
-                              ) : isBreakSlot(slot) ? (
-                                <div className="h-full w-full flex items-center justify-center" />
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center">
-                                  <div className="w-0.5 h-0.5 rounded-full bg-gray-400" />
-                                </div>
-                              )}
-                            </TableCell>
-                          );
-                        })}
-                      </TableRow>
-                    );
+                     return (
+                       <TableRow
+                         key={rowItem.day}
+                         className="hover:bg-transparent print:border-black"
+                       >
+                         <TableCell className="font-bold text-[11px] uppercase p-0 align-middle text-center bg-white border-r border-b border-black print:border-black text-black">
+                           {rowItem.day}
+                         </TableCell>
+                         {rowItem.slots.map((sessionList, index) => {
+                           const slot = sortedTimeSlots[index];
+                           const sessions = sessionList && sessionList.length > 0 ? sessionList : null;
+                           return (
+                             <TableCell
+                               key={index}
+                               className={cn(
+                                 "align-middle border-r border-b border-black p-1 bg-white print:border-black text-center h-[70px]",
+                                 (!sessions && isBreakSlot(slot)) ? "bg-gray-100" : ""
+                               )}
+                             >
+                               {sessions ? (
+                                 <div className="flex flex-col items-center justify-center text-center text-black leading-tight py-0.5 gap-0.5">
+                                   {sessions.map((session, sIdx) => {
+                                     const key = generateClassKey(
+                                       session.department,
+                                       session.semester,
+                                       session.day,
+                                       session.teacherId,
+                                       session.startTimeRaw
+                                     );
+                                     const offRecord = classOffMap[key];
+                                     const isOffSlot = Boolean(offRecord?.status);
+                                     const isTeacherOff = availabilityMap[session.teacherId] === false;
+                                     const isCancelled = isOffSlot || isTeacherOff || session.is_cancelled;
+
+                                     return (
+                                       <div key={`print-${session.id}`} className={cn(
+                                         "w-full text-center",
+                                         sessions.length > 1 && sIdx < sessions.length - 1 && "border-b border-black/20 pb-0.5 mb-0.5"
+                                       )}>
+                                         <span className="font-bold text-[11px] block">{session.course}</span>
+                                         <span className="text-[10px] block">Room {session.room}{session.group_name ? ` - ${session.group_name}` : ""}</span>
+                                         <span className="text-[9px] font-semibold text-gray-800 block">{session.semester} Sem</span>
+                                         {isCancelled && (
+                                           <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label block">
+                                             (Cancelled)
+                                           </span>
+                                         )}
+                                       </div>
+                                     );
+                                   })}
+                                 </div>
+                               ) : isBreakSlot(slot) ? (
+                                 <div className="h-full w-full flex items-center justify-center" />
+                               ) : (
+                                 <div className="h-full w-full flex items-center justify-center">
+                                   <div className="w-0.5 h-0.5 rounded-full bg-gray-400" />
+                                 </div>
+                               )}
+                             </TableCell>
+                           );
+                         })}
+                       </TableRow>
+                     );
                   })
                 )}
               </TableBody>
