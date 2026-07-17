@@ -1,20 +1,65 @@
 import NoticesPageClient from "@/components/modules/dashboard/notices";
-import { getAllDepartments } from "@/services/departments";
+import { getAllDepartments, getAllDepartmentsView } from "@/services/departments";
 import { getAllSemesters } from "@/services/semesters";
 import { getAllNotices } from "@/services/notices";
+import { getRoutine } from "@/services/routine";
+import { getValidToken } from "@/services/auth";
+import { jwtDecode } from "jwt-decode";
 
 export const dynamic = "force-dynamic";
 
 const NoticesPage = async () => {
-  const [noticesRes, deptsRes, semsRes] = await Promise.all([
+  let deptsRes = await getAllDepartmentsView();
+  if (!deptsRes.success) {
+    deptsRes = await getAllDepartments();
+  }
+
+  const [noticesRes, semsRes] = await Promise.all([
     getAllNotices(),
-    getAllDepartments(), 
     getAllSemesters(),  
   ]);
 
   const noticesData = noticesRes.success && noticesRes.data ? noticesRes.data : [];
-  const deptData = deptsRes.success && deptsRes.data ? deptsRes.data : [];
+  let deptData = deptsRes.success && deptsRes.data ? deptsRes.data : [];
   const semData = semsRes.success && semsRes.data ? semsRes.data : [];
+
+  const token = await getValidToken();
+  let isTeacher = false;
+  if (token) {
+    try {
+      const decoded = jwtDecode<{ role?: string }>(token);
+      isTeacher = decoded.role?.toUpperCase() === "TEACHER";
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  if (isTeacher) {
+    const routineRes = await getRoutine();
+    if (routineRes.success && Array.isArray(routineRes.data)) {
+      const teacherDepts = new Set<string>();
+      const teacherDeptIds = new Set<number>();
+      routineRes.data.forEach((item: any) => {
+        if (item.department_name) {
+          teacherDepts.add(item.department_name.toLowerCase().trim());
+        }
+        if (item.department) {
+          teacherDeptIds.add(Number(item.department));
+        }
+      });
+
+      const filteredDepts = deptData.filter((dept: any) => {
+        const matchesId = teacherDeptIds.has(dept.id);
+        const matchesName = dept.name && teacherDepts.has(dept.name.toLowerCase().trim());
+        const matchesCode = dept.code && teacherDepts.has(dept.code.toLowerCase().trim());
+        return matchesId || matchesName || matchesCode;
+      });
+
+      if (filteredDepts.length > 0) {
+        deptData = filteredDepts;
+      }
+    }
+  }
 
   const getSemIdByName = (name: string) => {
     const sem = semData.find((s: any) => s.name === name);

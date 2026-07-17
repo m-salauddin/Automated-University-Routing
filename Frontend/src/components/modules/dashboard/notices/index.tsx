@@ -16,7 +16,9 @@ import {
   Check, 
   Info, 
   Loader2, 
-  X
+  X,
+  Pencil,
+  Trash2
 } from "lucide-react";
 import { 
   Dialog, 
@@ -32,7 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CustomSelect } from "@/components/ui/custom-select";
-import { createNotice } from "@/services/notices";
+import { createNotice, updateNotice, deleteNotice } from "@/services/notices";
 
 interface Notice {
   id: number;
@@ -88,19 +90,28 @@ export default function NoticesPageClient({
   batches,
   deptsRes
 }: NoticesPageClientProps) {
+  const depts: Department[] = departments || [];
+  const bts: Batch[] = batches || [];
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const { role } = useSelector((state: RootState) => state.auth);
+  const { role, username } = useSelector((state: RootState) => state.auth);
   const canCreate = role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "TEACHER";
 
-  // Parse notices list
+  // Parse notices list — deduplicate by id to prevent React key conflicts
   const noticesListRaw = Array.isArray(initialNotices) 
     ? initialNotices 
     : (initialNotices?.results || initialNotices?.data || []);
-  const [notices, setNotices] = useState<Notice[]>(noticesListRaw);
+  const seenIds = new Set<number>();
+  const dedupedNotices = noticesListRaw.filter((n: Notice) => {
+    if (n.id == null) return true; // keep id-less items, handled by idx key
+    if (seenIds.has(n.id)) return false;
+    seenIds.add(n.id);
+    return true;
+  });
+  const [notices, setNotices] = useState<Notice[]>(dedupedNotices);
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -115,18 +126,31 @@ export default function NoticesPageClient({
   const [selectedBatches, setSelectedBatches] = useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Edit Notice states
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingNotice, setEditingNotice] = useState<Notice | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editMessage, setEditMessage] = useState("");
+  const [editNoticeType, setEditNoticeType] = useState<string>("GLOBAL");
+  const [editSelectedDepts, setEditSelectedDepts] = useState<number[]>([]);
+  const [editSelectedBatches, setEditSelectedBatches] = useState<number[]>([]);
+
+  // Delete Notice states
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deletingNoticeId, setDeletingNoticeId] = useState<number | null>(null);
+
   // Department mapping for easy name lookups
   const deptMap = useMemo(() => {
     const map = new Map<number, Department>();
-    departments.forEach(d => map.set(d.id, d));
+    depts.forEach(d => map.set(d.id, d));
     return map;
-  }, [departments]);
+  }, [depts]);
 
-  // Unique batches list for select form (since page-seeded batches are duplicated per dept)
+  // Unique bts list for select form (since page-seeded bts are duplicated per dept)
   const uniqueBatchesList = useMemo(() => {
     const seen = new Set<string>();
     const list: { id: number; name: string }[] = [];
-    batches.forEach(b => {
+    bts.forEach(b => {
       const key = `${b.id}-${b.name}`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -134,7 +158,7 @@ export default function NoticesPageClient({
       }
     });
     return list.sort((a, b) => b.id - a.id);
-  }, [batches]);
+  }, [bts]);
 
   // Filtered notices computed state
   const filteredNotices = useMemo(() => {
@@ -154,10 +178,10 @@ export default function NoticesPageClient({
   };
 
   const handleSelectAllDepts = () => {
-    if (selectedDepts.length === departments.length) {
+    if (selectedDepts.length === depts.length) {
       setSelectedDepts([]);
     } else {
-      setSelectedDepts(departments.map(d => d.id));
+      setSelectedDepts(depts.map(d => d.id));
     }
   };
 
@@ -206,6 +230,114 @@ export default function NoticesPageClient({
         setIsCreateOpen(false);
       } else {
         toast.error(res.message || "Failed to create notice.", { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An unexpected error occurred.", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const openEditModal = (notice: Notice) => {
+    setEditingNotice(notice);
+    setEditTitle(notice.title);
+    setEditMessage(notice.message);
+    setEditNoticeType(notice.notice_type?.toUpperCase() || "GLOBAL");
+    setEditSelectedDepts(notice.target_departments || []);
+    setEditSelectedBatches(notice.target_batches || []);
+    setIsEditOpen(true);
+  };
+
+  const handleEditToggleDept = (id: number) => {
+    setEditSelectedDepts(prev => 
+      prev.includes(id) ? prev.filter(dId => dId !== id) : [...prev, id]
+    );
+  };
+
+  const handleEditSelectAllDepts = () => {
+    if (editSelectedDepts.length === depts.length) {
+      setEditSelectedDepts([]);
+    } else {
+      setEditSelectedDepts(depts.map(d => d.id));
+    }
+  };
+
+  const handleEditToggleBatch = (id: number) => {
+    setEditSelectedBatches(prev => 
+      prev.includes(id) ? prev.filter(bId => bId !== id) : [...prev, id]
+    );
+  };
+
+  const handleEditSelectAllBatches = () => {
+    if (editSelectedBatches.length === uniqueBatchesList.length) {
+      setEditSelectedBatches([]);
+    } else {
+      setEditSelectedBatches(uniqueBatchesList.map(b => b.id));
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingNotice) return;
+    if (!editTitle.trim() || !editMessage.trim()) {
+      toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const toastId = toast.loading("Updating notice...");
+
+    try {
+      const res = await updateNotice(editingNotice.id, {
+        notice_type: editNoticeType,
+        title: editTitle.trim(),
+        message: editMessage.trim(),
+        target_departments: editNoticeType === "TARGETED" ? editSelectedDepts : [],
+        target_batches: editNoticeType === "TARGETED" ? editSelectedBatches : []
+      });
+
+      if (res.success && res.data) {
+        toast.success("Notice updated successfully!", { id: toastId });
+        
+        const isResponseObjNotice = res.data && typeof res.data === "object" && res.data.title && res.data.message;
+        const updatedNotice: Notice = {
+          ...editingNotice,
+          ...(isResponseObjNotice ? res.data : {}),
+          title: editTitle.trim(),
+          message: editMessage.trim(),
+          notice_type: editNoticeType,
+          target_departments: editNoticeType === "TARGETED" ? editSelectedDepts : [],
+          target_batches: editNoticeType === "TARGETED" ? editSelectedBatches : []
+        };
+
+        setNotices(prev => prev.map(n => n.id === editingNotice.id ? updatedNotice : n));
+        setIsEditOpen(false);
+      } else {
+        toast.error(res.message || "Failed to update notice.", { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "An unexpected error occurred.", { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteSubmit = async () => {
+    if (deletingNoticeId == null) return;
+
+    setIsSubmitting(true);
+    const toastId = toast.loading("Deleting notice...");
+
+    try {
+      const res = await deleteNotice(deletingNoticeId);
+
+      if (res.success) {
+        toast.success("Notice deleted successfully!", { id: toastId });
+        setNotices(prev => prev.filter(n => n.id !== deletingNoticeId));
+        setIsDeleteOpen(false);
+        setDeletingNoticeId(null);
+      } else {
+        toast.error(res.message || "Failed to delete notice.", { id: toastId });
       }
     } catch (err: any) {
       toast.error(err.message || "An unexpected error occurred.", { id: toastId });
@@ -363,6 +495,11 @@ export default function NoticesPageClient({
                       : "recently";
                     
                     const isGlobal = notice.notice_type?.toUpperCase() === "GLOBAL";
+                    const isOwner = notice.author_name?.toLowerCase() === username?.toLowerCase() ||
+                                    notice.created_by_name?.toLowerCase() === username?.toLowerCase() ||
+                                    (notice as any).created_by?.toString() === username ||
+                                    (notice as any).author?.toString() === username;
+                    const canManage = role?.toUpperCase() === "ADMIN" || (role?.toUpperCase() === "TEACHER" && isOwner);
 
                     // Map targets
                     const deptCodes = notice.target_departments?.map(id => deptMap.get(id)?.code || deptMap.get(id)?.name || id) || [];
@@ -373,7 +510,7 @@ export default function NoticesPageClient({
 
                     return (
                       <motion.div
-                        key={notice.id}
+                        key={notice.id != null ? `notice-${notice.id}` : `notice-idx-${idx}`}
                         layout
                         initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -393,9 +530,30 @@ export default function NoticesPageClient({
                               {notice.notice_type} Notice
                             </span>
 
-                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                              <Clock className="size-3.5" />
-                              {formattedDate}
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Clock className="size-3.5" />
+                                {formattedDate}
+                              </div>
+
+                              {canManage && (
+                                <div className="flex items-center gap-1 print:hidden border-l pl-2 border-border ml-1">
+                                  <button
+                                    onClick={() => openEditModal(notice)}
+                                    className="p-1 text-muted-foreground hover:text-foreground rounded transition-colors"
+                                    title="Edit Notice"
+                                  >
+                                    <Pencil className="size-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => { setDeletingNoticeId(notice.id); setIsDeleteOpen(true); }}
+                                    className="p-1 text-muted-foreground hover:text-destructive rounded transition-colors"
+                                    title="Delete Notice"
+                                  >
+                                    <Trash2 className="size-3.5" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -554,16 +712,16 @@ export default function NoticesPageClient({
                         onClick={handleSelectAllDepts}
                         className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider"
                       >
-                        {selectedDepts.length === departments.length ? "Deselect All" : "Select All"}
+                        {selectedDepts.length === depts.length ? "Deselect All" : "Select All"}
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-1.5 max-h-[100px] overflow-y-auto p-1.5 bg-muted/20 rounded-lg border border-border">
-                      {departments.length === 0 && (
+                      {depts.length === 0 && (
                         <p className="text-xs text-red-500 font-mono p-1">
-                          No departments: {JSON.stringify(deptsRes || { message: "No data" })}
+                          No depts: {JSON.stringify(deptsRes || { message: "No data" })}
                         </p>
                       )}
-                      {departments.map((dept) => {
+                      {depts.map((dept) => {
                         const selected = selectedDepts.includes(dept.id);
                         return (
                           <button
@@ -645,6 +803,237 @@ export default function NoticesPageClient({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Notice Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-xl bg-background border border-border p-0 overflow-hidden shadow-2xl rounded-2xl font-lexend">
+          <form onSubmit={handleEditSubmit}>
+            <DialogHeader className="p-6 pb-4 bg-muted/20 border-b">
+              <DialogTitle className="text-xl font-bold flex items-center gap-2 text-foreground">
+                <Pencil className="size-5 text-primary stroke-[2.5px]" />
+                Edit Notice
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground mt-1">
+                Make changes to your published notice. Target users will automatically receive the updated notice.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* Notice Type */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Notice Type <span className="text-red-500">*</span>
+                </label>
+                <div className="flex gap-3">
+                  {["GLOBAL", "TARGETED"].map((type) => {
+                    const active = editNoticeType === type;
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => {
+                          setEditNoticeType(type);
+                          if (type === "GLOBAL") {
+                            setEditSelectedDepts([]);
+                            setEditSelectedBatches([]);
+                          }
+                        }}
+                        className={`flex-1 py-2 px-3 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                          active 
+                            ? "bg-primary/10 border-primary text-primary"
+                            : "bg-transparent border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        }`}
+                      >
+                        {active && <Check className="size-3.5 stroke-[3px]" />}
+                        {type} Notice
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Title */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Notice Title <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  placeholder="Enter a descriptive, clear title"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  maxLength={255}
+                  required
+                  className="bg-background border-input focus-visible:ring-primary h-10"
+                />
+                <div className="text-[10px] text-right text-muted-foreground">
+                  {editTitle.length}/255 characters
+                </div>
+              </div>
+
+              {/* Message */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Notice Message <span className="text-red-500">*</span>
+                </label>
+                <Textarea
+                  placeholder="Type the notice message detail here..."
+                  value={editMessage}
+                  onChange={(e) => setEditMessage(e.target.value)}
+                  required
+                  rows={4}
+                  className="bg-background border-input focus-visible:ring-primary resize-y min-h-[100px]"
+                />
+              </div>
+
+              {/* Targets Division */}
+              {editNoticeType === "TARGETED" && (
+                <div className="border-t border-border pt-3.5 space-y-3.5">
+                  <div className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <Info className="size-3.5 text-muted-foreground" />
+                    <span>Audience Targeting (Optional)</span>
+                  </div>
+
+                  {/* Target Departments */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground">Target Departments</span>
+                      <button
+                        type="button"
+                        onClick={handleEditSelectAllDepts}
+                        className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider"
+                      >
+                        {editSelectedDepts.length === depts.length ? "Deselect All" : "Select All"}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-[100px] overflow-y-auto p-1.5 bg-muted/20 rounded-lg border border-border">
+                      {depts.map((dept) => {
+                        const selected = editSelectedDepts.includes(dept.id);
+                        return (
+                          <button
+                            key={dept.id}
+                            type="button"
+                            onClick={() => handleEditToggleDept(dept.id)}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-all ${
+                              selected 
+                                ? "bg-primary border-primary text-primary-foreground font-semibold"
+                                : "bg-background border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            }`}
+                          >
+                            {dept.code || dept.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Target Batches */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-foreground">Target Batches</span>
+                      <button
+                        type="button"
+                        onClick={handleEditSelectAllBatches}
+                        className="text-[10px] text-primary hover:underline font-bold uppercase tracking-wider"
+                      >
+                        {editSelectedBatches.length === uniqueBatchesList.length ? "Deselect All" : "Select All"}
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-[100px] overflow-y-auto p-1.5 bg-muted/20 rounded-lg border border-border">
+                      {uniqueBatchesList.map((batch) => {
+                        const selected = editSelectedBatches.includes(batch.id);
+                        return (
+                          <button
+                            key={batch.id}
+                            type="button"
+                            onClick={() => handleEditToggleBatch(batch.id)}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-all ${
+                              selected 
+                                ? "bg-primary border-primary text-primary-foreground font-semibold"
+                                : "bg-background border-input text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                            }`}
+                          >
+                            {batch.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="p-4 bg-muted/20 border-t flex gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setIsEditOpen(false)}
+                disabled={isSubmitting}
+                className="border border-border"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium min-w-[120px]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Notice Dialog */}
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent className="max-w-md bg-background border border-border p-0 overflow-hidden shadow-2xl rounded-2xl font-lexend">
+          <div className="p-6 space-y-4">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-foreground">
+                Delete Notice
+              </DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground mt-1">
+                Are you sure you want to delete this notice? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <DialogFooter className="p-4 bg-muted/20 border-t flex gap-2 justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsDeleteOpen(false)}
+              disabled={isSubmitting}
+              className="border border-border"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteSubmit}
+              disabled={isSubmitting}
+              className="min-w-[100px]"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </motion.div>

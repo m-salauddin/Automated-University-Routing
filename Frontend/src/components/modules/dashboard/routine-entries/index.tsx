@@ -46,6 +46,15 @@ import {
   Undo2,
   Redo2,
   Users,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  Database,
+  Camera,
+  FileDown,
+  FileUp,
+  RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,6 +89,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { generateRoutine, getRoutine, updateRoutineEntry, swapRoutineEntries, cancelClass, reactivateClass, updateCancelMessage, rollbackRoutine } from "@/services/routine";
+import { DataManagementDialog } from "./DataManagementDialog";
 import { createLog } from "@/services/logs";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -161,68 +171,55 @@ function CancellationModal({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md w-full overflow-hidden">
-        <AnimatePresence mode="wait">
-          {isOpen && (
-            <motion.div
-              variants={modalContentVariants}
-              initial="hidden"
-              animate="visible"
-              className="flex flex-col gap-4"
+        <div className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for cancelling{" "}
+              <strong>{courseName}</strong>. This will be visible to
+              students.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label
+                htmlFor="reason"
+                className="flex justify-between text-xs font-medium"
+              >
+                <span>Reason</span>
+                <span
+                  className={cn(
+                    "text-muted-foreground",
+                    reason.length === LIMIT && "text-red-500"
+                  )}
+                >
+                  {reason.length}/{LIMIT} characters
+                </span>
+              </Label>
+              <Textarea
+                id="reason"
+                placeholder="e.g., Sick leave, Emergency meeting..."
+                value={reason}
+                onChange={handleTextChange}
+                className="h-32 resize-none break-all whitespace-pre-wrap"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button variant="outline" onClick={handleCloseClick}>
+              Close
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmClick}
+              disabled={!reason.trim()}
             >
-              <motion.div variants={modalItemVariants}>
-                <DialogHeader>
-                  <DialogTitle>{title}</DialogTitle>
-                  <DialogDescription>
-                    Please provide a reason for cancelling{" "}
-                    <strong>{courseName}</strong>. This will be visible to
-                    students.
-                  </DialogDescription>
-                </DialogHeader>
-              </motion.div>
-
-              <motion.div variants={modalItemVariants} className="space-y-3">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="reason"
-                    className="flex justify-between text-xs font-medium"
-                  >
-                    <span>Reason</span>
-                    <span
-                      className={cn(
-                        "text-muted-foreground",
-                        reason.length === LIMIT && "text-red-500"
-                      )}
-                    >
-                      {reason.length}/{LIMIT} characters
-                    </span>
-                  </Label>
-                  <Textarea
-                    id="reason"
-                    placeholder="e.g., Sick leave, Emergency meeting..."
-                    value={reason}
-                    onChange={handleTextChange}
-                    className="h-32 resize-none break-all whitespace-pre-wrap"
-                  />
-                </div>
-              </motion.div>
-
-              <motion.div variants={modalItemVariants}>
-                <DialogFooter className="sm:justify-end gap-2">
-                  <Button variant="outline" onClick={handleCloseClick}>
-                    Close
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={handleConfirmClick}
-                    disabled={!reason.trim()}
-                  >
-                    {confirmLabel}
-                  </Button>
-                </DialogFooter>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              {confirmLabel}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -244,6 +241,7 @@ export type APIRoutineItem = {
   group_name?: string | null;
   is_cancelled?: boolean;
   cancel_message?: string | null;
+  course_type?: string;
 };
 
 export type TimeSlot = {
@@ -266,6 +264,7 @@ type ClassSession = {
   is_cancelled?: boolean;
   cancel_message?: string | null;
   group_name?: string | null;
+  course_type?: string;
 };
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
@@ -328,6 +327,13 @@ const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string
   return false;
 };
 
+const checkIsLab = (s: ClassSession) => {
+  if (s.course_type) {
+    return s.course_type.toLowerCase() === "lab";
+  }
+  return isLabClass(s.course, undefined, s.room);
+};
+
 const formatTimeSlotLabel = (timeStr: string) => {
   if (!timeStr) return "";
   const [hStr, mStr] = timeStr.split(":");
@@ -341,48 +347,46 @@ const formatTimeSlotLabel = (timeStr: string) => {
 };
 
 
+// Page toolbar — simple stagger, fast
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.05, delayChildren: 0.1 },
+    transition: { staggerChildren: 0.04, delayChildren: 0 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { y: 20, opacity: 0 },
+  hidden: { y: 8, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { type: "spring" as const, stiffness: 120, damping: 20 },
+    transition: { duration: 0.15, ease: "easeOut" },
   },
 };
 
-
+// Modal open/close — snappy scale + opacity
 const modalContentVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.95 },
+  hidden: { opacity: 0, scale: 0.97 },
   visible: {
     opacity: 1,
     scale: 1,
-    transition: {
-      duration: 0.2,
-      ease: "easeOut",
-      staggerChildren: 0.1,
-    },
+    transition: { duration: 0.15, ease: "easeOut", staggerChildren: 0.05 },
   },
   exit: {
     opacity: 0,
-    scale: 0.95,
-    transition: { duration: 0.15 },
+    scale: 0.97,
+    transition: { duration: 0.1, ease: "easeIn" },
   },
 };
 
+// Modal inner items — fast fade-up
 const modalItemVariants: Variants = {
-  hidden: { y: 15, opacity: 0 },
+  hidden: { y: 8, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { type: "spring", stiffness: 300, damping: 24 },
+    transition: { duration: 0.12, ease: "easeOut" },
   },
 };
 
@@ -420,7 +424,128 @@ interface RoutineTableProps {
   onReactivateClass?: (session: ClassSession) => void;
   onUpdateCancelMessage?: (session: ClassSession) => void;
   onHistoryAction?: (action: HistoryAction) => void;
+  selectedTeacher?: string;
 }
+
+interface LazyDropdownProps {
+  isRoutineLocked: boolean;
+  isSubmitting: boolean;
+  session: ClassSession;
+  setSelectedSwapSource: React.Dispatch<React.SetStateAction<ClassSession | null>>;
+  onCancelClass?: (session: ClassSession) => void;
+  onReactivateClass?: (session: ClassSession) => void;
+  onUpdateCancelMessage?: (session: ClassSession) => void;
+  isClassOffToday: boolean;
+  isMulti?: boolean;
+}
+
+const LazyClassActionsDropdown = ({
+  isRoutineLocked,
+  isSubmitting,
+  session,
+  setSelectedSwapSource,
+  onCancelClass,
+  onReactivateClass,
+  onUpdateCancelMessage,
+  isClassOffToday,
+  isMulti = false,
+}: LazyDropdownProps) => {
+  const [isInteracted, setIsInteracted] = useState(false);
+
+  const triggerButton = (
+    <button
+      draggable={false}
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      className={cn(
+        isMulti
+          ? "absolute top-0.5 right-0.5 p-0.5 rounded opacity-0 group-hover/item:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-opacity focus:opacity-100 outline-none cursor-pointer shrink-0 z-10"
+          : "ml-0.5 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-opacity focus:opacity-100 outline-none cursor-pointer"
+      )}
+      aria-label="Class actions"
+    >
+      <MoreVertical className={isMulti ? "w-2.5 h-2.5 text-muted-foreground" : "w-3 h-3 text-muted-foreground"} />
+    </button>
+  );
+
+  if (isRoutineLocked || isSubmitting) return null;
+
+  if (!isInteracted) {
+    return (
+      <div
+        onMouseEnter={() => setIsInteracted(true)}
+        onFocus={() => setIsInteracted(true)}
+        className={isMulti ? "absolute top-0.5 right-0.5 z-10" : "shrink-0"}
+      >
+        {triggerButton}
+      </div>
+    );
+  }
+
+  return (
+    <div className={isMulti ? "absolute top-0.5 right-0.5 z-10" : "shrink-0"}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          {triggerButton}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="w-48"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="cursor-pointer font-medium"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedSwapSource(session);
+            }}
+          >
+            <ArrowLeftRight className="size-4 mr-2" /> Swap / Move Class
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {!isClassOffToday ? (
+            <DropdownMenuItem
+              className="text-red-500 focus:text-red-500 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancelClass?.(session);
+              }}
+            >
+              <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
+            </DropdownMenuItem>
+          ) : (
+            <>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReactivateClass?.(session);
+                }}
+              >
+                <CheckCheck className="size-4 mr-2" /> Activate Class
+              </DropdownMenuItem>
+              {session.is_cancelled && (
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateCancelMessage?.(session);
+                  }}
+                >
+                  <Pencil className="size-4 mr-2" /> Update Message
+                </DropdownMenuItem>
+              )}
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+};
 
 const MemoizedRoutineTable = React.memo(
   ({
@@ -440,6 +565,7 @@ const MemoizedRoutineTable = React.memo(
     onReactivateClass,
     onUpdateCancelMessage,
     onHistoryAction,
+    selectedTeacher = "All Teachers",
   }: RoutineTableProps) => {
     try {
       const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1039,7 +1165,7 @@ const MemoizedRoutineTable = React.memo(
                 {timeSlots.map((slot, idx) => {
                   const hasClass = groupSchedule.some(rowItem => rowItem.slots[idx] !== null);
                   const isBreak = isBreakSlot(slot);
-                  const defaultColWidth = isBreak ? 100 : 180;
+                  const defaultColWidth = isBreak ? (hasClass ? 180 : 50) : 180;
                   const colWidth = colWidths[slot.id] || defaultColWidth;
 
                   if (isBreak) {
@@ -1055,7 +1181,7 @@ const MemoizedRoutineTable = React.memo(
                         >
                           <div className="h-full flex items-center justify-center">
                             <span className={cn(
-                              "text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print-break-text-no-class",
+                              "text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print-break-text-no-class",
                               isPrint ? "print:text-black" : ""
                             )}>
                               BREAK
@@ -1134,472 +1260,404 @@ const MemoizedRoutineTable = React.memo(
               );
               if (dayRows.length === 0) return null;
 
-              const TbodyComponent = isPrint ? ("tbody" as any) : motion.tbody;
-              const tbodyProps = isPrint ? {} : {
-                variants: containerVariants,
-                initial: "hidden",
-                animate: "visible"
-              };
-
               return (
-                <TbodyComponent
+                <tbody
                   key={dayName}
-                  {...tbodyProps}
                   className={cn(isPrint ? "print:break-inside-avoid !print:break-inside-avoid" : "")}
                 >
-                  <AnimatePresence mode="popLayout">
-                    {dayRows.map((rowItem, rowIndex) => {
-                      const isFirstRowOfDay = rowIndex === 0;
-                      const rowSpan = dayRows.length;
-                      const rowHasGroup = rowItem.slots.some((s) => s && s.some(sess => sess.group_name));
+                  {dayRows.map((rowItem, rowIndex) => {
+                    const isFirstRowOfDay = rowIndex === 0;
+                    const rowSpan = dayRows.length;
+                    const rowHasGroup = rowItem.slots.some((s) => s && s.some(sess => sess.group_name));
 
-                      const TrComponent = isPrint ? ("tr" as any) : motion.tr;
-                      const trProps = isPrint ? {} : {
-                        variants: itemVariants
-                      };
+                    return (
+                      <tr
+                        key={`${rowItem.day}-${rowItem.semester}`}
+                        className={cn(
+                          "border-b border-border hover:bg-muted/5",
+                          isPrint ? "!print:border-black print:border-b print:h-auto" : ""
+                        )}
+                        style={isPrint ? {} : { height: rowHeights[`${rowItem.day}-${rowItem.semester}`] || 85 }}
+                      >
+                        {/* Day Label (grouped by rowSpan) */}
+                        {isFirstRowOfDay && (
+                          <TableCell
+                            rowSpan={rowSpan}
+                            className={cn(
+                              "font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border relative",
+                              isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black print:font-bold" : ""
+                            )}
+                          >
+                            <div className={cn("flex items-center justify-center h-full w-full py-4", isPrint ? "print:py-2" : "")}>
+                              <span className={cn(
+                                "writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0",
+                                isPrint ? "print:rotate-0 print:text-[12px]" : ""
+                              )}>
+                                {rowItem.day.slice(0, 3).toUpperCase()}
+                              </span>
+                            </div>
+                            {!isPrint && !isAllSemestersMode && (
+                              <div
+                                onMouseDown={(e) => startRowResize(e, `${rowItem.day}-${rowItem.semester}`, 85)}
+                                className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize hover:bg-primary/50 hover:h-1.5 transition-all z-30"
+                              />
+                            )}
+                          </TableCell>
+                        )}
 
-                      return (
-                        <TrComponent
-                          key={`${rowItem.day}-${rowItem.semester}`}
-                          {...trProps}
-                          className={cn(
-                            "border-b border-border hover:bg-muted/5",
-                            isPrint ? "!print:border-black print:border-b print:h-auto" : ""
-                          )}
-                          style={isPrint ? {} : { height: rowHeights[`${rowItem.day}-${rowItem.semester}`] || 85 }}
-                        >
-                          {/* Day Label (grouped by rowSpan) */}
-                          {isFirstRowOfDay && (
+                        {/* Semester Label */}
+                        {isAllSemestersMode && (
+                          <TableCell className={cn(
+                            "font-bold text-xs text-center border-r border-border bg-muted/10 print-sem-cell w-12 min-w-[48px] relative",
+                            isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black" : ""
+                          )}>
+                            {rowItem.semester}
+                            {!isPrint && (
+                              <div
+                                onMouseDown={(e) => startRowResize(e, `${rowItem.day}-${rowItem.semester}`, 85)}
+                                className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize hover:bg-primary/50 hover:h-1.5 transition-all z-30"
+                              />
+                            )}
+                          </TableCell>
+                        )}
+
+                        {/* Time Slots */}
+                        {rowItem.slots.map((sessionList, index) => {
+                          const slot = timeSlots[index];
+                          const sessions = sessionList && sessionList.length > 0 ? sessionList : null;
+                          const firstSession = sessions ? sessions[0] : null;
+                          const isMulti = sessions ? sessions.length > 1 : false;
+
+                          // Compute cell-level highlights/states based on all sessions
+                          const anyHighlighted = sessions ? sessions.some(s => isMatch(s)) : false;
+                          const anyTeacherOff = sessions ? sessions.some(s => {
+                            const tKey = s.teacherId ?? s.teacher;
+                            const sTime = s.originalTime || "";
+                            const cKey = tKey && sTime ? generateClassKey(s.department, s.semester, abbreviateDay(s.day), tKey, sTime) : "";
+                            const offData = cKey ? classOffMap[cKey] : undefined;
+                            return (offData?.status) || s.is_cancelled || (availabilityMap[tKey] === false);
+                          }) : false;
+
+                          return (
                             <TableCell
-                              rowSpan={rowSpan}
+                              key={index}
+                              onClick={() => {
+                                if (selectedSwapSource) {
+                                  if (rowItem.semester === selectedSwapSource.semester) {
+                                    handleDropOnCell(rowItem, index, selectedSwapSource);
+                                    setSelectedSwapSource(null);
+                                  }
+                                  return;
+                                }
+                                // For single-session cancelled cells, show reason on click
+                                if (firstSession && !isMulti) {
+                                  const tKey = firstSession.teacherId ?? firstSession.teacher;
+                                  const sTime = firstSession.originalTime || "";
+                                  const cKey = tKey && sTime ? generateClassKey(firstSession.department, firstSession.semester, abbreviateDay(firstSession.day), tKey, sTime) : "";
+                                  const offData = cKey ? classOffMap[cKey] : undefined;
+                                  const isOff = Boolean(offData?.status) || Boolean(firstSession.is_cancelled);
+                                  if (isOff) {
+                                    onCellClick({
+                                      course: firstSession.course,
+                                      teacher: firstSession.teacher,
+                                      reason: offData?.reason || firstSession.cancel_message || "No reason provided.",
+                                    });
+                                  }
+                                }
+                              }}
+                              data-cell-key={`${rowItem.day}-${rowItem.semester}`}
+                              data-cell-index={index}
+                              data-cell-semester={rowItem.semester}
                               className={cn(
-                                "font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border relative",
-                                isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black print:font-bold" : ""
+                                "h-px align-middle border-r border-border relative p-2",
+                                isPrint ? "!print:border-r !print:border-black" : "",
+                                (selectedSwapSource && rowItem.semester === selectedSwapSource.semester)
+                                  ? "cursor-pointer hover:bg-primary/5 transition-colors"
+                                  : "cursor-default",
+                                anyHighlighted
+                                  ? "bg-emerald-100/50 dark:bg-emerald-900/20" + (isPrint ? " print:bg-transparent" : "")
+                                  : anyTeacherOff
+                                    ? "bg-red-100/30 dark:bg-red-950/10" + (isPrint ? " print:bg-transparent" : "")
+                                    : "bg-transparent" + (isPrint ? " print:bg-white" : "")
                               )}
                             >
-                              <div className={cn("flex items-center justify-center h-full w-full py-4", isPrint ? "print:py-2" : "")}>
-                                <span className={cn(
-                                  "writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0",
-                                  isPrint ? "print:rotate-0 print:text-[12px]" : ""
-                                )}>
-                                  {rowItem.day.slice(0, 3).toUpperCase()}
-                                </span>
-                              </div>
-                              {!isPrint && !isAllSemestersMode && (
-                                <div
-                                  onMouseDown={(e) => startRowResize(e, `${rowItem.day}-${rowItem.semester}`, 85)}
-                                  className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize hover:bg-primary/50 hover:h-1.5 transition-all z-30"
-                                />
-                              )}
-                            </TableCell>
-                          )}
-
-                          {/* Semester Label */}
-                          {isAllSemestersMode && (
-                            <TableCell className={cn(
-                              "font-bold text-xs text-center border-r border-border bg-muted/10 print-sem-cell w-12 min-w-[48px] relative",
-                              isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black" : ""
-                            )}>
-                              {rowItem.semester}
+                              {/* CSS-driven drag overlays */}
                               {!isPrint && (
-                                <div
-                                  onMouseDown={(e) => startRowResize(e, `${rowItem.day}-${rowItem.semester}`, 85)}
-                                  className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize hover:bg-primary/50 hover:h-1.5 transition-all z-30"
-                                />
+                                <>
+                                  <div className="drag-target-dashed absolute inset-0.5 rounded-lg border-2 border-dashed border-primary/45 bg-primary/5 pointer-events-none z-20 opacity-0 scale-95 transition-all duration-150" />
+                                  <div className="drag-target-hovered absolute inset-0.5 rounded-lg border-2 border-solid border-primary bg-primary/15 shadow-md shadow-primary/20 pointer-events-none z-20 opacity-0 transition-all duration-150" />
+                                </>
                               )}
-                            </TableCell>
-                          )}
-
-                          {/* Time Slots */}
-                          {rowItem.slots.map((sessionList, index) => {
-                            const slot = timeSlots[index];
-                            const sessions = sessionList && sessionList.length > 0 ? sessionList : null;
-                            const firstSession = sessions ? sessions[0] : null;
-                            const isMulti = sessions ? sessions.length > 1 : false;
-
-                            // Compute cell-level highlights/states based on all sessions
-                            const anyHighlighted = sessions ? sessions.some(s => isMatch(s)) : false;
-                            const anyTeacherOff = sessions ? sessions.some(s => {
-                              const tKey = s.teacherId ?? s.teacher;
-                              const sTime = s.originalTime || "";
-                              const cKey = tKey && sTime ? generateClassKey(s.department, s.semester, abbreviateDay(s.day), tKey, sTime) : "";
-                              const offData = cKey ? classOffMap[cKey] : undefined;
-                              return (offData?.status) || s.is_cancelled || (availabilityMap[tKey] === false);
-                            }) : false;
-
-                            return (
-                              <TableCell
-                                key={index}
-                                onClick={() => {
-                                  if (selectedSwapSource) {
-                                    if (rowItem.semester === selectedSwapSource.semester) {
-                                      handleDropOnCell(rowItem, index, selectedSwapSource);
-                                      setSelectedSwapSource(null);
-                                    }
-                                    return;
-                                  }
-                                  // For single-session cancelled cells, show reason on click
-                                  if (firstSession && !isMulti) {
-                                    const tKey = firstSession.teacherId ?? firstSession.teacher;
-                                    const sTime = firstSession.originalTime || "";
-                                    const cKey = tKey && sTime ? generateClassKey(firstSession.department, firstSession.semester, abbreviateDay(firstSession.day), tKey, sTime) : "";
-                                    const offData = cKey ? classOffMap[cKey] : undefined;
-                                    const isOff = Boolean(offData?.status) || Boolean(firstSession.is_cancelled);
-                                    if (isOff) {
-                                      onCellClick({
-                                        course: firstSession.course,
-                                        teacher: firstSession.teacher,
-                                        reason: offData?.reason || firstSession.cancel_message || "No reason provided.",
+                              {sessions ? (
+                                <>
+                                  {(() => {
+                                    if (isMulti) {
+                                      // Compute combined container states from all sessions
+                                      const isMultiHighlight = sessions.some(s => isMatch(s));
+                                      const isMultiTeacherOff = sessions.some(s => {
+                                        const tKey = s.teacherId ?? s.teacher;
+                                        const sTime = s.originalTime || "";
+                                        const cKey = tKey && sTime ? generateClassKey(s.department, s.semester, abbreviateDay(s.day), tKey, sTime) : "";
+                                        const offData = cKey ? classOffMap[cKey] : undefined;
+                                        return (offData?.status) || s.is_cancelled || (availabilityMap[tKey] === false);
                                       });
-                                    }
-                                  }
-                                }}
-                                data-cell-key={`${rowItem.day}-${rowItem.semester}`}
-                                data-cell-index={index}
-                                data-cell-semester={rowItem.semester}
-                                className={cn(
-                                  "h-px align-middle border-r border-border relative p-2",
-                                  isPrint ? "!print:border-r !print:border-black" : "",
-                                  (selectedSwapSource && rowItem.semester === selectedSwapSource.semester)
-                                    ? "cursor-pointer hover:bg-primary/5 transition-colors"
-                                    : "cursor-default",
-                                  anyHighlighted
-                                    ? "bg-emerald-100/50 dark:bg-emerald-900/20" + (isPrint ? " print:bg-transparent" : "")
-                                    : anyTeacherOff
-                                      ? "bg-red-100/30 dark:bg-red-950/10" + (isPrint ? " print:bg-transparent" : "")
-                                      : "bg-transparent" + (isPrint ? " print:bg-white" : "")
-                                )}
-                              >
-                                {/* CSS-driven drag overlays */}
-                                {!isPrint && (
-                                  <>
-                                    <div className="drag-target-dashed absolute inset-0.5 rounded-lg border-2 border-dashed border-primary/45 bg-primary/5 pointer-events-none z-20 opacity-0 scale-95 transition-all duration-150" />
-                                    <div className="drag-target-hovered absolute inset-0.5 rounded-lg border-2 border-solid border-primary bg-primary/15 shadow-md shadow-primary/20 pointer-events-none z-20 opacity-0 transition-all duration-150" />
-                                  </>
-                                )}
-                                {sessions ? (
-                                  <>
-                                    {(() => {
-                                      if (isMulti) {
-                                        // Compute combined container states from all sessions
-                                        const isMultiHighlight = sessions.some(s => isMatch(s));
-                                        const isMultiTeacherOff = sessions.some(s => {
-                                          const tKey = s.teacherId ?? s.teacher;
-                                          const sTime = s.originalTime || "";
-                                          const cKey = tKey && sTime ? generateClassKey(s.department, s.semester, abbreviateDay(s.day), tKey, sTime) : "";
-                                          const offData = cKey ? classOffMap[cKey] : undefined;
-                                          return (offData?.status) || s.is_cancelled || (availabilityMap[tKey] === false);
-                                        });
-                                        const isMultiLab = sessions.every(s => isLabClass(s.course, undefined, s.room));
-                                        const isMultiTheory = sessions.every(s => !isLabClass(s.course, undefined, s.room));
+                                      const isMultiLab = sessions.every(s => checkIsLab(s));
+                                      const isMultiTheory = sessions.every(s => !checkIsLab(s));
 
-                                        const containerBgClass = isMultiTeacherOff
-                                          ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
-                                          : isMultiHighlight
-                                            ? "bg-background border-emerald-500 shadow-md"
-                                            : isMultiLab
-                                              ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40 hover:shadow-md"
-                                              : isMultiTheory
-                                                ? "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40 hover:shadow-md"
-                                                : "bg-slate-50/45 border-slate-200 dark:bg-slate-950/20 dark:border-slate-800/30 hover:border-teal-400/40 hover:shadow-md";
-
-                                        return (
-                                          <div className={cn(
-                                            "print:hidden w-full rounded-md border flex flex-row p-0.5 shadow-sm relative select-none justify-between items-stretch h-full min-h-[69px] gap-1",
-                                            "transition-all duration-150",
-                                            containerBgClass
-                                          )}>
-                                            {sessions.map((session, sIdx) => {
-                                              const teacherKey = session.teacherId ?? session.teacher;
-                                              const startTimeRaw = session.originalTime || "";
-                                              const key = teacherKey && startTimeRaw
-                                                ? generateClassKey(session.department, session.semester, abbreviateDay(session.day), teacherKey, startTimeRaw)
-                                                : "";
-                                              const classOffData = key ? classOffMap[key] : undefined;
-                                              const isClassOffToday = Boolean(classOffData?.status) || Boolean(session.is_cancelled);
-                                              const cancellationReason = classOffData?.reason || session.cancel_message || "No reason provided.";
-                                              const isTeacherOff = (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
-                                              const highlighted = isMatch(session);
-                                              const isLab = isLabClass(session.course, undefined, session.room);
-
-                                              return (
-                                                <React.Fragment key={session.id}>
-                                                  <div
-                                                    data-session-id={session.id}
-                                                    data-drag-source={selectedSwapSource?.id === session.id ? "1" : undefined}
-                                                    onPointerDown={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? (e) => startPointerDrag(e, session, isLab) : undefined}
-                                                    onPointerMove={onPointerMove}
-                                                    onPointerUp={onPointerUp}
-                                                    onPointerCancel={onPointerCancel}
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      if (isClassOffToday) {
-                                                        onCellClick({ course: session.course, teacher: session.teacher, reason: cancellationReason });
-                                                      }
-                                                    }}
-                                                    className={cn(
-                                                      "relative flex-1 flex flex-col justify-between rounded px-1.5 py-1.5 transition-colors duration-150 min-w-0 select-none group/item",
-                                                      (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:bg-black/5 dark:hover:bg-white/5"
-                                                    )}
-                                                  >
-                                                    <div className="flex flex-col gap-0.5 items-start w-full">
-                                                      <div className="flex items-center justify-between gap-0.5 w-full max-w-full">
-                                                        <div className={cn(
-                                                          "text-[8.5px] font-bold tracking-[-0.05em] text-foreground truncate pr-3.5 w-full block",
-                                                          isClassOffToday && "opacity-70 line-through"
-                                                        )}>
-                                                          {session.course}
-                                                        </div>
-                                                        {!isRoutineLocked && !isSubmitting && (
-                                                          <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                              <button
-                                                                draggable={false}
-                                                                onMouseDown={(e) => e.stopPropagation()}
-                                                                onPointerDown={(e) => e.stopPropagation()}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                className="absolute top-0.5 right-0.5 p-0.5 rounded opacity-0 group-hover/item:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-opacity focus:opacity-100 outline-none cursor-pointer shrink-0 z-10"
-                                                                aria-label="Class actions"
-                                                              >
-                                                                <MoreVertical className="w-2.5 h-2.5 text-muted-foreground" />
-                                                              </button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end" className="w-48" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
-                                                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                              <DropdownMenuSeparator />
-                                                              <DropdownMenuItem className="cursor-pointer font-medium" onClick={(e) => { e.stopPropagation(); setSelectedSwapSource(session); }}>
-                                                                <ArrowLeftRight className="size-4 mr-2" /> Swap / Move Class
-                                                              </DropdownMenuItem>
-                                                              <DropdownMenuSeparator />
-                                                              {!isClassOffToday ? (
-                                                                <DropdownMenuItem className="text-red-500 focus:text-red-500 cursor-pointer" onClick={(e) => { e.stopPropagation(); onCancelClass?.(session); }}>
-                                                                  <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
-                                                                </DropdownMenuItem>
-                                                              ) : (
-                                                                <>
-                                                                  <DropdownMenuItem className="cursor-pointer" onClick={(e) => { e.stopPropagation(); onReactivateClass?.(session); }}>
-                                                                    <CheckCheck className="size-4 mr-2" /> Activate Class
-                                                                  </DropdownMenuItem>
-                                                                  {session.is_cancelled && (
-                                                                    <DropdownMenuItem className="cursor-pointer" onClick={(e) => { e.stopPropagation(); onUpdateCancelMessage?.(session); }}>
-                                                                      <Pencil className="size-4 mr-2" /> Update Message
-                                                                    </DropdownMenuItem>
-                                                                  )}
-                                                                </>
-                                                              )}
-                                                            </DropdownMenuContent>
-                                                          </DropdownMenu>
-                                                        )}
-                                                      </div>
-                                                    </div>
-                                                    <div className="flex flex-col items-start gap-0.5 w-full mt-1">
-                                                      <div className="flex items-center gap-1 text-[9px] text-muted-foreground font-medium truncate max-w-full">
-                                                        <User className="w-2.5 h-2.5 opacity-70 shrink-0" />
-                                                        <span className="truncate">{getTeacherInitials(session.teacher)}</span>
-                                                      </div>
-                                                      <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground/80 truncate max-w-full">
-                                                        <MapPin className="w-2.5 h-2.5 opacity-70 shrink-0" />
-                                                        <span className="truncate">{session.room}</span>
-                                                      </div>
-                                                      {session.group_name && (
-                                                        <div className="flex items-center gap-1 text-[9px] font-medium text-muted-foreground/80 truncate max-w-full">
-                                                          <Users className="w-2.5 h-2.5 opacity-70 shrink-0" />
-                                                          <span className="truncate">{session.group_name.replace("Group ", "")}</span>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  </div>
-                                                  {sIdx < sessions.length - 1 && (
-                                                    <div className="w-[1px] bg-border/40 self-stretch my-1 shrink-0" />
-                                                  )}
-                                                </React.Fragment>
-                                              );
-                                            })}
-                                          </div>
-                                        );
-                                      }
-                                      const session = sessions[0];
-                                      const teacherKey = session.teacherId ?? session.teacher;
-                                      const startTimeRaw = session.originalTime || "";
-                                      const key = teacherKey && startTimeRaw
-                                        ? generateClassKey(session.department, session.semester, abbreviateDay(session.day), teacherKey, startTimeRaw)
-                                        : "";
-                                      const classOffData = key ? classOffMap[key] : undefined;
-                                      const isClassOffToday = Boolean(classOffData?.status) || Boolean(session.is_cancelled);
-                                      const cancellationReason = classOffData?.reason || session.cancel_message || "No reason provided.";
-                                      const isTeacherOff = (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
-                                      const highlighted = isMatch(session);
-                                      const isLab = isLabClass(session.course, undefined, session.room);
+                                      const containerBgClass = isMultiTeacherOff
+                                        ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                                        : isMultiHighlight
+                                          ? "bg-background border-emerald-500 shadow-md"
+                                          : isMultiLab
+                                            ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40 hover:shadow-md"
+                                            : isMultiTheory
+                                              ? "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40 hover:shadow-md"
+                                              : "bg-slate-50/45 border-slate-200 dark:bg-slate-950/20 dark:border-slate-800/30 hover:border-teal-400/40 hover:shadow-md";
 
                                       return (
-                                        <motion.div
-                                          key={session.id}
-                                          data-session-id={session.id}
-                                          data-drag-source={selectedSwapSource?.id === session.id ? "1" : undefined}
-                                          onPointerDown={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? (e) => startPointerDrag(e, session, isLab) : undefined}
-                                          onPointerMove={onPointerMove}
-                                          onPointerUp={onPointerUp}
-                                          onPointerCancel={onPointerCancel}
-                                          className={cn(
-                                            "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden relative select-none",
-                                            "transition-colors duration-150",
-                                            (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:shadow-md",
-                                            isTeacherOff
-                                              ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
-                                              : highlighted
-                                                ? "bg-background border-emerald-500 shadow-md"
-                                                : isLab
-                                                  ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40 hover:shadow-md"
-                                                  : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40 hover:shadow-md"
-                                          )}
-                                        >
-                                          <div className="flex justify-between items-start w-full gap-1">
-                                            <div className="flex flex-col">
-                                              <span className={cn(
-                                                "text-xs font-extrabold tracking-tight leading-tight text-foreground",
-                                                isClassOffToday && "opacity-70"
-                                              )}>
-                                                {session.course}
-                                              </span>
-                                            </div>
-                                            <div className="flex items-center gap-0.5 shrink-0">
-                                              {isLab ? (
-                                                <span className={cn(
-                                                  "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
-                                                  isTeacherOff
-                                                    ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                    : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
-                                                )}>Lab</span>
-                                              ) : (
-                                                <span className={cn(
-                                                  "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
-                                                  isTeacherOff
-                                                    ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                    : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
-                                                )}>Theory</span>
-                                              )}
-                                              {!isRoutineLocked && !isSubmitting && (
-                                                <DropdownMenu>
-                                                  <DropdownMenuTrigger asChild>
-                                                    <button
-                                                      draggable={false}
-                                                      onMouseDown={(e) => e.stopPropagation()}
-                                                      onPointerDown={(e) => e.stopPropagation()}
-                                                      onClick={(e) => e.stopPropagation()}
-                                                      className="ml-0.5 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-opacity focus:opacity-100 outline-none cursor-pointer"
-                                                      aria-label="Class actions"
-                                                    >
-                                                      <MoreVertical className="w-3 h-3 text-muted-foreground" />
-                                                    </button>
-                                                  </DropdownMenuTrigger>
-                                                  <DropdownMenuContent align="end" className="w-48" onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
-                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem className="cursor-pointer font-medium" onClick={(e) => { e.stopPropagation(); setSelectedSwapSource(session); }}>
-                                                      <ArrowLeftRight className="size-4 mr-2" /> Swap / Move Class
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    {!isClassOffToday ? (
-                                                      <DropdownMenuItem className="text-red-500 focus:text-red-500 cursor-pointer" onClick={(e) => { e.stopPropagation(); onCancelClass?.(session); }}>
-                                                        <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
-                                                      </DropdownMenuItem>
-                                                    ) : (
-                                                      <>
-                                                        <DropdownMenuItem className="cursor-pointer" onClick={(e) => { e.stopPropagation(); onReactivateClass?.(session); }}>
-                                                          <CheckCheck className="size-4 mr-2" /> Activate Class
-                                                        </DropdownMenuItem>
-                                                        {session.is_cancelled && (
-                                                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => { e.stopPropagation(); onUpdateCancelMessage?.(session); }}>
-                                                            <Pencil className="size-4 mr-2" /> Update Message
-                                                          </DropdownMenuItem>
-                                                        )}
-                                                      </>
+                                        <div className={cn(
+                                          "print:hidden w-full rounded-md border flex flex-row p-0.5 shadow-sm relative select-none justify-between items-stretch h-full min-h-[69px] gap-1",
+                                          "transition-all duration-150",
+                                          containerBgClass
+                                        )}>
+                                          {sessions.map((session, sIdx) => {
+                                            const teacherKey = session.teacherId ?? session.teacher;
+                                            const startTimeRaw = session.originalTime || "";
+                                            const key = teacherKey && startTimeRaw
+                                              ? generateClassKey(session.department, session.semester, abbreviateDay(session.day), teacherKey, startTimeRaw)
+                                              : "";
+                                            const classOffData = key ? classOffMap[key] : undefined;
+                                            const isClassOffToday = Boolean(classOffData?.status) || Boolean(session.is_cancelled);
+                                            const cancellationReason = classOffData?.reason || session.cancel_message || "No reason provided.";
+                                            const isTeacherOff = (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
+                                            const highlighted = isMatch(session);
+                                            const isLab = checkIsLab(session);
+
+                                            return (
+                                              <React.Fragment key={session.id}>
+                                                <div
+                                                  data-session-id={session.id}
+                                                  data-drag-source={selectedSwapSource?.id === session.id ? "1" : undefined}
+                                                  onPointerDown={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? (e) => startPointerDrag(e, session, isLab) : undefined}
+                                                  onPointerMove={onPointerMove}
+                                                  onPointerUp={onPointerUp}
+                                                  onPointerCancel={onPointerCancel}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (isClassOffToday) {
+                                                      onCellClick({ course: session.course, teacher: session.teacher, reason: cancellationReason });
+                                                    }
+                                                  }}
+                                                  className={cn(
+                                                    "relative flex-1 flex flex-col justify-between rounded px-1.5 py-1.5 transition-colors duration-150 min-w-0 select-none group/item",
+                                                    (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:bg-black/5 dark:hover:bg-white/5"
+                                                  )}
+                                                >
+                                                  <div className="flex flex-col gap-0.5 items-start w-full">
+                                                    <div className="flex items-center justify-between gap-0.5 w-full max-w-full">
+                                                      <div className={cn(
+                                                        "text-[8.5px] font-bold tracking-[-0.05em] text-foreground truncate pr-3.5 w-full block",
+                                                        isClassOffToday && "opacity-70 line-through"
+                                                      )}>
+                                                        {session.course}
+                                                      </div>
+                                                      <LazyClassActionsDropdown
+                                                        isRoutineLocked={isRoutineLocked}
+                                                        isSubmitting={isSubmitting}
+                                                        session={session}
+                                                        setSelectedSwapSource={setSelectedSwapSource}
+                                                        onCancelClass={onCancelClass}
+                                                        onReactivateClass={onReactivateClass}
+                                                        onUpdateCancelMessage={onUpdateCancelMessage}
+                                                        isClassOffToday={isClassOffToday}
+                                                        isMulti={true}
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex flex-col items-start gap-0.5 w-full mt-1">
+                                                    <div className="flex items-center gap-1 text-[9px] text-muted-foreground font-medium truncate max-w-full">
+                                                      {selectedTeacher !== "All Teachers" ? (
+                                                        <><BookOpen className="w-2.5 h-2.5 opacity-70 shrink-0" /><span className="truncate">{session.semester}</span></>
+                                                      ) : (
+                                                        <><User className="w-2.5 h-2.5 opacity-70 shrink-0" /><span className="truncate">{getTeacherInitials(session.teacher)}</span></>
+                                                      )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground/80 truncate max-w-full">
+                                                      <MapPin className="w-2.5 h-2.5 opacity-70 shrink-0" />
+                                                      <span className="truncate">{session.room}</span>
+                                                    </div>
+                                                    {session.group_name && (
+                                                      <div className="flex items-center gap-1 text-[9px] font-medium text-muted-foreground/80 truncate max-w-full">
+                                                        <Users className="w-2.5 h-2.5 opacity-70 shrink-0" />
+                                                        <span className="truncate">{session.group_name.replace("Group ", "")}</span>
+                                                      </div>
                                                     )}
-                                                  </DropdownMenuContent>
-                                                </DropdownMenu>
-                                              )}
-                                            </div>
-                                          </div>
-                                          <div className="flex flex-col gap-0.5 mt-1 w-full text-left">
-                                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                                              <User className="w-3 h-3 opacity-70" />
-                                              <span>{getTeacherInitials(session.teacher)}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-                                              <MapPin className="w-3 h-3 opacity-70" />
-                                              <span>{session.room}</span>
-                                            </div>
-                                            {session.group_name ? (
-                                              <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80">
-                                                <Users className="w-3 h-3 opacity-70" />
-                                                <span>{session.group_name}</span>
-                                              </div>
-                                            ) : (
-                                              <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80 invisible select-none pointer-events-none" aria-hidden="true">
-                                                <Users className="w-3 h-3 opacity-0" />
-                                                <span>Placeholder</span>
-                                              </div>
-                                            )}
-                                          </div>
-                                        </motion.div>
+                                                  </div>
+                                                </div>
+                                                {sIdx < sessions.length - 1 && (
+                                                  <div className="w-[1px] bg-border/40 self-stretch my-1 shrink-0" />
+                                                )}
+                                              </React.Fragment>
+                                            );
+                                          })}
+                                        </div>
                                       );
-                                    })()}
-                                    {/* Print view for multi or single sessions */}
-                                    <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1 gap-0.5">
-                                      {sessions.map((session, sIdx) => {
-                                        const teacherKey = session.teacherId ?? session.teacher;
-                                        const sTime = session.originalTime || "";
-                                        const cKey = teacherKey && sTime ? generateClassKey(session.department, session.semester, abbreviateDay(session.day), teacherKey, sTime) : "";
-                                        const offData = cKey ? classOffMap[cKey] : undefined;
-                                        const isTeacherOff = (offData?.status) || session.is_cancelled || (availabilityMap[teacherKey] === false);
-                                        return (
-                                          <div key={session.id} className={cn(
-                                            "w-full text-center",
-                                            isMulti && sIdx < sessions.length - 1 && "border-b border-black/20 pb-0.5 mb-0.5"
-                                          )}>
-                                            <span className="font-bold text-[11px] block">
-                                              {session.course}, T-{getTeacherInitials(session.teacher)}
+                                    }
+                                    const session = sessions[0];
+                                    const teacherKey = session.teacherId ?? session.teacher;
+                                    const startTimeRaw = session.originalTime || "";
+                                    const key = teacherKey && startTimeRaw
+                                      ? generateClassKey(session.department, session.semester, abbreviateDay(session.day), teacherKey, startTimeRaw)
+                                      : "";
+                                    const classOffData = key ? classOffMap[key] : undefined;
+                                    const isClassOffToday = Boolean(classOffData?.status) || Boolean(session.is_cancelled);
+                                    const cancellationReason = classOffData?.reason || session.cancel_message || "No reason provided.";
+                                    const isTeacherOff = (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
+                                    const highlighted = isMatch(session);
+                                    const isLab = checkIsLab(session);
+
+                                    return (
+                                      <motion.div
+                                        key={session.id}
+                                        data-session-id={session.id}
+                                        data-drag-source={selectedSwapSource?.id === session.id ? "1" : undefined}
+                                        onPointerDown={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? (e) => startPointerDrag(e, session, isLab) : undefined}
+                                        onPointerMove={onPointerMove}
+                                        onPointerUp={onPointerUp}
+                                        onPointerCancel={onPointerCancel}
+                                        className={cn(
+                                          "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden relative select-none",
+                                          "transition-colors duration-150",
+                                          (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:shadow-md",
+                                          isTeacherOff
+                                            ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                                            : highlighted
+                                              ? "bg-background border-emerald-500 shadow-md"
+                                              : isLab
+                                                ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40 hover:shadow-md"
+                                                : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40 hover:shadow-md"
+                                        )}
+                                      >
+                                        <div className="flex justify-between items-start w-full gap-1">
+                                          <div className="flex flex-col">
+                                            <span className={cn(
+                                              "text-xs font-extrabold tracking-tight leading-tight text-foreground",
+                                              isClassOffToday && "opacity-70"
+                                            )}>
+                                              {session.course}
                                             </span>
-                                            <span className="font-bold text-[11px] block">
-                                              {session.room}{session.group_name ? ` - ${session.group_name}` : ""}
-                                            </span>
-                                            {isTeacherOff && (
-                                              <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label block">
-                                                (Cancelled)
-                                              </span>
+                                          </div>
+                                          <div className="flex items-center gap-0.5 shrink-0">
+                                            {isLab ? (
+                                              <span className={cn(
+                                                "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
+                                                isTeacherOff
+                                                  ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                  : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                              )}>Lab</span>
+                                            ) : (
+                                              <span className={cn(
+                                                "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
+                                                isTeacherOff
+                                                  ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                  : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                              )}>Theory</span>
+                                            )}
+                                            <LazyClassActionsDropdown
+                                              isRoutineLocked={isRoutineLocked}
+                                              isSubmitting={isSubmitting}
+                                              session={session}
+                                              setSelectedSwapSource={setSelectedSwapSource}
+                                              onCancelClass={onCancelClass}
+                                              onReactivateClass={onReactivateClass}
+                                              onUpdateCancelMessage={onUpdateCancelMessage}
+                                              isClassOffToday={isClassOffToday}
+                                              isMulti={false}
+                                            />
+                                          </div>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 mt-1 w-full text-left">
+                                          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                                            {selectedTeacher !== "All Teachers" ? (
+                                              <><BookOpen className="w-3 h-3 opacity-70" /><span>{session.semester}</span></>
+                                            ) : (
+                                              <><User className="w-3 h-3 opacity-70" /><span>{getTeacherInitials(session.teacher)}</span></>
                                             )}
                                           </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </>
-                                ) : isBreakSlot(slot) ? (
-                                  <>
-                                    <div
-                                      className="absolute inset-0 opacity-10 print:hidden"
-                                      style={{
-                                        backgroundImage:
-                                          "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
-                                        backgroundSize: "4px 4px",
-                                      }}
-                                    />
-                                    <div className="h-full w-full min-h-[48px] flex items-center justify-center relative z-10 print:hidden">
-                                      <Utensils className="w-3 h-3 text-foreground/40" />
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="h-full w-full flex items-center justify-center min-h-[48px] print:min-h-0">
-                                    <div className="w-1 h-1 rounded-full bg-border print:hidden" />
+                                          <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
+                                            <MapPin className="w-3 h-3 opacity-70" />
+                                            <span>{session.room}</span>
+                                          </div>
+                                          {session.group_name ? (
+                                            <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80">
+                                              <Users className="w-3 h-3 opacity-70" />
+                                              <span>{session.group_name}</span>
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80 invisible select-none pointer-events-none" aria-hidden="true">
+                                              <Users className="w-3 h-3 opacity-0" />
+                                              <span>Placeholder</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </motion.div>
+                                    );
+                                  })()}
+                                  {/* Print view for multi or single sessions */}
+                                  <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1 gap-0.5">
+                                    {sessions.map((session, sIdx) => {
+                                      const teacherKey = session.teacherId ?? session.teacher;
+                                      const sTime = session.originalTime || "";
+                                      const cKey = teacherKey && sTime ? generateClassKey(session.department, session.semester, abbreviateDay(session.day), teacherKey, sTime) : "";
+                                      const offData = cKey ? classOffMap[cKey] : undefined;
+                                      const isTeacherOff = (offData?.status) || session.is_cancelled || (availabilityMap[teacherKey] === false);
+                                      return (
+                                        <div key={session.id} className={cn(
+                                          "w-full text-center",
+                                          isMulti && sIdx < sessions.length - 1 && "border-b border-black/20 pb-0.5 mb-0.5"
+                                        )}>
+                                          <span className="font-bold text-[11px] block">
+                                            {session.course}{selectedTeacher !== "All Teachers" ? ` (${session.semester.replace(" Semester", " Sem")})` : `, T-${getTeacherInitials(session.teacher)}`}
+                                          </span>
+                                          <span className="font-bold text-[11px] block">
+                                            {session.room}{session.group_name ? ` - ${session.group_name}` : ""}
+                                          </span>
+                                          {isTeacherOff && (
+                                            <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label block">
+                                              (Cancelled)
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                )}
-                              </TableCell>
-                            );
-                          })}
-                        </TrComponent>
-                      );
-                    })}
-                  </AnimatePresence>
-                </TbodyComponent>
+                                </>
+                              ) : isBreakSlot(slot) ? (
+                                <>
+                                  <div
+                                    className="absolute inset-0 opacity-10 print:hidden"
+                                    style={{
+                                      backgroundImage:
+                                        "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
+                                      backgroundSize: "4px 4px",
+                                    }}
+                                  />
+                                  <div className="h-full w-full min-h-[48px] flex items-center justify-center relative z-10 print:hidden">
+                                    <Utensils className="w-3 h-3 text-foreground/40" />
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center min-h-[48px] print:min-h-0">
+                                  <div className="w-1 h-1 rounded-full bg-border print:hidden" />
+                                </div>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
               );
             })}
           </Table>
@@ -1833,6 +1891,10 @@ export default function AdminRoutinePage({
     setRedoStack([]);
   }, []);
 
+  // ── Data Management (Export / Import) ──────────────────────────────────────
+  const [dataManagementOpen, setDataManagementOpen] = useState(false);
+
+
 
   const [lockConfirmModal, setLockConfirmModal] = useState<{
     isOpen: boolean;
@@ -1874,8 +1936,40 @@ export default function AdminRoutinePage({
 
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [selectedSemester, setSelectedSemester] = useState<string>("");
+  const [selectedTeacher, setSelectedTeacher] = useState<string>("All Teachers");
+
+  const isFilterDirty = useMemo(() => {
+    return (
+      (selectedSemester && selectedSemester !== "All Semesters") ||
+      (selectedTeacher && selectedTeacher !== "All Teachers") ||
+      inputValue !== ""
+    );
+  }, [selectedSemester, selectedTeacher, inputValue]);
+
+  const handleClearFilters = useCallback(() => {
+    setSelectedSemester("All Semesters");
+    setSelectedTeacher("All Teachers");
+    setInputValue("");
+  }, []);
 
   const localRoutineList = useSelector((s: RootState) => s.routine.routineList);
+
+  const teachersList = useMemo(() => {
+    if (!selectedDept) return ["All Teachers"];
+
+    const teachers = new Set<string>();
+    localRoutineList.forEach(item => {
+      if (item.department_name === selectedDept && item.teacher_name) {
+        teachers.add(item.teacher_name);
+      }
+    });
+
+    return ["All Teachers", ...Array.from(teachers).sort()];
+  }, [localRoutineList, selectedDept]);
+
+  useEffect(() => {
+    setSelectedTeacher("All Teachers");
+  }, [selectedDept]);
 
   const setLocalRoutineList = useCallback((updater: React.SetStateAction<APIRoutineItem[]>) => {
     if (typeof updater === "function") {
@@ -1942,7 +2036,7 @@ export default function AdminRoutinePage({
     }
   };
 
-  const handleReactivate = async (session: ClassSession) => {
+  const handleReactivate = useCallback(async (session: ClassSession) => {
     try {
       const res = await reactivateClass(session.id);
       if (res.success) {
@@ -1971,7 +2065,7 @@ export default function AdminRoutinePage({
     } catch (err: any) {
       toast.error(err.message || "An error occurred");
     }
-  };
+  }, [dispatch]);
 
   const isLoadingRoutine = useSelector((s: RootState) => s.routine.isLoading);
 
@@ -1997,7 +2091,7 @@ export default function AdminRoutinePage({
       return;
     }
     setGenerationVersion((prev) => prev + 1);
-  }, [localRoutineList, sortedTimeSlots, selectedDept, selectedSemester]);
+  }, [localRoutineList, sortedTimeSlots, selectedDept, selectedSemester, selectedTeacher]);
 
   const departments = useMemo(() => {
     if (dbDepartments.length > 0) {
@@ -2210,7 +2304,7 @@ export default function AdminRoutinePage({
     fetchUpdatedRoutine();
   }, [selectedDeptId, selectedSemesterId]);
 
-  const handleConfirmGenerate = async () => {
+  const handleConfirmGenerate = useCallback(async () => {
     if (isRoutineLocked) return;
     if (generateModal.departmentId === undefined) {
       toast.error("Please select a valid department to generate routine.");
@@ -2276,7 +2370,7 @@ export default function AdminRoutinePage({
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [isRoutineLocked, generateModal, dispatch, dbDepartments, dbSemesters, router]);
 
 
   const initiateLockAction = () => {
@@ -2289,7 +2383,7 @@ export default function AdminRoutinePage({
     }
   };
 
-  const handleConfirmLockAction = () => {
+  const handleConfirmLockAction = useCallback(() => {
     const type = lockConfirmModal.type;
     const input = lockConfirmInput.trim();
 
@@ -2302,7 +2396,7 @@ export default function AdminRoutinePage({
       toast.success("Routine unlocked. Generation enabled.");
       setLockConfirmModal((prev) => ({ ...prev, isOpen: false }));
     }
-  };
+  }, [lockConfirmModal.type, lockConfirmInput, dispatch]);
 
   const handleCellClick = useCallback(
     (data: { course: string; teacher: string; reason: string }) => {
@@ -2346,11 +2440,8 @@ export default function AdminRoutinePage({
 
 
   const currentRoutineSchedule = useMemo(() => {
+    const isTeacherFiltered = selectedTeacher !== "All Teachers";
     const isAllSemesters = selectedSemester === "All Semesters";
-
-    const targetSemesters = isAllSemesters
-      ? semesters.filter((s) => s !== "All Semesters")
-      : [selectedSemester];
 
     const scheduleRows: {
       day: string;
@@ -2361,31 +2452,25 @@ export default function AdminRoutinePage({
     const slotStartTimes = sortedTimeSlots.map((ts) => normalizeTime(ts.start_time));
     const uniqueCourses = new Set<string>();
 
-    DAYS_ORDER.forEach((day) => {
-      // Check if this day has any classes scheduled for the selected department
-      const dayHasAnyClasses = localRoutineList.some((item) => {
-        if (!selectedDept) return false;
-        return item.department_name === selectedDept && item.day_name === day;
-      });
+    if (isTeacherFiltered) {
+      // Teacher mode: 1 row per day (with no semester column)
+      DAYS_ORDER.forEach((day) => {
+        // Get all classes of this teacher on this day
+        const teacherClasses = localRoutineList.filter((item) => {
+          if (!selectedDept) return false;
+          const matchDept = item.department_name === selectedDept;
+          const matchDay = item.day_name === day;
+          const matchTeacher = item.teacher_name === selectedTeacher;
+          return matchDept && matchDay && matchTeacher;
+        });
 
-      targetSemesters.forEach((sem) => {
+        if (teacherClasses.length === 0) return; // Hide day if teacher has no classes
+
         const rowSlots = Array(sortedTimeSlots.length).fill(
           null
         ) as (ClassSession[] | null)[];
 
-        const itemsForCell = localRoutineList.filter((item) => {
-          if (!selectedDept) return false;
-
-          const matchDept = item.department_name === selectedDept;
-          const matchSem = item.semester_name === sem;
-          const matchDay = item.day_name === day;
-
-          return matchDept && matchSem && matchDay;
-        });
-
-        let hasContent = false;
-
-        itemsForCell.forEach((item) => {
+        teacherClasses.forEach((item) => {
           const normalizedApiTime = normalizeTime(item.start_time);
           const slotIndex = slotStartTimes.indexOf(normalizedApiTime);
 
@@ -2404,6 +2489,7 @@ export default function AdminRoutinePage({
               is_cancelled: Boolean(item.is_cancelled),
               cancel_message: item.cancel_message || null,
               group_name: item.group_name || null,
+              course_type: item.course_type,
             };
             if (rowSlots[slotIndex] === null) {
               rowSlots[slotIndex] = [session];
@@ -2411,36 +2497,104 @@ export default function AdminRoutinePage({
               rowSlots[slotIndex]!.push(session);
             }
             uniqueCourses.add(item.course_code);
-            hasContent = true;
           }
         });
 
-        const shouldPush = isAllSemesters ? dayHasAnyClasses : hasContent;
-
-        if (shouldPush) {
-          scheduleRows.push({
-            day,
-            semester: sem,
-            slots: rowSlots,
-          });
-        }
+        scheduleRows.push({
+          day,
+          semester: "",
+          slots: rowSlots,
+        });
       });
-    });
+    } else {
+      // Normal mode: 1 row per semester under day
+      const targetSemesters = isAllSemesters
+        ? semesters.filter((s) => s !== "All Semesters")
+        : [selectedSemester];
+
+      DAYS_ORDER.forEach((day) => {
+        // Check if this day has any classes scheduled for the selected department
+        const dayHasAnyClasses = localRoutineList.some((item) => {
+          if (!selectedDept) return false;
+          return item.department_name === selectedDept && item.day_name === day;
+        });
+
+        targetSemesters.forEach((sem) => {
+          const rowSlots = Array(sortedTimeSlots.length).fill(
+            null
+          ) as (ClassSession[] | null)[];
+
+          const itemsForCell = localRoutineList.filter((item) => {
+            if (!selectedDept) return false;
+
+            const matchDept = item.department_name === selectedDept;
+            const matchSem = item.semester_name === sem;
+            const matchDay = item.day_name === day;
+
+            return matchDept && matchSem && matchDay;
+          });
+
+          let hasContent = false;
+
+          itemsForCell.forEach((item) => {
+            const normalizedApiTime = normalizeTime(item.start_time);
+            const slotIndex = slotStartTimes.indexOf(normalizedApiTime);
+
+            if (slotIndex !== -1) {
+              const session: ClassSession = {
+                id: item.id,
+                dayId: typeof item.day === 'string' ? parseInt(item.day, 10) : item.day,
+                course: item.course_code,
+                teacher: item.teacher_name,
+                room: item.room_number,
+                teacherId: item.teacher_name,
+                originalTime: item.start_time,
+                department: item.department_name,
+                semester: item.semester_name,
+                day: item.day_name,
+                is_cancelled: Boolean(item.is_cancelled),
+                cancel_message: item.cancel_message || null,
+                group_name: item.group_name || null,
+                course_type: item.course_type,
+              };
+              if (rowSlots[slotIndex] === null) {
+                rowSlots[slotIndex] = [session];
+              } else {
+                rowSlots[slotIndex]!.push(session);
+              }
+              uniqueCourses.add(item.course_code);
+              hasContent = true;
+            }
+          });
+
+          const shouldPush = isAllSemesters ? dayHasAnyClasses : hasContent;
+
+          if (shouldPush) {
+            scheduleRows.push({
+              day,
+              semester: sem,
+              slots: rowSlots,
+            });
+          }
+        });
+      });
+    }
 
     const totalCredits = uniqueCourses.size * 3;
 
     return {
       label: selectedDept || "Select Department",
-      subLabel:
-        selectedSemester === "All Semesters"
+      subLabel: isTeacherFiltered
+        ? `${selectedTeacher}'s Routine`
+        : selectedSemester === "All Semesters"
           ? "All Semesters"
           : `${selectedSemester} Semester`,
       totalCredits: totalCredits,
       schedule: scheduleRows,
       isEmpty: scheduleRows.length === 0,
-      isAllSemestersMode: isAllSemesters,
+      isAllSemestersMode: !isTeacherFiltered && isAllSemesters,
     };
-  }, [localRoutineList, selectedDept, selectedSemester, semesters, sortedTimeSlots]);
+  }, [localRoutineList, selectedDept, selectedSemester, semesters, sortedTimeSlots, selectedTeacher]);
 
   const printHeader = useMemo(() => (
     <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center pt-0 text-center w-full font-serif text-black">
@@ -2448,11 +2602,11 @@ export default function AdminRoutinePage({
         Department of {currentRoutineSchedule.label}
         {currentRoutineSchedule.isAllSemestersMode && " (All Routine)"}
       </h1>
-      {!currentRoutineSchedule.isAllSemestersMode && (
+      {(!currentRoutineSchedule.isAllSemestersMode || selectedTeacher !== "All Teachers") ? (
         <>
           <div className="border-2 border-black! border-double px-8 py-0.5 mb-3 print-header-border">
             <h2 className="text-base font-bold uppercase text-black tracking-wide">
-              Class Routine
+              {selectedTeacher !== "All Teachers" ? `${selectedTeacher}'s Class Routine` : "Class Routine"}
             </h2>
           </div>
           <table className="w-full border-collapse border border-black mb-6 text-xs text-black font-serif print-header-table">
@@ -2467,15 +2621,22 @@ export default function AdminRoutinePage({
                   {currentRoutineSchedule.totalCredits}
                 </td>
               </tr>
+              {selectedTeacher !== "All Teachers" && (
+                <tr>
+                  <td className="bg-gray-200 font-bold text-center w-[15%] py-1.5">Teacher</td>
+                  <td colSpan={3} className="bg-white font-bold text-center py-1.5 font-sans">
+                    {selectedTeacher}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </>
-      )}
-      {currentRoutineSchedule.isAllSemestersMode && (
+      ) : (
         <div className="mb-6" />
       )}
     </div>
-  ), [currentRoutineSchedule]);
+  ), [currentRoutineSchedule, selectedTeacher]);
 
   const validTeacherShortNames = useMemo(() => {
     const uniqueShortNames = new Set<string>();
@@ -2836,6 +2997,16 @@ export default function AdminRoutinePage({
               )}
 
               <Button
+                onClick={() => setDataManagementOpen(true)}
+                variant="outline"
+                className="gap-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-500/60 hidden md:flex"
+                title="Excel Export / Import / Sync"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                <span className="hidden lg:inline">Data Tools</span>
+              </Button>
+
+              <Button
                 onClick={() => window.print()}
                 variant="outline"
                 className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex"
@@ -2861,7 +3032,7 @@ export default function AdminRoutinePage({
                 />
               </div>
 
-              { }
+              {/* Semester select filter */}
               <div className="flex-1 min-w-[150px]">
                 <CustomSelect
                   value={selectedSemester}
@@ -2871,6 +3042,16 @@ export default function AdminRoutinePage({
                     label: sem === "All Semesters" ? "All Semesters" : `${sem} Semester`
                   }))}
                   placeholder="Select Semester"
+                />
+              </div>
+
+              {/* Teacher select filter */}
+              <div className="flex-1 min-w-[180px]">
+                <CustomSelect
+                  value={selectedTeacher}
+                  onChange={setSelectedTeacher}
+                  options={teachersList.map((t) => ({ value: t, label: t }))}
+                  placeholder="Select Teacher"
                 />
               </div>
 
@@ -2905,6 +3086,27 @@ export default function AdminRoutinePage({
                 />
               </div>
             </motion.div>
+
+            <AnimatePresence>
+              {isFilterDirty && (
+                <motion.div
+                  variants={itemVariants}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="w-full sm:w-auto"
+                >
+                  <Button
+                    variant="ghost"
+                    onClick={handleClearFilters}
+                    className="gap-2 text-muted-foreground hover:text-foreground text-xs font-semibold px-4 h-12 rounded-xl border border-dashed border-border hover:border-muted-foreground/30 w-full sm:w-auto transition-all"
+                  >
+                    <X className="h-4 w-4" />
+                    Clear Filters
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
 
@@ -3053,6 +3255,7 @@ export default function AdminRoutinePage({
               <div className="overflow-x-auto w-full print:overflow-visible">
                 { }
                 <MemoizedRoutineTable
+                  key={selectedTeacher}
                   schedule={currentRoutineSchedule.schedule}
                   timeSlots={sortedTimeSlots}
                   isMatch={isMatch}
@@ -3069,6 +3272,7 @@ export default function AdminRoutinePage({
                   onReactivateClass={handleReactivateClass}
                   onUpdateCancelMessage={handleUpdateCancelMessage}
                   onHistoryAction={handleHistoryAction}
+                  selectedTeacher={selectedTeacher}
                 />
               </div>
             </motion.div>
@@ -3088,6 +3292,16 @@ export default function AdminRoutinePage({
 
       { }
       <ViewReasonDialog ref={viewReasonDialogRef} />
+
+      {/* ── Data Management Dialog ── */}
+      <DataManagementDialog
+        isOpen={dataManagementOpen}
+        onOpenChange={setDataManagementOpen}
+        onSuccess={() => refreshRoutine(true)}
+      />
+
+
+
 
       { }
       <Dialog

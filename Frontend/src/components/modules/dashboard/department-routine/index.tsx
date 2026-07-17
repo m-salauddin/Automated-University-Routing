@@ -87,6 +87,7 @@ type ClassSession = {
   is_cancelled?: boolean;
   cancel_message?: string | null;
   group_name?: string | null;
+  course_type?: string;
 };
 
 type DayRow = {
@@ -171,6 +172,13 @@ const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string
     return lastDigit % 2 === 0;
   }
   return false;
+};
+
+const checkIsLab = (s: ClassSession) => {
+  if (s.course_type) {
+    return s.course_type.toLowerCase() === "lab";
+  }
+  return isLabClass(s.course, undefined, s.room);
 };
 
 const containerVariants = {
@@ -535,6 +543,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
           is_cancelled: Boolean(item.is_cancelled),
           cancel_message: item.cancel_message || null,
           group_name: item.group_name || null,
+          course_type: item.course_type,
         };
         if (dayRow.slots[slotIndex] === null) {
           dayRow.slots[slotIndex] = [session];
@@ -768,7 +777,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
               const cancellationReason = classOffData?.reason || session.cancel_message || "No reason provided.";
               const isTeacherOff = (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
               const highlighted = isMatch(session);
-              const isLab = isLabClass(session.course, undefined, session.room);
+              const isLab = checkIsLab(session);
               const isClickable = isClassOffToday || (role === "teacher" && teacherSemesters.has(semesterKey));
 
               const handleCardClick = (e: React.MouseEvent) => {
@@ -836,10 +845,10 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                         isTeacherOff
                           ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-950/10 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
                           : highlighted
-                          ? "bg-background border-emerald-500 shadow-md"
-                          : isLab
-                          ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40"
-                          : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40"
+                            ? "bg-background border-emerald-500 shadow-md"
+                            : isLab
+                              ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40"
+                              : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40"
                       )}
                     >
                       <div className="flex justify-between items-start w-full gap-1">
@@ -938,7 +947,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
       <Table className="w-full overflow-hidden min-w-[1000px] print:min-w-0 print:w-full border border-border/60 border-collapse text-sm print:border-collapse !print:border-black">
         <TableHeader>
           <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b">
-            <TableCell 
+            <TableCell
               className="p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border/60 relative bg-muted/40 print:bg-white !print:border-r !print:border-black print:w-20 print:min-w-0"
               style={{ width: colWidths["day"] || 90, minWidth: colWidths["day"] || 90 }}
             >
@@ -968,7 +977,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             </TableCell>
 
             {isAllSemesters && (
-              <TableCell 
+              <TableCell
                 className="w-12 min-w-[48px] text-center font-bold bg-muted/40 border-r border-border/60 text-xs uppercase print:bg-white print:text-black !print:border-r !print:border-black print-sem-cell relative"
                 style={{ width: colWidths["semester"] || 48, minWidth: colWidths["semester"] || 48 }}
               >
@@ -983,7 +992,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             {sortedTimeSlots.map((slot, idx) => {
               const hasClass = scheduleToRender.some((dayRow) => dayRow.slots[idx] !== null);
               const isBreak = isBreakSlot(slot);
-              const defaultColWidth = isBreak ? 100 : 180;
+              const defaultColWidth = isBreak ? (hasClass ? 180 : 50) : 180;
               const colWidth = colWidths[slot.id] || defaultColWidth;
 
               if (isBreak) {
@@ -995,7 +1004,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                       style={{ width: colWidth, minWidth: colWidth }}
                     >
                       <div className="h-full flex items-center justify-center">
-                        <span className="text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black print-break-text-no-class">
+                        <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black print-break-text-no-class">
                           BREAK
                         </span>
                       </div>
@@ -1092,7 +1101,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
                           </TableCell>
                         )}
 
-                        <TableCell 
+                        <TableCell
                           className="font-bold text-xs text-center border-r border-border/60 bg-muted/10 print:bg-white print:text-black !print:border-r !print:border-black print-sem-cell w-12 min-w-[48px] relative"
                           style={{ width: colWidths["semester"] || 48, minWidth: colWidths["semester"] || 48 }}
                         >

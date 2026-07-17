@@ -58,7 +58,6 @@ export function NotificationBell() {
 
     const matchSwapRequest = (notification: Notification, requests: any[]): number | null => {
         if (!requests || requests.length === 0) {
-            console.warn("[SwapMatch] swapRequests is empty — cannot match.");
             return null;
         }
 
@@ -67,16 +66,6 @@ export function NotificationBell() {
         const date = dateMatch ? dateMatch[0] : null;
         const isProxy = text.includes("proxy") || text.includes("substitut");
         const swapType = isProxy ? "PROXY" : "MUTUAL";
-
-        console.log("[SwapMatch] Looking for:", { swapType, date, text });
-        console.log("[SwapMatch] Available requests:", requests.map((r: any) => ({
-            id: r.id,
-            swap_type: r.swap_type,
-            swap_date: r.swap_date,
-            status: r.status,
-            requester: r.requester_name || r.requester_username || r.requester?.username,
-            target: r.target_teacher_name || r.target_teacher_username || r.target_teacher?.username,
-        })));
 
         // Pass 1: exact type + date + username match
         let found = requests.find((r: any) => {
@@ -88,7 +77,7 @@ export function NotificationBell() {
             if (targetUsername && text.includes(targetUsername)) return true;
             return false;
         });
-        if (found) { console.log("[SwapMatch] Pass 1 match:", found.id); return found.id; }
+        if (found) return found.id;
 
         // Pass 2: type + date match (ignore username)
         found = requests.find((r: any) => {
@@ -96,50 +85,47 @@ export function NotificationBell() {
             if (date && r.swap_date !== date) return false;
             return true;
         });
-        if (found) { console.log("[SwapMatch] Pass 2 match (date only):", found.id); return found.id; }
+        if (found) return found.id;
 
         // Pass 3: type match only, prefer PENDING status
         found = requests.find((r: any) =>
             r.swap_type === swapType && (r.status === "PENDING" || !r.status)
         );
-        if (found) { console.log("[SwapMatch] Pass 3 match (type+pending):", found.id); return found.id; }
+        if (found) return found.id;
 
         // Pass 4: just type match — last resort
         found = requests.find((r: any) => r.swap_type === swapType);
-        if (found) { console.log("[SwapMatch] Pass 4 match (type only):", found.id); return found.id; }
+        if (found) return found.id;
 
         // Pass 5: absolutely any pending request
         found = requests.find((r: any) => r.status === "PENDING" || !r.status);
-        if (found) { console.log("[SwapMatch] Pass 5 match (any pending):", found.id); return found.id; }
+        if (found) return found.id;
 
-        console.warn("[SwapMatch] No match found in any pass.");
         return null;
     };
 
     const getSwapRequestId = (notification: Notification): number | null => {
         const n = notification as any;
-        console.log("[NotifDebug] Raw notification object:", JSON.stringify(n, null, 2));
 
-        if (n.action_object_id) { console.log("[NotifDebug] Found via action_object_id:", n.action_object_id); return Number(n.action_object_id); }
-        if (n.action_object_object_id) { console.log("[NotifDebug] Found via action_object_object_id:", n.action_object_object_id); return Number(n.action_object_object_id); }
-        if (n.target_id) { console.log("[NotifDebug] Found via target_id:", n.target_id); return Number(n.target_id); }
-        if (n.target_object_id) { console.log("[NotifDebug] Found via target_object_id:", n.target_object_id); return Number(n.target_object_id); }
-        if (n.action_object && typeof n.action_object === "object" && n.action_object.id) { console.log("[NotifDebug] Found via action_object.id:", n.action_object.id); return Number(n.action_object.id); }
-        if (n.target && typeof n.target === "object" && n.target.id) { console.log("[NotifDebug] Found via target.id:", n.target.id); return Number(n.target.id); }
+        if (n.action_object_id) return Number(n.action_object_id);
+        if (n.action_object_object_id) return Number(n.action_object_object_id);
+        if (n.target_id) return Number(n.target_id);
+        if (n.target_object_id) return Number(n.target_object_id);
+        if (n.action_object && typeof n.action_object === "object" && n.action_object.id) return Number(n.action_object.id);
+        if (n.target && typeof n.target === "object" && n.target.id) return Number(n.target.id);
         if (n.data && typeof n.data === "object") {
-            if (n.data.request_id) { console.log("[NotifDebug] Found via data.request_id:", n.data.request_id); return Number(n.data.request_id); }
-            if (n.data.id) { console.log("[NotifDebug] Found via data.id:", n.data.id); return Number(n.data.id); }
-            if (n.data.action_object_id) { console.log("[NotifDebug] Found via data.action_object_id:", n.data.action_object_id); return Number(n.data.action_object_id); }
+            if (n.data.request_id) return Number(n.data.request_id);
+            if (n.data.id) return Number(n.data.id);
+            if (n.data.action_object_id) return Number(n.data.action_object_id);
         }
         if (n.action_url) {
             const urlMatch = n.action_url.match(/\/(\d+)\/?$/) || n.action_url.match(/(\d+)/);
-            if (urlMatch && urlMatch[1]) { console.log("[NotifDebug] Found via action_url:", urlMatch[1]); return Number(urlMatch[1]); }
+            if (urlMatch && urlMatch[1]) return Number(urlMatch[1]);
         }
         const text = `${notification.title || ""} ${notification.verb || ""} ${notification.message || ""} ${notification.description || ""}`;
         const match = text.match(/(?:request|swap|id)[:#\s]+(\d+)/i) || text.match(/#(\d+)/);
-        if (match && match[1]) { console.log("[NotifDebug] Found via text pattern:", match[1]); return Number(match[1]); }
+        if (match && match[1]) return Number(match[1]);
 
-        console.warn("[NotifDebug] No ID in notification fields — falling back to text matching.");
         return matchSwapRequest(notification, swapRequests);
     };
 
@@ -212,12 +198,7 @@ export function NotificationBell() {
             const swapRes = await getSwapRequests();
             if (swapRes.success) {
                 const list = Array.isArray(swapRes.data) ? swapRes.data : (swapRes.data?.results ?? []);
-                if (!(swapRes as any).isNotSupported) {
-                    console.log("[SwapRequests] Fetched", list.length, "swap requests:", list);
-                }
                 setSwapRequests(list);
-            } else {
-                console.warn("[SwapRequests] Failed to fetch:", swapRes.message);
             }
         } catch (error) {
             console.error("Failed to load notifications:", error);
@@ -353,9 +334,9 @@ export function NotificationBell() {
                                     const title = notification.title || notification.verb || "Notification";
                                     const message = notification.message || notification.description || "";
                                     const dateStr = notification.created_at || notification.timestamp;
-                                    const swapId = getSwapRequestId(notification);
                                     const isProxy = isProxyRequest(notification);
                                     const isMutual = isMutualSwapRequest(notification);
+                                    const swapId = (isProxy || isMutual) ? getSwapRequestId(notification) : null;
 
                                     const matchedReq = swapRequests.find(r => r.id === swapId);
                                     const backendStatus = matchedReq ? (matchedReq.status || matchedReq.action) : null;
@@ -403,7 +384,12 @@ export function NotificationBell() {
                                                 "relative px-5 py-4 transition-all duration-200 group",
                                                 !showActions && isUnread && "cursor-pointer",
                                                 isUnread
-                                                    ? "bg-amber-50/50 dark:bg-amber-500/[0.03]"
+                                                    ? isNotice ? "bg-sky-50/40 dark:bg-sky-500/[0.02]"
+                                                      : isAccepted ? "bg-emerald-50/40 dark:bg-emerald-500/[0.02]"
+                                                      : isRejected ? "bg-red-50/40 dark:bg-red-500/[0.02]"
+                                                      : isProxy ? "bg-violet-50/40 dark:bg-violet-500/[0.02]"
+                                                      : isMutual ? "bg-blue-50/40 dark:bg-blue-500/[0.02]"
+                                                      : "bg-amber-50/40 dark:bg-amber-500/[0.02]"
                                                     : "bg-transparent hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30"
                                             )}
                                         >
@@ -414,7 +400,9 @@ export function NotificationBell() {
                                                     isNotice ? "bg-sky-500" :
                                                     isAccepted ? "bg-emerald-500" :
                                                     isRejected ? "bg-red-500" :
-                                                    "bg-amber-400"
+                                                    isProxy ? "bg-violet-500" :
+                                                    isMutual ? "bg-blue-500" :
+                                                    "bg-amber-500"
                                                 )} />
                                             )}
 
@@ -518,39 +506,41 @@ export function NotificationBell() {
                                                     className="flex flex-col gap-2 mt-3 ml-11"
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    {/* Request ID input — pre-filled if auto-detected */}
-                                                    <div className="flex items-center gap-2">
-                                                        <label className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 shrink-0">
-                                                            Request ID
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            min="1"
-                                                            placeholder={swapId ? String(swapId) : "Enter ID…"}
-                                                            value={swapIdInputs[notification.id] ?? (swapId ? String(swapId) : "")}
-                                                            onChange={(e) =>
-                                                                setSwapIdInputs(prev => ({
-                                                                    ...prev,
-                                                                    [notification.id]: e.target.value
-                                                                }))
-                                                            }
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            className={cn(
-                                                                "w-20 h-6 px-2 rounded-md text-[11px] font-mono border outline-none transition-colors",
-                                                                "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700",
-                                                                "text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400",
-                                                                "focus:border-amber-400 dark:focus:border-amber-500",
-                                                                !swapId && !swapIdInputs[notification.id]
-                                                                    ? "border-amber-300 dark:border-amber-600/50"
-                                                                    : ""
+                                                    {/* Request ID input — only shown as fallback if auto-detection fails */}
+                                                    {!swapId && (
+                                                        <div className="flex items-center gap-2">
+                                                            <label className="text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 shrink-0">
+                                                                Request ID
+                                                            </label>
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                placeholder="Enter ID…"
+                                                                value={swapIdInputs[notification.id] ?? ""}
+                                                                onChange={(e) =>
+                                                                    setSwapIdInputs(prev => ({
+                                                                        ...prev,
+                                                                        [notification.id]: e.target.value
+                                                                    }))
+                                                                }
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                className={cn(
+                                                                    "w-20 h-6 px-2 rounded-md text-[11px] font-mono border outline-none transition-colors",
+                                                                    "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700",
+                                                                    "text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400",
+                                                                    "focus:border-amber-400 dark:focus:border-amber-500",
+                                                                    !swapIdInputs[notification.id]
+                                                                        ? "border-amber-300 dark:border-amber-600/50"
+                                                                        : ""
+                                                                )}
+                                                            />
+                                                            {!swapIdInputs[notification.id] && (
+                                                                <span className="text-[10px] text-amber-500 dark:text-amber-400">
+                                                                    required
+                                                                </span>
                                                             )}
-                                                        />
-                                                        {!swapId && !swapIdInputs[notification.id] && (
-                                                            <span className="text-[10px] text-amber-500 dark:text-amber-400">
-                                                                required
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                        </div>
+                                                    )}
                                                     {/* Buttons */}
                                                     <div className="flex items-center gap-2">
                                                         <button

@@ -15,6 +15,7 @@ export type APIRoutineItem = {
   group_name?: string | null;
   is_cancelled?: boolean;
   cancel_message?: string | null;
+  course_type?: string;
 };
 
 export interface RoutineState {

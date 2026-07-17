@@ -129,6 +129,7 @@ export type APIRoutineItem = {
   is_temporary_proxy?: boolean;
   is_temporary_mutual?: boolean;
   date?: string;
+  course_type?: string;
 };
 
 type TeacherInfo = {
@@ -157,6 +158,7 @@ type RoutineRowState = {
   is_temporary_proxy?: boolean;
   is_temporary_mutual?: boolean;
   date?: string;
+  course_type?: string;
 };
 
 type TimeSlot = {
@@ -286,68 +288,55 @@ function CancellationModal({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md w-full overflow-hidden">
-        <AnimatePresence mode="wait">
-          {isOpen && (
-            <motion.div
-              variants={modalContainerVariants}
-              initial="hidden"
-              animate="visible"
-              className="flex flex-col gap-4"
+        <div className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for cancelling{" "}
+              <strong>{courseName}</strong>. This will be visible to
+              students.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label
+                htmlFor="reason"
+                className="flex justify-between text-xs font-medium"
+              >
+                <span>Reason</span>
+                <span
+                  className={cn(
+                    "text-muted-foreground",
+                    reason.length === LIMIT && "text-red-500"
+                  )}
+                >
+                  {reason.length}/{LIMIT} characters
+                </span>
+              </Label>
+              <Textarea
+                id="reason"
+                placeholder="e.g., Sick leave, Emergency meeting..."
+                value={reason}
+                onChange={handleTextChange}
+                className="h-32 resize-none break-all whitespace-pre-wrap"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button variant="outline" onClick={handleCloseClick}>
+              Close
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmClick}
+              disabled={!reason.trim()}
             >
-              <motion.div variants={modalItemVariants}>
-                <DialogHeader>
-                  <DialogTitle>{title}</DialogTitle>
-                  <DialogDescription>
-                    Please provide a reason for cancelling{" "}
-                    <strong>{courseName}</strong>. This will be visible to
-                    students.
-                  </DialogDescription>
-                </DialogHeader>
-              </motion.div>
-
-              <motion.div variants={modalItemVariants} className="space-y-3">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="reason"
-                    className="flex justify-between text-xs font-medium"
-                  >
-                    <span>Reason</span>
-                    <span
-                      className={cn(
-                        "text-muted-foreground",
-                        reason.length === LIMIT && "text-red-500"
-                      )}
-                    >
-                      {reason.length}/{LIMIT} characters
-                    </span>
-                  </Label>
-                  <Textarea
-                    id="reason"
-                    placeholder="e.g., Sick leave, Emergency meeting..."
-                    value={reason}
-                    onChange={handleTextChange}
-                    className="h-32 resize-none break-all whitespace-pre-wrap"
-                  />
-                </div>
-              </motion.div>
-
-              <motion.div variants={modalItemVariants}>
-                <DialogFooter className="sm:justify-end gap-2">
-                  <Button variant="outline" onClick={handleCloseClick}>
-                    Close
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={handleConfirmClick}
-                    disabled={!reason.trim()}
-                  >
-                    {confirmLabel}
-                  </Button>
-                </DialogFooter>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              {confirmLabel}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -692,8 +681,11 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
 
       const mappedRows: RoutineRowState[] = routineList.map((item) => {
         const isLab =
-          item.course_code.endsWith("L") ||
-          item.course_name.toLowerCase().includes("lab");
+          item.course_type?.toLowerCase() === "lab" ||
+          (!item.course_type && (
+            item.course_code.endsWith("L") ||
+            item.course_name.toLowerCase().includes("lab")
+          ));
 
         return {
           id: item.id,
@@ -713,6 +705,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           is_temporary_proxy: Boolean(item.is_temporary_proxy),
           is_temporary_mutual: Boolean(item.is_temporary_mutual),
           date: item.date || "",
+          course_type: item.course_type,
         };
       });
 
@@ -1997,7 +1990,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                       <Table className="w-full overflow-hidden min-w-[1000px] border border-border/60 border-collapse text-sm print:border-collapse !print:border-black">
                         <TableHeader>
                           <TableRow className="border-b border-border/60 hover:bg-transparent print:border-black print:border-b bg-muted/40">
-                            <TableCell 
+                            <TableCell
                               className="p-0 w-[90px] min-w-[90px] h-[50px] border-r border-border/60 relative bg-muted/40 print:bg-white !print:border-r !print:border-black print:w-20 print:min-w-0"
                               style={{ width: colWidths["day"] || 90, minWidth: colWidths["day"] || 90 }}
                             >
@@ -2028,7 +2021,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                             {sortedTimeSlots.map((slot, idx) => {
                               const hasClass = gridSchedule.some(dayRow => dayRow.slots[idx] !== null);
                               const isBreak = isBreakSlot(slot);
-                              const defaultColWidth = isBreak ? 100 : 180;
+                              const defaultColWidth = isBreak ? (hasClass ? 180 : 50) : 180;
                               const colWidth = colWidths[slot.id] || defaultColWidth;
 
                               if (isBreak) {
@@ -2040,7 +2033,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                                       style={{ width: colWidth, minWidth: colWidth }}
                                     >
                                       <div className="h-full flex items-center justify-center">
-                                        <span className="text-[9.5px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black print-break-text-no-class">
+                                        <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black print-break-text-no-class">
                                           BREAK
                                         </span>
                                       </div>
@@ -2179,7 +2172,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                                                 </React.Fragment>
                                               ))}
                                             </div>
-                                            
+
                                             <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-0.5 gap-0.5">
                                               {sessions.map((session, sIdx) => {
                                                 const key = generateClassKey(
@@ -2335,7 +2328,7 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                             className="w-10 min-w-10 text-center align-middle h-[45px] border-r border-b border-black p-0 print:border-black bg-white print:w-6 print:min-w-0"
                           >
                             <div className="flex flex-col items-center justify-center h-full w-full px-1">
-                              <span className="font-bold text-[10px] text-black -rotate-90 whitespace-nowrap print-break-text-no-class">
+                              <span className="font-bold text-[8px] text-black -rotate-90 whitespace-nowrap print-break-text-no-class">
                                 BREAK
                               </span>
                             </div>
@@ -2385,69 +2378,69 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
                   </TableRow>
                 ) : (
                   gridSchedule.map((rowItem) => {
-                     return (
-                       <TableRow
-                         key={rowItem.day}
-                         className="hover:bg-transparent print:border-black"
-                       >
-                         <TableCell className="font-bold text-[11px] uppercase p-0 align-middle text-center bg-white border-r border-b border-black print:border-black text-black">
-                           {rowItem.day}
-                         </TableCell>
-                         {rowItem.slots.map((sessionList, index) => {
-                           const slot = sortedTimeSlots[index];
-                           const sessions = sessionList && sessionList.length > 0 ? sessionList : null;
-                           return (
-                             <TableCell
-                               key={index}
-                               className={cn(
-                                 "align-middle border-r border-b border-black p-1 bg-white print:border-black text-center h-[70px]",
-                                 (!sessions && isBreakSlot(slot)) ? "bg-gray-100" : ""
-                               )}
-                             >
-                               {sessions ? (
-                                 <div className="flex flex-col items-center justify-center text-center text-black leading-tight py-0.5 gap-0.5">
-                                   {sessions.map((session, sIdx) => {
-                                     const key = generateClassKey(
-                                       session.department,
-                                       session.semester,
-                                       session.day,
-                                       session.teacherId,
-                                       session.startTimeRaw
-                                     );
-                                     const offRecord = classOffMap[key];
-                                     const isOffSlot = Boolean(offRecord?.status);
-                                     const isTeacherOff = availabilityMap[session.teacherId] === false;
-                                     const isCancelled = isOffSlot || isTeacherOff || session.is_cancelled;
+                    return (
+                      <TableRow
+                        key={rowItem.day}
+                        className="hover:bg-transparent print:border-black"
+                      >
+                        <TableCell className="font-bold text-[11px] uppercase p-0 align-middle text-center bg-white border-r border-b border-black print:border-black text-black">
+                          {rowItem.day}
+                        </TableCell>
+                        {rowItem.slots.map((sessionList, index) => {
+                          const slot = sortedTimeSlots[index];
+                          const sessions = sessionList && sessionList.length > 0 ? sessionList : null;
+                          return (
+                            <TableCell
+                              key={index}
+                              className={cn(
+                                "align-middle border-r border-b border-black p-1 bg-white print:border-black text-center h-[70px]",
+                                (!sessions && isBreakSlot(slot)) ? "bg-gray-100" : ""
+                              )}
+                            >
+                              {sessions ? (
+                                <div className="flex flex-col items-center justify-center text-center text-black leading-tight py-0.5 gap-0.5">
+                                  {sessions.map((session, sIdx) => {
+                                    const key = generateClassKey(
+                                      session.department,
+                                      session.semester,
+                                      session.day,
+                                      session.teacherId,
+                                      session.startTimeRaw
+                                    );
+                                    const offRecord = classOffMap[key];
+                                    const isOffSlot = Boolean(offRecord?.status);
+                                    const isTeacherOff = availabilityMap[session.teacherId] === false;
+                                    const isCancelled = isOffSlot || isTeacherOff || session.is_cancelled;
 
-                                     return (
-                                       <div key={`print-${session.id}`} className={cn(
-                                         "w-full text-center",
-                                         sessions.length > 1 && sIdx < sessions.length - 1 && "border-b border-black/20 pb-0.5 mb-0.5"
-                                       )}>
-                                         <span className="font-bold text-[11px] block">{session.course}</span>
-                                         <span className="text-[10px] block">Room {session.room}{session.group_name ? ` - ${session.group_name}` : ""}</span>
-                                         <span className="text-[9px] font-semibold text-gray-800 block">{session.semester} Sem</span>
-                                         {isCancelled && (
-                                           <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label block">
-                                             (Cancelled)
-                                           </span>
-                                         )}
-                                       </div>
-                                     );
-                                   })}
-                                 </div>
-                               ) : isBreakSlot(slot) ? (
-                                 <div className="h-full w-full flex items-center justify-center" />
-                               ) : (
-                                 <div className="h-full w-full flex items-center justify-center">
-                                   <div className="w-0.5 h-0.5 rounded-full bg-gray-400" />
-                                 </div>
-                               )}
-                             </TableCell>
-                           );
-                         })}
-                       </TableRow>
-                     );
+                                    return (
+                                      <div key={`print-${session.id}`} className={cn(
+                                        "w-full text-center",
+                                        sessions.length > 1 && sIdx < sessions.length - 1 && "border-b border-black/20 pb-0.5 mb-0.5"
+                                      )}>
+                                        <span className="font-bold text-[11px] block">{session.course}</span>
+                                        <span className="text-[10px] block">Room {session.room}{session.group_name ? ` - ${session.group_name}` : ""}</span>
+                                        <span className="text-[9px] font-semibold text-gray-800 block">{session.semester} Sem</span>
+                                        {isCancelled && (
+                                          <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label block">
+                                            (Cancelled)
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : isBreakSlot(slot) ? (
+                                <div className="h-full w-full flex items-center justify-center" />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center">
+                                  <div className="w-0.5 h-0.5 rounded-full bg-gray-400" />
+                                </div>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    );
                   })
                 )}
               </TableBody>

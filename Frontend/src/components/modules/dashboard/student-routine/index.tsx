@@ -48,6 +48,7 @@ export type APIRoutineItem = {
   semester_name: string;
   room_number: string;
   group_name?: string | null;
+  course_type?: string;
 };
 
 export type TimeSlot = {
@@ -68,6 +69,7 @@ type ClassSession = {
   is_cancelled?: boolean;
   cancel_message?: string | null;
   group_name?: string | null;
+  course_type?: string;
 };
 
 type DayRow = {
@@ -153,6 +155,13 @@ const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string
     return lastDigit % 2 === 0;
   }
   return false;
+};
+
+const checkIsLab = (s: ClassSession) => {
+  if (s.course_type) {
+    return s.course_type.toLowerCase() === "lab";
+  }
+  return checkIsLab(s);
 };
 
 const containerVariants = {
@@ -358,6 +367,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
           is_cancelled: (item as any).is_cancelled ?? false,
           cancel_message: (item as any).cancel_message ?? null,
           group_name: item.group_name ?? null,
+          course_type: item.course_type,
         };
         if (dayRow.slots[slotIndex] === null) {
           dayRow.slots[slotIndex] = [session];
@@ -874,7 +884,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                       {sortedTimeSlots.map((slot, idx) => {
                         const hasClass = currentRoutine?.schedule?.some(dayRow => dayRow.slots[idx] !== null);
                         const isBreak = isBreakSlot(slot);
-                        const defaultColWidth = isBreak ? 100 : 180;
+                        const defaultColWidth = isBreak ? (hasClass ? 180 : 50) : 180;
                         const colWidth = colWidths[slot.id] || defaultColWidth;
 
                         if (isBreak) {
@@ -886,7 +896,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                                 style={{ width: colWidth, minWidth: colWidth }}
                               >
                                 <div className="h-full flex items-center justify-center">
-                                  <span className="text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black print-break-text-no-class">
+                                  <span className="text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print:text-black print-break-text-no-class">
                                     BREAK
                                   </span>
                                 </div>
@@ -1044,8 +1054,8 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                                           const offData = cKey ? classOffMap[cKey] : undefined;
                                           return (offData?.status) || s.is_cancelled || (availabilityMap[tKey] === false);
                                         });
-                                        const isMultiLab = sessions.every(s => isLabClass(s.course, undefined, s.room));
-                                        const isMultiTheory = sessions.every(s => !isLabClass(s.course, undefined, s.room));
+                                        const isMultiLab = sessions.every(s => checkIsLab(s));
+                                        const isMultiTheory = sessions.every(s => !checkIsLab(s));
 
                                         const containerBgClass = isMultiTeacherOff
                                           ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-950/10 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
@@ -1073,7 +1083,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                                               const isClassOffToday = Boolean(classOffData?.status) || Boolean(session.is_cancelled);
                                               const cancellationReason = classOffData?.reason || session.cancel_message || "No reason provided.";
                                               const isTeacherOff = (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
-                                              const isLab = isLabClass(session.course, undefined, session.room);
+                                              const isLab = checkIsLab(session);
 
                                               return (
                                                 <React.Fragment key={`${session.course}-${session.teacher}-${session.room}`}>
@@ -1135,7 +1145,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots, studentS
                                       const cancellationReason = classOffData?.reason || session.cancel_message || "No reason provided.";
                                       const isTeacherOff = (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
                                       const highlighted = isMatch(session);
-                                      const isLab = isLabClass(session.course, undefined, session.room);
+                                      const isLab = checkIsLab(session);
 
                                       return (
                                         <div

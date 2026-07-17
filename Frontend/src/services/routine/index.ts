@@ -56,8 +56,6 @@ const getRoutine = async (params?: GetRoutineParams) => {
                     errorJson.message ||
                     errorMessage;
             } catch {
-                // Backend returned a non-JSON HTML error (e.g. Django AttributeError for admin users).
-                // This is a known backend bug — suppress the noise and return empty gracefully.
             }
             return { success: false, message: errorMessage };
         }
@@ -239,15 +237,15 @@ const cancelClass = async (routineId: number, cancelMessage: string) => {
         try {
             const decoded = jwtDecode<{ role?: string }>(token);
             isAdmin = decoded.role?.toLowerCase() === "admin";
-        } catch {}
+        } catch { }
 
         const CANCEL_CLASS_URL = isAdmin
             ? `${process.env.NEXT_PUBLIC_BASE_API}/academic/admin/routine/${routineId}/cancel/`
             : `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
 
-        const body = { 
-            action: "cancel", 
-            cancel_message: cancelMessage 
+        const body = {
+            action: "cancel",
+            cancel_message: cancelMessage
         };
         console.log("[CancelClass] POST", CANCEL_CLASS_URL, "body:", JSON.stringify(body));
 
@@ -270,7 +268,7 @@ const cancelClass = async (routineId: number, cancelMessage: string) => {
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -295,14 +293,14 @@ const reactivateClass = async (routineId: number) => {
         try {
             const decoded = jwtDecode<{ role?: string }>(token);
             isAdmin = decoded.role?.toLowerCase() === "admin";
-        } catch {}
+        } catch { }
 
         const CANCEL_CLASS_URL = isAdmin
             ? `${process.env.NEXT_PUBLIC_BASE_API}/academic/admin/routine/${routineId}/cancel/`
             : `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
 
-        const body = { 
-            action: "reactivate" 
+        const body = {
+            action: "reactivate"
         };
         console.log("[ReactivateClass] POST", CANCEL_CLASS_URL, JSON.stringify(body));
 
@@ -325,7 +323,7 @@ const reactivateClass = async (routineId: number) => {
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -350,15 +348,15 @@ const updateCancelMessage = async (routineId: number, cancelMessage: string) => 
         try {
             const decoded = jwtDecode<{ role?: string }>(token);
             isAdmin = decoded.role?.toLowerCase() === "admin";
-        } catch {}
+        } catch { }
 
         const CANCEL_CLASS_URL = isAdmin
             ? `${process.env.NEXT_PUBLIC_BASE_API}/academic/admin/routine/${routineId}/cancel/`
             : `${process.env.NEXT_PUBLIC_BASE_API}/academic/cancel-class/${routineId}/`;
 
-        const body = { 
-            action: "update", 
-            cancel_message: cancelMessage 
+        const body = {
+            action: "update",
+            cancel_message: cancelMessage
         };
         console.log("[UpdateCancelMsg] POST", CANCEL_CLASS_URL, JSON.stringify(body));
 
@@ -381,7 +379,7 @@ const updateCancelMessage = async (routineId: number, cancelMessage: string) => 
             try {
                 const errorJson = JSON.parse(errorText);
                 errorMessage = errorJson.detail || errorJson.non_field_errors?.[0] || errorJson.message || errorMessage;
-            } catch {}
+            } catch { }
             return { success: false, message: errorMessage };
         }
 
@@ -617,5 +615,180 @@ export {
     updateRoutineEntry,
     requestSwap,
     respondSwap,
-    getSwapRequests
+    getSwapRequests,
+};
+
+// ── Excel Export ─────────────────────────────────────────────────────────────
+export const exportExcel = async (modelName: string): Promise<{ success: boolean; blob?: Blob; message?: string }> => {
+    try {
+        const token = await getValidToken();
+        if (!token) return { success: false, message: "No access token found." };
+
+        const url = `${process.env.NEXT_PUBLIC_BASE_API}/academic/export-excel/?model_name=${encodeURIComponent(modelName)}`;
+        const res = await fetch(url, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            let msg = `Export failed (${res.status})`;
+            try { msg = JSON.parse(text)?.detail || msg; } catch { /* ignore */ }
+            return { success: false, message: msg };
+        }
+
+        const blob = await res.blob();
+        return { success: true, blob };
+    } catch (error) {
+        console.error("[Excel] Export error:", error);
+        return { success: false, message: "Export failed" };
+    }
+};
+
+// ── Excel Import ─────────────────────────────────────────────────────────────
+export const importExcel = async (modelName: string, file: File): Promise<{ success: boolean; data?: any; message?: string }> => {
+    try {
+        const token = await getValidToken();
+        if (!token) return { success: false, message: "No access token found." };
+
+        const formData = new FormData();
+        formData.append("model_name", modelName);
+        formData.append("file", file);
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_API}/academic/import-excel/`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+            cache: "no-store",
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            return { success: false, message: data?.detail || data?.message || `Import failed (${res.status})` };
+        }
+        return { success: true, data };
+    } catch (error) {
+        console.error("[Excel] Import error:", error);
+        return { success: false, message: "Import failed" };
+    }
+};
+
+// ── Full Sync Download ────────────────────────────────────────────────────────
+export const syncDownloadExcel = async (): Promise<{ success: boolean; blob?: Blob; message?: string }> => {
+    try {
+        const token = await getValidToken();
+        if (!token) return { success: false, message: "No access token found." };
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_API}/academic/sync/excel/`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` },
+            cache: "no-store",
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            let msg = `Sync download failed (${res.status})`;
+            try { msg = JSON.parse(text)?.detail || msg; } catch { /* ignore */ }
+            return { success: false, message: msg };
+        }
+
+        const blob = await res.blob();
+        return { success: true, blob };
+    } catch (error) {
+        console.error("[Sync] Download error:", error);
+        return { success: false, message: "Sync download failed" };
+    }
+};
+
+// ── Full Sync Upload ──────────────────────────────────────────────────────────
+export const syncUploadExcel = async (file: File): Promise<{ success: boolean; data?: any; message?: string }> => {
+    try {
+        const token = await getValidToken();
+        if (!token) return { success: false, message: "No access token found." };
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_API}/academic/sync/excel/`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+            cache: "no-store",
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            return { success: false, message: data?.detail || data?.message || `Sync upload failed (${res.status})` };
+        }
+        return { success: true, data };
+    } catch (error) {
+        console.error("[Sync] Upload error:", error);
+        return { success: false, message: "Sync upload failed" };
+    }
+};
+
+// ── Create Snapshot ───────────────────────────────────────────────────────────
+export const createSnapshot = async (): Promise<{ success: boolean; data?: any; message?: string }> => {
+    try {
+        const token = await getValidToken();
+        if (!token) return { success: false, message: "No access token found." };
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_API}/academic/sync/snapshot/`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            cache: "no-store",
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            return { success: false, message: data?.detail || data?.message || `Snapshot failed (${res.status})` };
+        }
+        return { success: true, data };
+    } catch (error) {
+        console.error("[Snapshot] Error:", error);
+        return { success: false, message: "Snapshot failed" };
+    }
+};
+
+// ── System Settings ───────────────────────────────────────────────────────────
+export const getSystemSettings = async (): Promise<{ success: boolean; data?: { is_routine_locked: boolean }; message?: string }> => {
+    try {
+        const token = await getValidToken();
+        if (!token) return { success: false, message: "No access token found." };
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_API}/academic/system-settings/`, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            cache: "no-store",
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { success: false, message: data?.detail || `Failed (${res.status})` };
+        return { success: true, data };
+    } catch (error) {
+        console.error("[Settings] Get error:", error);
+        return { success: false, message: "Failed to get system settings" };
+    }
+};
+
+export const setSystemSettings = async (isLocked: boolean): Promise<{ success: boolean; message?: string }> => {
+    try {
+        const token = await getValidToken();
+        if (!token) return { success: false, message: "No access token found." };
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_API}/academic/system-settings/`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ is_routine_locked: isLocked }),
+            cache: "no-store",
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return { success: false, message: data?.detail || `Failed (${res.status})` };
+        return { success: true };
+    } catch (error) {
+        console.error("[Settings] Set error:", error);
+        return { success: false, message: "Failed to update system settings" };
+    }
 };
