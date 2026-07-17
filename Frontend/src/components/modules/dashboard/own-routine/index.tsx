@@ -1625,6 +1625,10 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
           .print-header-table {
             border: 1px solid black !important;
             border-color: black !important;
+            width: calc(100% - 2px) !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            margin-bottom: 24px !important;
           }
 
           /* Ensure clear text and transparent backgrounds for print */
@@ -1778,18 +1782,28 @@ export default function OwnRoutinePage({ routineList, timeSlots }: OwnRoutinePag
 
         <div className="print-page-container w-full">
           <div className="hidden print:flex flex-col items-center justify-center mb-6 pt-2 text-center w-full font-serif text-black">
-            <h1 className="text-2xl font-bold text-black mb-3 font-lexend tracking-tight">
+            <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
               Department of Computer Science & Engineering
             </h1>
-            <div className="px-8 py-1 flex items-center justify-center gap-2">
-              <h2 className="font-lexend text-black tracking-wide">
-                {teacherInfo ? teacherInfo.name : username}&apos;s Class Routine
+            <div className="border-2 border-black! border-double px-8 py-0.5 mb-3 print-header-border">
+              <h2 className="text-base font-bold uppercase text-black tracking-wide">
+                Class Routine
               </h2>
-              <span className="text-black font-lexend font-medium text-sm">•</span>
-              <span className="font-lexend text-black text-sm">
-                Total Credits: <span className="font-bold">{totalCredits}</span>
-              </span>
             </div>
+            <table className="w-full border-collapse border border-black mb-6 text-xs text-black font-serif print-header-table">
+              <tbody>
+                <tr>
+                  <td className="bg-gray-200 font-bold text-center w-[15%] py-1.5">Teacher</td>
+                  <td className="bg-white font-bold text-center w-[35%] py-1.5">
+                    {teacherInfo ? teacherInfo.name : username}
+                  </td>
+                  <td className="bg-gray-200 font-bold text-center w-[25%] py-1.5">Total Credit</td>
+                  <td className="bg-white font-bold text-center w-[25%] py-1.5">
+                    {totalCredits}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
           <motion.div variants={itemVariants} className="print:hidden">
             <Card className="w-full overflow-hidden dark:bg-[#111113] border shadow-sm print:border-none print:shadow-none print:overflow-visible">

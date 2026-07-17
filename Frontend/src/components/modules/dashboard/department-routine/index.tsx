@@ -1488,6 +1488,7 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
             width: calc(100% - 2px) !important;
             margin-left: auto !important;
             margin-right: auto !important;
+            margin-bottom: 24px !important;
           }
 
           /* Ensure clear text and transparent backgrounds for print */
@@ -1690,15 +1691,29 @@ export default function DepartmentRoutinePage({ routineList, timeSlots }: Props)
               {/* Print view: single page table */}
               <div className="hidden print:block print:w-full print:gap-0">
                 <div className="print-page-container w-full">
-                  <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-3 pt-0 text-center w-full font-serif text-black">
+                  <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center pt-0 text-center w-full font-serif text-black">
                     <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
                       Department of {auth.department_name || "Department"}
                     </h1>
-                    <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
+                    <div className="border-2 border-black! border-double px-8 py-0.5 mb-3 print-header-border">
                       <h2 className="text-base font-bold uppercase text-black tracking-wide">
                         Class Routine
                       </h2>
                     </div>
+                    <table className="w-full border-collapse border border-black mb-6 text-xs text-black font-serif print-header-table">
+                      <tbody>
+                        <tr>
+                          <td className="bg-gray-200 font-bold text-center w-[15%] py-1.5">Semester</td>
+                          <td className="bg-white font-bold text-center w-[35%] py-1.5">
+                            {activeSemesterId.replace(" Semester", "")}
+                          </td>
+                          <td className="bg-gray-200 font-bold text-center w-[25%] py-1.5">Total Credit</td>
+                          <td className="bg-white font-bold text-center w-[25%] py-1.5">
+                            {currentRoutine?.credits || 0}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
 
                   <motion.div
