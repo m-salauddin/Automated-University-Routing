@@ -1917,6 +1917,25 @@ export default function AdminRoutinePage({
     ignoreWarnings: false,
   });
 
+  const [generateResultModal, setGenerateResultModal] = useState<{
+    isOpen: boolean;
+    success: boolean;
+    data: {
+      status?: string;
+      total_classes_required?: number;
+      successful_classes?: number;
+      dropped_classes?: number;
+      shortage_details?: string[] | any[];
+      message?: string;
+    } | null;
+    errorMsg?: string | null;
+  }>({
+    isOpen: false,
+    success: false,
+    data: null,
+    errorMsg: null,
+  });
+
   const openGenerateModal = () => {
     if (isRoutineLocked) return;
     setGenerateModal({
@@ -2323,6 +2342,13 @@ export default function AdminRoutinePage({
         dispatch(resetAll());
         toast.success("Routine generated successfully!");
 
+        setGenerateResultModal({
+          isOpen: true,
+          success: true,
+          data: result.data || null,
+          errorMsg: null
+        });
+
         setUndoStack((prev) => [
           ...prev,
           {
@@ -2363,10 +2389,22 @@ export default function AdminRoutinePage({
         router.refresh();
       } else {
         toast.error(result.message || "Failed to generate routine");
+        setGenerateResultModal({
+          isOpen: true,
+          success: false,
+          data: result.data || null,
+          errorMsg: result.message || "Failed to generate routine"
+        });
       }
     } catch (err) {
       console.error(err);
       toast.error("An unexpected error occurred");
+      setGenerateResultModal({
+        isOpen: true,
+        success: false,
+        data: null,
+        errorMsg: "An unexpected error occurred. Please check console logs."
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -3587,6 +3625,148 @@ export default function AdminRoutinePage({
         confirmLabel={cancellationMode === "update" ? "Update Message" : "Confirm Cancellation"}
         initialReason={pendingCancellation?.initialReason}
       />
+
+      {/* Generate Routine Result Modal */}
+      <Dialog
+        open={generateResultModal.isOpen}
+        onOpenChange={(open) =>
+          setGenerateResultModal((prev) => ({ ...prev, isOpen: open }))
+        }
+      >
+        <DialogContent className="sm:max-w-[480px] p-6 rounded-2xl border bg-card text-card-foreground shadow-2xl font-lexend">
+          {generateResultModal.isOpen && (
+            <div className="space-y-6">
+              <DialogHeader className="text-center flex flex-col items-center">
+                <div className={cn(
+                  "size-12 rounded-full flex items-center justify-center mb-3 animate-bounce",
+                  generateResultModal.success 
+                    ? "bg-emerald-500/10 text-emerald-500 dark:bg-emerald-950/20" 
+                    : "bg-red-500/10 text-red-500 dark:bg-red-950/20"
+                )}>
+                  {generateResultModal.success ? (
+                    <CheckCircle2 className="size-7 stroke-[2.5]" />
+                  ) : (
+                    <AlertTriangle className="size-7 stroke-[2.5]" />
+                  )}
+                </div>
+                <DialogTitle className="text-xl font-bold">
+                  {generateResultModal.success ? "Routine Generated Successfully" : "Routine Generation Failed"}
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground mt-1">
+                  {generateResultModal.success 
+                    ? "The automatic scheduler has successfully generated class slots." 
+                    : "The scheduler encountered conflicts or resource constraints."}
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Success Info Block */}
+              {generateResultModal.success && generateResultModal.data && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-muted/30 border rounded-xl p-3 flex flex-col justify-center">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Required</span>
+                      <span className="text-lg font-extrabold text-foreground mt-0.5">
+                        {generateResultModal.data.total_classes_required ?? "-"}
+                      </span>
+                    </div>
+                    <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 flex flex-col justify-center">
+                      <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">Successful</span>
+                      <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        {generateResultModal.data.successful_classes ?? "-"}
+                      </span>
+                    </div>
+                    <div className={cn(
+                      "border rounded-xl p-3 flex flex-col justify-center",
+                      (generateResultModal.data.dropped_classes ?? 0) > 0 
+                        ? "bg-red-500/5 border-red-500/20" 
+                        : "bg-muted/30"
+                    )}>
+                      <span className={cn(
+                        "text-[10px] uppercase font-bold tracking-wider",
+                        (generateResultModal.data.dropped_classes ?? 0) > 0 
+                          ? "text-red-600 dark:text-red-400" 
+                          : "text-muted-foreground"
+                      )}>Dropped</span>
+                      <span className={cn(
+                        "text-lg font-extrabold mt-0.5",
+                        (generateResultModal.data.dropped_classes ?? 0) > 0 
+                          ? "text-red-600 dark:text-red-400" 
+                          : "text-foreground"
+                      )}>
+                        {generateResultModal.data.dropped_classes ?? 0}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-muted/50 p-4 rounded-xl border border-border/80">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1.5">
+                      Scheduler Message
+                    </p>
+                    <p className="text-sm font-medium text-foreground/90">
+                      {generateResultModal.data.message || "No status message returned."}
+                    </p>
+                  </div>
+
+                  {Array.isArray(generateResultModal.data.shortage_details) && generateResultModal.data.shortage_details.length > 0 && (
+                    <div className="border border-amber-500/20 bg-amber-500/5 p-4 rounded-xl space-y-2">
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <AlertTriangle className="size-3.5" />
+                        Shortage / Conflict Warnings
+                      </p>
+                      <ul className="text-xs text-amber-600 dark:text-amber-300 list-disc pl-4 space-y-1">
+                        {generateResultModal.data.shortage_details.map((detail: any, idx: number) => (
+                          <li key={idx}>
+                            {typeof detail === "object" ? JSON.stringify(detail) : String(detail)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Error Info Block */}
+              {!generateResultModal.success && (
+                <div className="space-y-4">
+                  <div className="bg-red-500/5 border border-red-500/20 p-4 rounded-xl">
+                    <p className="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-widest mb-1.5">
+                      Error Message
+                    </p>
+                    <p className="text-sm font-medium text-red-600 dark:text-red-300">
+                      {generateResultModal.errorMsg || "An unknown error occurred during generation."}
+                    </p>
+                  </div>
+
+                  {generateResultModal.data && Array.isArray(generateResultModal.data.shortage_details) && generateResultModal.data.shortage_details.length > 0 && (
+                    <div className="border border-red-500/10 bg-red-500/5 p-4 rounded-xl space-y-2">
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <AlertTriangle className="size-3.5" />
+                        Details of Resource Shortages
+                      </p>
+                      <ul className="text-xs text-red-600 dark:text-red-300 list-disc pl-4 space-y-1">
+                        {generateResultModal.data.shortage_details.map((detail: any, idx: number) => (
+                          <li key={idx}>
+                            {typeof detail === "object" ? JSON.stringify(detail) : String(detail)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <Button
+                  onClick={() => setGenerateResultModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-6 py-2 rounded-xl"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

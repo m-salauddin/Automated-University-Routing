@@ -156,8 +156,10 @@ const generateRoutine = async (params: GenerateRoutineParams) => {
         if (!res.ok) {
             const errorText = await res.text();
             let errorMessage = `Routine generation failed (${res.status})`;
+            let errorData = null;
             try {
                 const errorJson = JSON.parse(errorText);
+                errorData = errorJson;
                 errorMessage =
                     errorJson.detail ||
                     errorJson.non_field_errors?.[0] ||
@@ -168,7 +170,7 @@ const generateRoutine = async (params: GenerateRoutineParams) => {
                     `[Routine] Non-JSON Error Body: ${errorText.slice(0, 200)}`
                 );
             }
-            return { success: false, message: errorMessage };
+            return { success: false, message: errorMessage, data: errorData };
         }
 
         const rawResult = await res.json();
