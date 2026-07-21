@@ -9,39 +9,18 @@ import { getAllUsers } from "@/services/users";
 
 const page = async () => {
   const [
-    routineResponse,
-    timeSlotsResponse,
     departmentsResponse,
-    semestersResponse,
     coursesResponse,
     usersResponse,
   ] = await Promise.all([
-    getRoutine(),
-    getAllTimeSlots(),
     getAllDepartments(),
-    getAllSemesters(),
     getAllCourses(),
     getAllUsers(),
   ]);
 
-  const routineList =
-    routineResponse.success && Array.isArray(routineResponse.data)
-      ? routineResponse.data
-      : [];
-
-  const timeSlots =
-    timeSlotsResponse.success && Array.isArray(timeSlotsResponse.data)
-      ? timeSlotsResponse.data
-      : [];
-
   const departments =
     departmentsResponse.success && Array.isArray(departmentsResponse.data)
       ? departmentsResponse.data
-      : [];
-
-  const dbSemesters =
-    semestersResponse.success && Array.isArray(semestersResponse.data)
-      ? semestersResponse.data
       : [];
 
   const courses =
@@ -54,7 +33,6 @@ const page = async () => {
       ? usersResponse.data
       : [];
 
-  // Filter departments to only show those that have at least one course or student user
   const dbDepartments = departments.filter((dept) => {
     const hasCourses = courses.some(
       (c: any) =>
@@ -71,6 +49,42 @@ const page = async () => {
     );
     return hasCourses || hasStudents;
   });
+
+  const defaultDeptId = dbDepartments.length > 0 ? dbDepartments[0].id : undefined;
+
+  const safeGetRoutine = async () => {
+    try {
+      if (defaultDeptId === undefined) return { success: true as const, data: [] };
+      return await getRoutine({ department_id: defaultDeptId });
+    } catch {
+      return { success: true as const, data: [] };
+    }
+  };
+
+  const [
+    routineResponse,
+    timeSlotsResponse,
+    semestersResponse,
+  ] = await Promise.all([
+    safeGetRoutine(),
+    getAllTimeSlots(),
+    getAllSemesters(),
+  ]);
+
+  const routineList =
+    routineResponse.success && Array.isArray(routineResponse.data)
+      ? routineResponse.data
+      : [];
+
+  const timeSlots =
+    timeSlotsResponse.success && Array.isArray(timeSlotsResponse.data)
+      ? timeSlotsResponse.data
+      : [];
+
+  const dbSemesters =
+    semestersResponse.success && Array.isArray(semestersResponse.data)
+      ? semestersResponse.data
+      : [];
 
   return (
     <div>

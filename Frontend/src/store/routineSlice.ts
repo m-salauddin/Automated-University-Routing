@@ -12,8 +12,10 @@ export type APIRoutineItem = {
   department_name: string;
   semester_name: string;
   room_number: string;
+  group_name?: string | null;
   is_cancelled?: boolean;
   cancel_message?: string | null;
+  course_type?: string;
 };
 
 export interface RoutineState {

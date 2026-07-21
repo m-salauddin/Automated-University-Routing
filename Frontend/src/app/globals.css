@@ -348,3 +348,42 @@
   animation: card-rollback 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
   will-change: transform, box-shadow;
 }
+
+/* Swap Mode Hover Highlights for desktop */
+[data-dragging-semester="1st"] [data-cell-semester="1st"]:hover .drag-target-hovered,
+[data-dragging-semester="2nd"] [data-cell-semester="2nd"]:hover .drag-target-hovered,
+[data-dragging-semester="3rd"] [data-cell-semester="3rd"]:hover .drag-target-hovered,
+[data-dragging-semester="4th"] [data-cell-semester="4th"]:hover .drag-target-hovered,
+[data-dragging-semester="5th"] [data-cell-semester="5th"]:hover .drag-target-hovered,
+[data-dragging-semester="6th"] [data-cell-semester="6th"]:hover .drag-target-hovered,
+[data-dragging-semester="7th"] [data-cell-semester="7th"]:hover .drag-target-hovered,
+[data-dragging-semester="8th"] [data-cell-semester="8th"]:hover .drag-target-hovered,
+[data-dragging-semester="1"] [data-cell-semester="1"]:hover .drag-target-hovered,
+[data-dragging-semester="2"] [data-cell-semester="2"]:hover .drag-target-hovered,
+[data-dragging-semester="3"] [data-cell-semester="3"]:hover .drag-target-hovered,
+[data-dragging-semester="4"] [data-cell-semester="4"]:hover .drag-target-hovered,
+[data-dragging-semester="5"] [data-cell-semester="5"]:hover .drag-target-hovered,
+[data-dragging-semester="6"] [data-cell-semester="6"]:hover .drag-target-hovered,
+[data-dragging-semester="7"] [data-cell-semester="7"]:hover .drag-target-hovered,
+[data-dragging-semester="8"] [data-cell-semester="8"]:hover .drag-target-hovered {
+  opacity: 1 !important;
+}
+
+[data-dragging-semester="1st"] [data-cell-semester="1st"]:hover .drag-target-dashed,
+[data-dragging-semester="2nd"] [data-cell-semester="2nd"]:hover .drag-target-dashed,
+[data-dragging-semester="3rd"] [data-cell-semester="3rd"]:hover .drag-target-dashed,
+[data-dragging-semester="4th"] [data-cell-semester="4th"]:hover .drag-target-dashed,
+[data-dragging-semester="5th"] [data-cell-semester="5th"]:hover .drag-target-dashed,
+[data-dragging-semester="6th"] [data-cell-semester="6th"]:hover .drag-target-dashed,
+[data-dragging-semester="7th"] [data-cell-semester="7th"]:hover .drag-target-dashed,
+[data-dragging-semester="8th"] [data-cell-semester="8th"]:hover .drag-target-dashed,
+[data-dragging-semester="1"] [data-cell-semester="1"]:hover .drag-target-dashed,
+[data-dragging-semester="2"] [data-cell-semester="2"]:hover .drag-target-dashed,
+[data-dragging-semester="3"] [data-cell-semester="3"]:hover .drag-target-dashed,
+[data-dragging-semester="4"] [data-cell-semester="4"]:hover .drag-target-dashed,
+[data-dragging-semester="5"] [data-cell-semester="5"]:hover .drag-target-dashed,
+[data-dragging-semester="6"] [data-cell-semester="6"]:hover .drag-target-dashed,
+[data-dragging-semester="7"] [data-cell-semester="7"]:hover .drag-target-dashed,
+[data-dragging-semester="8"] [data-cell-semester="8"]:hover .drag-target-dashed {
+  opacity: 0 !important;
+}

@@ -45,6 +45,16 @@ import {
   MoreVertical,
   Undo2,
   Redo2,
+  Users,
+  Download,
+  Upload,
+  FileSpreadsheet,
+  Database,
+  Camera,
+  FileDown,
+  FileUp,
+  RefreshCw,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,6 +89,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { generateRoutine, getRoutine, updateRoutineEntry, swapRoutineEntries, cancelClass, reactivateClass, updateCancelMessage, rollbackRoutine } from "@/services/routine";
+import { DataManagementDialog } from "./DataManagementDialog";
 import { createLog } from "@/services/logs";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -160,68 +171,55 @@ function CancellationModal({
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md w-full overflow-hidden">
-        <AnimatePresence mode="wait">
-          {isOpen && (
-            <motion.div
-              variants={modalContentVariants}
-              initial="hidden"
-              animate="visible"
-              className="flex flex-col gap-4"
+        <div className="flex flex-col gap-4">
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for cancelling{" "}
+              <strong>{courseName}</strong>. This will be visible to
+              students.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label
+                htmlFor="reason"
+                className="flex justify-between text-xs font-medium"
+              >
+                <span>Reason</span>
+                <span
+                  className={cn(
+                    "text-muted-foreground",
+                    reason.length === LIMIT && "text-red-500"
+                  )}
+                >
+                  {reason.length}/{LIMIT} characters
+                </span>
+              </Label>
+              <Textarea
+                id="reason"
+                placeholder="e.g., Sick leave, Emergency meeting..."
+                value={reason}
+                onChange={handleTextChange}
+                className="h-32 resize-none break-all whitespace-pre-wrap"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="sm:justify-end gap-2">
+            <Button variant="outline" onClick={handleCloseClick}>
+              Close
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmClick}
+              disabled={!reason.trim()}
             >
-              <motion.div variants={modalItemVariants}>
-                <DialogHeader>
-                  <DialogTitle>{title}</DialogTitle>
-                  <DialogDescription>
-                    Please provide a reason for cancelling{" "}
-                    <strong>{courseName}</strong>. This will be visible to
-                    students.
-                  </DialogDescription>
-                </DialogHeader>
-              </motion.div>
-
-              <motion.div variants={modalItemVariants} className="space-y-3">
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="reason"
-                    className="flex justify-between text-xs font-medium"
-                  >
-                    <span>Reason</span>
-                    <span
-                      className={cn(
-                        "text-muted-foreground",
-                        reason.length === LIMIT && "text-red-500"
-                      )}
-                    >
-                      {reason.length}/{LIMIT} characters
-                    </span>
-                  </Label>
-                  <Textarea
-                    id="reason"
-                    placeholder="e.g., Sick leave, Emergency meeting..."
-                    value={reason}
-                    onChange={handleTextChange}
-                    className="h-32 resize-none break-all whitespace-pre-wrap"
-                  />
-                </div>
-              </motion.div>
-
-              <motion.div variants={modalItemVariants}>
-                <DialogFooter className="sm:justify-end gap-2">
-                  <Button variant="outline" onClick={handleCloseClick}>
-                    Close
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={handleConfirmClick}
-                    disabled={!reason.trim()}
-                  >
-                    {confirmLabel}
-                  </Button>
-                </DialogFooter>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              {confirmLabel}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -240,8 +238,10 @@ export type APIRoutineItem = {
   department_name: string;
   semester_name: string;
   room_number: string;
+  group_name?: string | null;
   is_cancelled?: boolean;
   cancel_message?: string | null;
+  course_type?: string;
 };
 
 export type TimeSlot = {
@@ -263,6 +263,8 @@ type ClassSession = {
   day: string;
   is_cancelled?: boolean;
   cancel_message?: string | null;
+  group_name?: string | null;
+  course_type?: string;
 };
 
 const DAYS_ORDER = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
@@ -325,6 +327,13 @@ const isLabClass = (courseCode: string, courseName?: string, roomNumber?: string
   return false;
 };
 
+const checkIsLab = (s: ClassSession) => {
+  if (s.course_type) {
+    return s.course_type.toLowerCase() === "lab";
+  }
+  return isLabClass(s.course, undefined, s.room);
+};
+
 const formatTimeSlotLabel = (timeStr: string) => {
   if (!timeStr) return "";
   const [hStr, mStr] = timeStr.split(":");
@@ -338,48 +347,46 @@ const formatTimeSlotLabel = (timeStr: string) => {
 };
 
 
+// Page toolbar — simple stagger, fast
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.05, delayChildren: 0.1 },
+    transition: { staggerChildren: 0.04, delayChildren: 0 },
   },
 };
 
 const itemVariants: Variants = {
-  hidden: { y: 20, opacity: 0 },
+  hidden: { y: 8, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { type: "spring" as const, stiffness: 120, damping: 20 },
+    transition: { duration: 0.15, ease: "easeOut" },
   },
 };
 
-
+// Modal open/close — snappy scale + opacity
 const modalContentVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.95 },
+  hidden: { opacity: 0, scale: 0.97 },
   visible: {
     opacity: 1,
     scale: 1,
-    transition: {
-      duration: 0.2,
-      ease: "easeOut",
-      staggerChildren: 0.1,
-    },
+    transition: { duration: 0.15, ease: "easeOut", staggerChildren: 0.05 },
   },
   exit: {
     opacity: 0,
-    scale: 0.95,
-    transition: { duration: 0.15 },
+    scale: 0.97,
+    transition: { duration: 0.1, ease: "easeIn" },
   },
 };
 
+// Modal inner items — fast fade-up
 const modalItemVariants: Variants = {
-  hidden: { y: 15, opacity: 0 },
+  hidden: { y: 8, opacity: 0 },
   visible: {
     y: 0,
     opacity: 1,
-    transition: { type: "spring", stiffness: 300, damping: 24 },
+    transition: { duration: 0.12, ease: "easeOut" },
   },
 };
 
@@ -397,7 +404,7 @@ const DAY_NAME_TO_ID: Record<string, number> = {
 };
 
 interface RoutineTableProps {
-  schedule: { day: string; semester: string; slots: (ClassSession | null)[] }[];
+  schedule: { day: string; semester: string; slots: (ClassSession[] | null)[] }[];
   timeSlots: TimeSlot[];
   isMatch: (session: ClassSession | null) => boolean;
   isAllSemestersMode: boolean;
@@ -417,7 +424,128 @@ interface RoutineTableProps {
   onReactivateClass?: (session: ClassSession) => void;
   onUpdateCancelMessage?: (session: ClassSession) => void;
   onHistoryAction?: (action: HistoryAction) => void;
+  selectedTeacher?: string;
 }
+
+interface LazyDropdownProps {
+  isRoutineLocked: boolean;
+  isSubmitting: boolean;
+  session: ClassSession;
+  setSelectedSwapSource: React.Dispatch<React.SetStateAction<ClassSession | null>>;
+  onCancelClass?: (session: ClassSession) => void;
+  onReactivateClass?: (session: ClassSession) => void;
+  onUpdateCancelMessage?: (session: ClassSession) => void;
+  isClassOffToday: boolean;
+  isMulti?: boolean;
+}
+
+const LazyClassActionsDropdown = ({
+  isRoutineLocked,
+  isSubmitting,
+  session,
+  setSelectedSwapSource,
+  onCancelClass,
+  onReactivateClass,
+  onUpdateCancelMessage,
+  isClassOffToday,
+  isMulti = false,
+}: LazyDropdownProps) => {
+  const [isInteracted, setIsInteracted] = useState(false);
+
+  const triggerButton = (
+    <button
+      draggable={false}
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      className={cn(
+        isMulti
+          ? "absolute top-0.5 right-0.5 p-0.5 rounded opacity-0 group-hover/item:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-opacity focus:opacity-100 outline-none cursor-pointer shrink-0 z-10"
+          : "ml-0.5 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-opacity focus:opacity-100 outline-none cursor-pointer"
+      )}
+      aria-label="Class actions"
+    >
+      <MoreVertical className={isMulti ? "w-2.5 h-2.5 text-muted-foreground" : "w-3 h-3 text-muted-foreground"} />
+    </button>
+  );
+
+  if (isRoutineLocked || isSubmitting) return null;
+
+  if (!isInteracted) {
+    return (
+      <div
+        onMouseEnter={() => setIsInteracted(true)}
+        onFocus={() => setIsInteracted(true)}
+        className={isMulti ? "absolute top-0.5 right-0.5 z-10" : "shrink-0"}
+      >
+        {triggerButton}
+      </div>
+    );
+  }
+
+  return (
+    <div className={isMulti ? "absolute top-0.5 right-0.5 z-10" : "shrink-0"}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          {triggerButton}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="w-48"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="cursor-pointer font-medium"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedSwapSource(session);
+            }}
+          >
+            <ArrowLeftRight className="size-4 mr-2" /> Swap / Move Class
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {!isClassOffToday ? (
+            <DropdownMenuItem
+              className="text-red-500 focus:text-red-500 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancelClass?.(session);
+              }}
+            >
+              <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
+            </DropdownMenuItem>
+          ) : (
+            <>
+              <DropdownMenuItem
+                className="cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReactivateClass?.(session);
+                }}
+              >
+                <CheckCheck className="size-4 mr-2" /> Activate Class
+              </DropdownMenuItem>
+              {session.is_cancelled && (
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateCancelMessage?.(session);
+                  }}
+                >
+                  <Pencil className="size-4 mr-2" /> Update Message
+                </DropdownMenuItem>
+              )}
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+};
 
 const MemoizedRoutineTable = React.memo(
   ({
@@ -437,6 +565,7 @@ const MemoizedRoutineTable = React.memo(
     onReactivateClass,
     onUpdateCancelMessage,
     onHistoryAction,
+    selectedTeacher = "All Teachers",
   }: RoutineTableProps) => {
     try {
       const [isSubmitting, setIsSubmitting] = useState(false);
@@ -445,6 +574,71 @@ const MemoizedRoutineTable = React.memo(
         source?: ClassSession;
         target?: ClassSession;
       }>({ isOpen: false });
+      const [selectedSwapSource, setSelectedSwapSource] = useState<ClassSession | null>(null);
+
+      const [colWidths, setColWidths] = useState<{ [key: string]: number }>({});
+      const [rowHeights, setRowHeights] = useState<{ [key: string]: number }>({});
+
+      const startColResize = useCallback((e: React.MouseEvent, colKey: string, defaultWidth: number, minWidth: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startX = e.clientX;
+        const cellElement = e.currentTarget.parentElement as HTMLElement;
+        if (!cellElement) return;
+
+        const startWidth = cellElement.offsetWidth;
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+          const deltaX = moveEvent.clientX - startX;
+          const newWidth = Math.max(minWidth, startWidth + deltaX);
+          cellElement.style.width = `${newWidth}px`;
+          cellElement.style.minWidth = `${newWidth}px`;
+        };
+
+        const onMouseUp = () => {
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", onMouseUp);
+
+          const finalWidth = cellElement.offsetWidth;
+          setColWidths((prev) => ({
+            ...prev,
+            [colKey]: finalWidth
+          }));
+        };
+
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+      }, []);
+
+      const startRowResize = useCallback((e: React.MouseEvent, rowKey: string, defaultHeight: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const startY = e.clientY;
+        const trElement = e.currentTarget.closest("tr") as HTMLElement;
+        if (!trElement) return;
+
+        const startHeight = trElement.offsetHeight;
+
+        const onMouseMove = (moveEvent: MouseEvent) => {
+          const deltaY = moveEvent.clientY - startY;
+          const newHeight = Math.max(60, startHeight + deltaY);
+          trElement.style.height = `${newHeight}px`;
+        };
+
+        const onMouseUp = () => {
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", onMouseUp);
+
+          const finalHeight = trElement.offsetHeight;
+          setRowHeights((prev) => ({
+            ...prev,
+            [rowKey]: finalHeight
+          }));
+        };
+
+        document.addEventListener("mousemove", onMouseMove);
+        document.addEventListener("mouseup", onMouseUp);
+      }, []);
 
       // All drag state lives in refs — zero React re-renders during drag
       const ghostRef = useRef<HTMLDivElement | null>(null);
@@ -460,6 +654,30 @@ const MemoizedRoutineTable = React.memo(
         hoveredCellIndex: null,
       });
       const dragScheduleRef = useRef<typeof schedule>([]);
+      // Edge-scroll refs — track pointer Y position and the running RAF id
+      const pointerYRef = useRef<number>(0);
+      const scrollRafRef = useRef<number | null>(null);
+
+      // Auto-scroll the page when pointer is within EDGE_ZONE px of the top/bottom
+      const startEdgeScroll = useCallback(() => {
+        const EDGE_ZONE = 80; // px from viewport edge to start scrolling
+        const MAX_SPEED = 18; // max px per frame
+        const loop = () => {
+          const y = pointerYRef.current;
+          const vh = window.innerHeight;
+          let speed = 0;
+          if (y < EDGE_ZONE) {
+            // Near top — scroll up
+            speed = -MAX_SPEED * (1 - y / EDGE_ZONE);
+          } else if (y > vh - EDGE_ZONE) {
+            // Near bottom — scroll down
+            speed = MAX_SPEED * (1 - (vh - y) / EDGE_ZONE);
+          }
+          if (speed !== 0) window.scrollBy({ top: speed, behavior: 'instant' });
+          scrollRafRef.current = requestAnimationFrame(loop);
+        };
+        scrollRafRef.current = requestAnimationFrame(loop);
+      }, []);
 
       const pageGroups = useMemo(() => {
         if (!isAllSemestersMode) return [schedule];
@@ -495,7 +713,7 @@ const MemoizedRoutineTable = React.memo(
       }, []);
 
       const handleDropOnCell = useCallback(async (targetRow: any, targetCellIndex: number, sourceSession: ClassSession) => {
-        const targetSession = targetRow.slots[targetCellIndex];
+        const targetSessionList = targetRow.slots[targetCellIndex];
         const targetDayName = targetRow.day;
         const targetDayId = DAY_NAME_TO_ID[targetDayName.toLowerCase()];
         const targetSlot = timeSlots[targetCellIndex];
@@ -505,7 +723,16 @@ const MemoizedRoutineTable = React.memo(
           return;
         }
 
-        if (!targetSession) {
+        // Guard: drop onto the exact same cell -> Do nothing
+        const isSameCell = sourceSession.dayId === targetDayId &&
+          normalizeTime(sourceSession.originalTime || "") === normalizeTime(targetSlot.start_time) &&
+          sourceSession.semester === targetRow.semester;
+
+        if (isSameCell) {
+          return;
+        }
+
+        if (!targetSessionList || targetSessionList.length === 0) {
           // Optimistically update the UI list instantly
           setLocalRoutineList(prev => prev.map(r => {
             if (r.id === sourceSession.id) {
@@ -562,6 +789,7 @@ const MemoizedRoutineTable = React.memo(
           }
         } else {
           // Occupied slot drop -> Swap Instantly!
+          const targetSession = targetSessionList[0];
           if (targetSession.id === sourceSession.id) return;
 
           // Optimistically update the UI list instantly by swapping source and target slots
@@ -629,23 +857,41 @@ const MemoizedRoutineTable = React.memo(
           }
         }
       }, [timeSlots, refreshRoutine, setLocalRoutineList, triggerRollbackAnimation, onHistoryAction]);
+      const pendingDragRef = useRef<{
+        session: ClassSession | null;
+        isLab: boolean;
+        startX: number;
+        startY: number;
+        sourceEl: HTMLDivElement | null;
+      }>({ session: null, isLab: false, startX: 0, startY: 0, sourceEl: null });
 
-      // Pointer-based drag handlers
-      const startPointerDrag = useCallback((e: React.PointerEvent<HTMLDivElement>, session: ClassSession, isLab: boolean) => {
-        if (isSubmitting) return;
-        e.currentTarget.setPointerCapture(e.pointerId);
+      const clearDragDom = useCallback(() => {
+        hoveredCellRef.current?.removeAttribute('data-hovered');
+        hoveredCellRef.current = null;
+        tableWrapperRef.current?.removeAttribute('data-dragging-semester');
+        // Clear source card attribute
+        tableWrapperRef.current?.querySelector('[data-drag-source]')?.removeAttribute('data-drag-source');
+        // Clear drag target classes
+        const targets = tableWrapperRef.current?.querySelectorAll('[data-drag-target-valid]');
+        targets?.forEach(el => el.removeAttribute('data-drag-target-valid'));
+        if (ghostRef.current) ghostRef.current.style.display = 'none';
+        document.body.style.cursor = '';
+        // Stop edge-scroll loop
+        if (scrollRafRef.current !== null) {
+          cancelAnimationFrame(scrollRafRef.current);
+          scrollRafRef.current = null;
+        }
+      }, []);
 
+      const commitDrag = useCallback((session: ClassSession, isLab: boolean, clientX: number, clientY: number, sourceEl: HTMLDivElement) => {
         dragStateRef.current.session = session;
         dragScheduleRef.current = schedule;
         dragStateRef.current.hoveredRowKey = null;
         dragStateRef.current.hoveredCellIndex = null;
 
-        // Mark dragging source card via DOM
-        e.currentTarget.setAttribute('data-drag-source', '1');
-        // Mark wrapper so CSS can dim non-target cells
+        sourceEl.setAttribute('data-drag-source', '1');
         tableWrapperRef.current?.setAttribute('data-dragging-semester', session.semester);
 
-        // Highlight only cells belonging to the same semester
         const cells = tableWrapperRef.current?.querySelectorAll(`[data-cell-semester="${session.semester}"]`);
         cells?.forEach(cell => cell.setAttribute('data-drag-target-valid', '1'));
 
@@ -654,7 +900,6 @@ const MemoizedRoutineTable = React.memo(
           const typeSpan = ghostRef.current.querySelector('[data-ghost-type]');
           const teacherSpan = ghostRef.current.querySelector('[data-ghost-teacher]');
           const roomSpan = ghostRef.current.querySelector('[data-ghost-room]');
-
           if (courseSpan) courseSpan.textContent = session.course;
           if (teacherSpan) teacherSpan.textContent = getTeacherInitials(session.teacher);
           if (roomSpan) roomSpan.textContent = session.room;
@@ -664,34 +909,31 @@ const MemoizedRoutineTable = React.memo(
               ? "text-[9px] font-black uppercase tracking-wider px-1 rounded border shrink-0 bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 border-violet-200/50"
               : "text-[9px] font-black uppercase tracking-wider px-1 rounded border shrink-0 bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50";
           }
-
           ghostRef.current.style.display = 'flex';
-          ghostRef.current.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%)) scale(1.06)`;
+          ghostRef.current.style.transform = `translate(calc(${clientX}px - 50%), calc(${clientY}px - 50%)) scale(1.06)`;
         }
         document.body.style.cursor = 'grabbing';
-      }, [isSubmitting, schedule]);
+        // Start edge-scroll loop
+        startEdgeScroll();
+      }, [schedule]);
 
-      const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+      // Window-level handlers — only attached once drag is committed
+      const windowPointerMove = useCallback((e: PointerEvent) => {
         if (!dragStateRef.current.session) return;
-        // Update ghost position directly on DOM — zero React re-render cost
+        // Track pointer Y for edge-scroll RAF
+        pointerYRef.current = e.clientY;
         if (ghostRef.current) {
           ghostRef.current.style.transform = `translate(calc(${e.clientX}px - 50%), calc(${e.clientY}px - 50%)) scale(1.06)`;
         }
-
-        // Detect hovered cell and toggle data-hovered attribute directly on DOM
         const el = document.elementFromPoint(e.clientX, e.clientY);
         const cell = el?.closest('[data-cell-key]') as HTMLElement | null;
-
         if (cell !== hoveredCellRef.current) {
-          // Clear previous
           hoveredCellRef.current?.removeAttribute('data-hovered');
           if (cell) {
-            // Only highlight cells matching dragged session's semester
             const sem = tableWrapperRef.current?.getAttribute('data-dragging-semester');
             if (sem && cell.getAttribute('data-cell-semester') === sem) {
               cell.setAttribute('data-hovered', '1');
               hoveredCellRef.current = cell;
-              // Track for drop
               dragStateRef.current.hoveredRowKey = cell.dataset.cellKey ?? null;
               dragStateRef.current.hoveredCellIndex = cell.dataset.cellIndex != null ? parseInt(cell.dataset.cellIndex) : null;
             } else {
@@ -707,31 +949,17 @@ const MemoizedRoutineTable = React.memo(
         }
       }, []);
 
-      const clearDragDom = useCallback(() => {
-        hoveredCellRef.current?.removeAttribute('data-hovered');
-        hoveredCellRef.current = null;
-        tableWrapperRef.current?.removeAttribute('data-dragging-semester');
-        // Clear source card attribute
-        tableWrapperRef.current?.querySelector('[data-drag-source]')?.removeAttribute('data-drag-source');
-
-        // Clear drag target classes
-        const targets = tableWrapperRef.current?.querySelectorAll('[data-drag-target-valid]');
-        targets?.forEach(el => el.removeAttribute('data-drag-target-valid'));
-
-        if (ghostRef.current) ghostRef.current.style.display = 'none';
-        document.body.style.cursor = '';
-      }, []);
-
-      const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+      const windowPointerUp = useCallback((e: PointerEvent) => {
         const src = dragStateRef.current.session;
-        if (!src) return;
-
-        e.currentTarget.releasePointerCapture(e.pointerId);
-        e.currentTarget.removeAttribute('data-drag-source');
+        window.removeEventListener('pointermove', windowPointerMove);
+        window.removeEventListener('pointerup', windowPointerUp);
+        window.removeEventListener('pointercancel', windowPointerUp);
+        pendingDragRef.current.session = null;
+        pendingDragRef.current.sourceEl = null;
+        if (!src) { clearDragDom(); return; }
 
         const rowKey = dragStateRef.current.hoveredRowKey;
         const cellIdx = dragStateRef.current.hoveredCellIndex;
-
         dragStateRef.current.session = null;
         dragStateRef.current.hoveredRowKey = null;
         dragStateRef.current.hoveredCellIndex = null;
@@ -743,15 +971,56 @@ const MemoizedRoutineTable = React.memo(
         );
         if (!targetRow) return;
         handleDropOnCell(targetRow, cellIdx, src);
-      }, [handleDropOnCell, clearDragDom]);
+      }, [windowPointerMove, handleDropOnCell, clearDragDom]);
 
-      const onPointerCancel = useCallback(() => {
-        dragStateRef.current.session = null;
-        dragStateRef.current.hoveredRowKey = null;
-        dragStateRef.current.hoveredCellIndex = null;
-        clearDragDom();
-        document.body.style.cursor = '';
-      }, [clearDragDom]);
+      // Window-level pending move — checks threshold before committing drag
+      const windowPendingMove = useCallback((e: PointerEvent) => {
+        const pending = pendingDragRef.current;
+        if (!pending.session || !pending.sourceEl) return;
+        const dx = e.clientX - pending.startX;
+        const dy = e.clientY - pending.startY;
+        if (Math.sqrt(dx * dx + dy * dy) < 4) return; // threshold not reached yet
+        // Threshold crossed — commit drag and switch to drag handlers
+        window.removeEventListener('pointermove', windowPendingMove);
+        window.removeEventListener('pointerup', windowPendingCancel);
+        window.removeEventListener('pointercancel', windowPendingCancel);
+        commitDrag(pending.session, pending.isLab, e.clientX, e.clientY, pending.sourceEl);
+        window.addEventListener('pointermove', windowPointerMove, { passive: true });
+        window.addEventListener('pointerup', windowPointerUp);
+        window.addEventListener('pointercancel', windowPointerUp);
+      }, [commitDrag, windowPointerMove, windowPointerUp]);
+
+      const windowPendingCancel = useCallback(() => {
+        window.removeEventListener('pointermove', windowPendingMove);
+        window.removeEventListener('pointerup', windowPendingCancel);
+        window.removeEventListener('pointercancel', windowPendingCancel);
+        pendingDragRef.current.session = null;
+        pendingDragRef.current.sourceEl = null;
+      }, [windowPendingMove]);
+
+      const startPointerDrag = useCallback((e: React.PointerEvent<HTMLDivElement>, session: ClassSession, isLab: boolean) => {
+        if (isSubmitting) return;
+        // Only trigger on primary pointer (left mouse / first touch)
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        // Record pending drag start — do NOT capture pointer so scrolling stays free
+        pendingDragRef.current = {
+          session,
+          isLab,
+          startX: e.clientX,
+          startY: e.clientY,
+          sourceEl: e.currentTarget,
+        };
+        dragScheduleRef.current = schedule;
+        // Attach pending-move listener — will commit drag once threshold crossed
+        window.addEventListener('pointermove', windowPendingMove, { passive: true });
+        window.addEventListener('pointerup', windowPendingCancel);
+        window.addEventListener('pointercancel', windowPendingCancel);
+      }, [isSubmitting, schedule, windowPendingMove, windowPendingCancel]);
+
+      // Dummy no-op handlers kept on the card element for compatibility
+      const onPointerMove = useCallback((_e: React.PointerEvent<HTMLDivElement>) => { }, []);
+      const onPointerUp = useCallback((_e: React.PointerEvent<HTMLDivElement>) => { }, []);
+      const onPointerCancel = useCallback((_e: React.PointerEvent<HTMLDivElement>) => { }, []);
 
       const confirmSwap = async () => {
         const { source, target } = swapConfirmModal;
@@ -827,7 +1096,7 @@ const MemoizedRoutineTable = React.memo(
       const renderTable = (groupSchedule: typeof schedule, isPrint: boolean) => {
         return (
           <Table className={cn(
-            "w-full overflow-hidden min-w-[1000px] border border-border border-collapse text-sm",
+            "w-full overflow-hidden min-w-[1000px] border border-border border-collapse text-sm table-fixed",
             isPrint ? "print:min-w-0 print:w-full print:border-collapse !print:border-black" : ""
           )}>
             <TableHeader>
@@ -835,10 +1104,13 @@ const MemoizedRoutineTable = React.memo(
                 "border-b border-border hover:bg-transparent",
                 isPrint ? "print:border-black print:border-b" : ""
               )}>
-                <TableCell className={cn(
-                  "p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border relative bg-muted/40",
-                  isPrint ? "print:bg-white !print:border-r !print:border-black print:w-16 print:min-w-0" : ""
-                )}>
+                <TableCell
+                  className={cn(
+                    "p-0 w-[90px] min-w-[90px] h-[60px] border-r border-border relative bg-muted/40",
+                    isPrint ? "print:bg-white !print:border-r !print:border-black print:w-16 print:min-w-0" : ""
+                  )}
+                  style={isPrint ? {} : { width: colWidths["day"] || 90, minWidth: colWidths["day"] || 90 }}
+                >
                   <svg
                     className="absolute inset-0 w-full h-full pointer-events-none"
                     preserveAspectRatio="none"
@@ -864,42 +1136,75 @@ const MemoizedRoutineTable = React.memo(
                   )}>
                     Day
                   </span>
+                  {!isPrint && (
+                    <div
+                      onMouseDown={(e) => startColResize(e, "day", 90, 70)}
+                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 hover:w-1.5 transition-all z-30"
+                    />
+                  )}
                 </TableCell>
 
                 {isAllSemestersMode && (
-                  <TableCell className={cn(
-                    "w-12 min-w-[48px] text-center font-bold bg-muted/40 border-r border-border text-xs uppercase print-sem-cell",
-                    isPrint ? "!print:border-r !print:border-black" : ""
-                  )}>
+                  <TableCell
+                    className={cn(
+                      "w-12 min-w-[48px] text-center font-bold bg-muted/40 border-r border-border text-xs uppercase print-sem-cell relative",
+                      isPrint ? "!print:border-r !print:border-black" : ""
+                    )}
+                    style={isPrint ? {} : { width: colWidths["semester"] || 48, minWidth: colWidths["semester"] || 48 }}
+                  >
                     SEM
+                    {!isPrint && (
+                      <div
+                        onMouseDown={(e) => startColResize(e, "semester", 48, 40)}
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 hover:w-1.5 transition-all z-30"
+                      />
+                    )}
                   </TableCell>
                 )}
 
                 {timeSlots.map((slot, idx) => {
                   const hasClass = groupSchedule.some(rowItem => rowItem.slots[idx] !== null);
-                  if (isBreakSlot(slot)) {
+                  const isBreak = isBreakSlot(slot);
+                  const defaultColWidth = isBreak ? (hasClass ? 180 : 50) : 180;
+                  const colWidth = colWidths[slot.id] || defaultColWidth;
+
+                  if (isBreak) {
                     if (!hasClass) {
                       return (
-                        <TableCell key={slot.id} className={cn(
-                          "w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 border-r border-border",
-                          isPrint ? "print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border !print:border-r !print:border-black" : ""
-                        )}>
+                        <TableCell
+                          key={slot.id}
+                          className={cn(
+                            "w-10 min-w-10 bg-foreground text-background text-center align-middle p-0 border-r border-border relative",
+                            isPrint ? "print:bg-white print:text-black print:w-6 print:min-w-0 border-r border-border !print:border-r !print:border-black" : ""
+                          )}
+                          style={isPrint ? {} : { width: colWidth, minWidth: colWidth }}
+                        >
                           <div className="h-full flex items-center justify-center">
                             <span className={cn(
-                              "text-xs font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print-break-text-no-class",
+                              "text-[10px] font-black uppercase tracking-widest -rotate-90 whitespace-nowrap text-background print-break-text-no-class",
                               isPrint ? "print:text-black" : ""
                             )}>
                               BREAK
                             </span>
                           </div>
+                          {!isPrint && (
+                            <div
+                              onMouseDown={(e) => startColResize(e, String(slot.id), defaultColWidth, 40)}
+                              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 hover:w-1.5 transition-all z-30"
+                            />
+                          )}
                         </TableCell>
                       );
                     } else {
                       return (
-                        <TableCell key={slot.id} className={cn(
-                          "bg-foreground text-background text-center align-middle p-0 border-r border-border min-w-[100px]",
-                          isPrint ? "print:bg-white print:text-black !print:border-r !print:border-black" : ""
-                        )}>
+                        <TableCell
+                          key={slot.id}
+                          className={cn(
+                            "bg-foreground text-background text-center align-middle p-0 border-r border-border min-w-[100px] relative",
+                            isPrint ? "print:bg-white print:text-black !print:border-r !print:border-black" : ""
+                          )}
+                          style={isPrint ? {} : { width: colWidth, minWidth: colWidth }}
+                        >
                           <div className="h-full flex items-center justify-center">
                             <span className={cn(
                               "text-xs font-black uppercase tracking-widest text-background whitespace-nowrap",
@@ -908,6 +1213,12 @@ const MemoizedRoutineTable = React.memo(
                               BREAK
                             </span>
                           </div>
+                          {!isPrint && (
+                            <div
+                              onMouseDown={(e) => startColResize(e, String(slot.id), defaultColWidth, 40)}
+                              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 hover:w-1.5 transition-all z-30"
+                            />
+                          )}
                         </TableCell>
                       );
                     }
@@ -916,9 +1227,10 @@ const MemoizedRoutineTable = React.memo(
                     <TableCell
                       key={slot.id}
                       className={cn(
-                        "text-center align-middle h-[60px] border-r border-border last:border-r-0 p-0 min-w-[100px] bg-muted/10",
+                        "text-center align-middle h-[60px] border-r border-border last:border-r-0 p-0 min-w-[100px] bg-muted/10 relative",
                         isPrint ? "!print:border-r !print:border-black print:last:border-r-0 print:h-auto print:bg-white print:min-w-0" : ""
                       )}
+                      style={isPrint ? {} : { width: colWidth, minWidth: colWidth }}
                     >
                       <div className="flex flex-col items-center justify-center h-full w-full px-1">
                         <span className={cn(
@@ -930,6 +1242,12 @@ const MemoizedRoutineTable = React.memo(
                           {formatTimeSlotLabel(slot.end_time)}
                         </span>
                       </div>
+                      {!isPrint && (
+                        <div
+                          onMouseDown={(e) => startColResize(e, String(slot.id), defaultColWidth, 180)}
+                          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/50 hover:w-1.5 transition-all z-30"
+                        />
+                      )}
                     </TableCell>
                   );
                 })}
@@ -942,310 +1260,404 @@ const MemoizedRoutineTable = React.memo(
               );
               if (dayRows.length === 0) return null;
 
-              const TbodyComponent = isPrint ? ("tbody" as any) : motion.tbody;
-              const tbodyProps = isPrint ? {} : {
-                variants: containerVariants,
-                initial: "hidden",
-                animate: "visible"
-              };
-
               return (
-                <TbodyComponent
+                <tbody
                   key={dayName}
-                  {...tbodyProps}
                   className={cn(isPrint ? "print:break-inside-avoid !print:break-inside-avoid" : "")}
                 >
-                  <AnimatePresence mode="popLayout">
-                    {dayRows.map((rowItem, rowIndex) => {
-                      const isFirstRowOfDay = rowIndex === 0;
-                      const rowSpan = dayRows.length;
+                  {dayRows.map((rowItem, rowIndex) => {
+                    const isFirstRowOfDay = rowIndex === 0;
+                    const rowSpan = dayRows.length;
+                    const rowHasGroup = rowItem.slots.some((s) => s && s.some(sess => sess.group_name));
 
-                      const TrComponent = isPrint ? ("tr" as any) : motion.tr;
-                      const trProps = isPrint ? {} : {
-                        variants: itemVariants
-                      };
+                    return (
+                      <tr
+                        key={`${rowItem.day}-${rowItem.semester}`}
+                        className={cn(
+                          "border-b border-border hover:bg-muted/5",
+                          isPrint ? "!print:border-black print:border-b print:h-auto" : ""
+                        )}
+                        style={isPrint ? {} : { height: rowHeights[`${rowItem.day}-${rowItem.semester}`] || 85 }}
+                      >
+                        {/* Day Label (grouped by rowSpan) */}
+                        {isFirstRowOfDay && (
+                          <TableCell
+                            rowSpan={rowSpan}
+                            className={cn(
+                              "font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border relative",
+                              isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black print:font-bold" : ""
+                            )}
+                          >
+                            <div className={cn("flex items-center justify-center h-full w-full py-4", isPrint ? "print:py-2" : "")}>
+                              <span className={cn(
+                                "writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0",
+                                isPrint ? "print:rotate-0 print:text-[12px]" : ""
+                              )}>
+                                {rowItem.day.slice(0, 3).toUpperCase()}
+                              </span>
+                            </div>
+                            {!isPrint && !isAllSemestersMode && (
+                              <div
+                                onMouseDown={(e) => startRowResize(e, `${rowItem.day}-${rowItem.semester}`, 85)}
+                                className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize hover:bg-primary/50 hover:h-1.5 transition-all z-30"
+                              />
+                            )}
+                          </TableCell>
+                        )}
 
-                      return (
-                        <TrComponent
-                          key={`${rowItem.day}-${rowItem.semester}`}
-                          {...trProps}
-                          className={cn(
-                            "border-b border-border hover:bg-muted/5 h-[85px]",
-                            isPrint ? "!print:border-black print:border-b print:h-auto" : ""
-                          )}
-                        >
-                          {/* Day Label (grouped by rowSpan) */}
-                          {isFirstRowOfDay && (
+                        {/* Semester Label */}
+                        {isAllSemestersMode && (
+                          <TableCell className={cn(
+                            "font-bold text-xs text-center border-r border-border bg-muted/10 print-sem-cell w-12 min-w-[48px] relative",
+                            isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black" : ""
+                          )}>
+                            {rowItem.semester}
+                            {!isPrint && (
+                              <div
+                                onMouseDown={(e) => startRowResize(e, `${rowItem.day}-${rowItem.semester}`, 85)}
+                                className="absolute bottom-0 left-0 right-0 h-1 cursor-row-resize hover:bg-primary/50 hover:h-1.5 transition-all z-30"
+                              />
+                            )}
+                          </TableCell>
+                        )}
+
+                        {/* Time Slots */}
+                        {rowItem.slots.map((sessionList, index) => {
+                          const slot = timeSlots[index];
+                          const sessions = sessionList && sessionList.length > 0 ? sessionList : null;
+                          const firstSession = sessions ? sessions[0] : null;
+                          const isMulti = sessions ? sessions.length > 1 : false;
+
+                          // Compute cell-level highlights/states based on all sessions
+                          const anyHighlighted = sessions ? sessions.some(s => isMatch(s)) : false;
+                          const anyTeacherOff = sessions ? sessions.some(s => {
+                            const tKey = s.teacherId ?? s.teacher;
+                            const sTime = s.originalTime || "";
+                            const cKey = tKey && sTime ? generateClassKey(s.department, s.semester, abbreviateDay(s.day), tKey, sTime) : "";
+                            const offData = cKey ? classOffMap[cKey] : undefined;
+                            return (offData?.status) || s.is_cancelled || (availabilityMap[tKey] === false);
+                          }) : false;
+
+                          return (
                             <TableCell
-                              rowSpan={rowSpan}
-                              className={cn(
-                                "font-bold text-xs uppercase tracking-wider p-0 align-middle text-center bg-muted/20 border-r border-border",
-                                isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black print:font-bold" : ""
-                              )}
-                            >
-                              <div className={cn("flex items-center justify-center h-full w-full py-4", isPrint ? "print:py-2" : "")}>
-                                <span className={cn(
-                                  "writing-mode-vertical lg:writing-mode-horizontal lg:rotate-0",
-                                  isPrint ? "print:rotate-0 print:text-[12px]" : ""
-                                )}>
-                                  {rowItem.day.slice(0, 3).toUpperCase()}
-                                </span>
-                              </div>
-                            </TableCell>
-                          )}
-
-                          {/* Semester Label */}
-                          {isAllSemestersMode && (
-                            <TableCell className={cn(
-                              "font-bold text-xs text-center border-r border-border bg-muted/10 print-sem-cell w-12 min-w-[48px]",
-                              isPrint ? "!print:border-r !print:border-black print:bg-white print:text-black" : ""
-                            )}>
-                              {rowItem.semester}
-                            </TableCell>
-                          )}
-
-                          {/* Time Slots */}
-                          {rowItem.slots.map((session, index) => {
-                            const slot = timeSlots[index];
-                            const teacherKey = session
-                              ? session.teacherId ?? session.teacher
-                              : undefined;
-
-                            const startTimeRaw = session?.originalTime || "";
-                            const key =
-                              session && teacherKey
-                                ? generateClassKey(
-                                  session.department,
-                                  session.semester,
-                                  abbreviateDay(session.day),
-                                  teacherKey,
-                                  startTimeRaw
-                                )
-                                : "";
-
-                            const classOffData =
-                              teacherKey && startTimeRaw && key
-                                ? classOffMap[key]
-                                : undefined;
-
-                            const isClassOffToday = Boolean(classOffData?.status) || Boolean(session?.is_cancelled);
-                            const cancellationReason =
-                              classOffData?.reason || session?.cancel_message || "No reason provided.";
-                            const isTeacherOff =
-                              (!!teacherKey && availabilityMap[teacherKey] === false) ||
-                              isClassOffToday;
-
-                            const highlighted = isMatch(session);
-                            const isLab = session ? isLabClass(session.course, undefined, session.room) : false;
-
-                            return (
-                              <TableCell
-                                key={index}
-                                onClick={() => {
-                                  if (session && isClassOffToday) {
+                              key={index}
+                              onClick={() => {
+                                if (selectedSwapSource) {
+                                  if (rowItem.semester === selectedSwapSource.semester) {
+                                    handleDropOnCell(rowItem, index, selectedSwapSource);
+                                    setSelectedSwapSource(null);
+                                  }
+                                  return;
+                                }
+                                // For single-session cancelled cells, show reason on click
+                                if (firstSession && !isMulti) {
+                                  const tKey = firstSession.teacherId ?? firstSession.teacher;
+                                  const sTime = firstSession.originalTime || "";
+                                  const cKey = tKey && sTime ? generateClassKey(firstSession.department, firstSession.semester, abbreviateDay(firstSession.day), tKey, sTime) : "";
+                                  const offData = cKey ? classOffMap[cKey] : undefined;
+                                  const isOff = Boolean(offData?.status) || Boolean(firstSession.is_cancelled);
+                                  if (isOff) {
                                     onCellClick({
-                                      course: session.course,
-                                      teacher: session.teacher,
-                                      reason: cancellationReason,
+                                      course: firstSession.course,
+                                      teacher: firstSession.teacher,
+                                      reason: offData?.reason || firstSession.cancel_message || "No reason provided.",
                                     });
                                   }
-                                }}
-                                data-cell-key={`${rowItem.day}-${rowItem.semester}`}
-                                data-cell-index={index}
-                                data-cell-semester={rowItem.semester}
-                                className={cn(
-                                  "align-middle border-r border-border relative",
-                                  isPrint ? "!print:border-r !print:border-black" : "",
-                                  (!session && isBreakSlot(slot))
-                                    ? "p-0 overflow-hidden"
-                                    : isPrint
-                                      ? "p-0.5"
-                                      : "p-2",
-                                  isClassOffToday ? "cursor-pointer" : "cursor-default",
-                                  highlighted
-                                    ? "bg-emerald-100/50 dark:bg-emerald-900/20" + (isPrint ? " print:bg-transparent" : "")
-                                    : isTeacherOff
-                                      ? "bg-red-100/30 dark:bg-red-950/10" + (isPrint ? " print:bg-transparent" : "")
-                                      : "bg-transparent" + (isPrint ? " print:bg-white" : "")
-                                )}
-                              >
-                                {/* CSS-driven drag overlays — shown/hidden via data-attributes, zero JS per frame */}
-                                {!isPrint && (
-                                  <>
-                                    {/* Dashed overlay: visible on same-semester cells while dragging (hidden when this cell is hovered) */}
-                                    <div className="drag-target-dashed absolute inset-0.5 rounded-lg border-2 border-dashed border-primary/45 bg-primary/5 pointer-events-none z-20 opacity-0 scale-95 transition-all duration-150" />
-                                    {/* Solid overlay: visible only on the hovered cell */}
-                                    <div className="drag-target-hovered absolute inset-0.5 rounded-lg border-2 border-solid border-primary bg-primary/15 shadow-md shadow-primary/20 pointer-events-none z-20 opacity-0 transition-all duration-150" />
-                                  </>
-                                )}
-                                {session ? (
-                                  <>
-                                    {/* Draggable card — NOT wrapped in DropdownMenuTrigger */}
-                                    <motion.div
-                                      data-session-id={session.id}
-                                      onPointerDown={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? (e) => startPointerDrag(e, session, isLab) : undefined}
-                                      onPointerMove={onPointerMove}
-                                      onPointerUp={onPointerUp}
-                                      onPointerCancel={onPointerCancel}
-                                      className={cn(
-                                        "w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden relative select-none",
-                                        "transition-colors duration-150",
-                                        (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:shadow-md",
-                                        isTeacherOff
-                                          ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
-                                          : highlighted
-                                            ? "bg-background border-emerald-500 shadow-md"
-                                            : isLab
-                                              ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40"
-                                              : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40"
-                                      )}
-                                    >
-                                      <div className="flex justify-between items-start w-full gap-1">
-                                        <div className="flex flex-col">
-                                          <span className={cn(
-                                            "text-xs font-extrabold tracking-tight leading-tight text-foreground",
-                                            isClassOffToday && "opacity-70"
-                                          )}>
-                                            {session.course}
-                                          </span>
-                                        </div>
-                                        <div className="flex items-center gap-0.5 shrink-0">
-                                          {isLab ? (
-                                            <span className={cn(
-                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
-                                              isTeacherOff
-                                                ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
-                                            )}>
-                                              Lab
-                                            </span>
-                                          ) : (
-                                            <span className={cn(
-                                              "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
-                                              isTeacherOff
-                                                ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
-                                                : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
-                                            )}>
-                                              Theory
-                                            </span>
-                                          )}
-                                          {/* Three-dot menu button — sole dropdown trigger, does NOT interfere with drag */}
-                                          {!isRoutineLocked && !isSubmitting && (
-                                            <DropdownMenu>
-                                              <DropdownMenuTrigger asChild>
-                                                <button
-                                                  draggable={false}
-                                                  onMouseDown={(e) => e.stopPropagation()}
-                                                  onPointerDown={(e) => e.stopPropagation()}
-                                                  onClick={(e) => e.stopPropagation()}
-                                                  className="ml-0.5 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-opacity focus:opacity-100 outline-none cursor-pointer"
-                                                  aria-label="Class actions"
+                                }
+                              }}
+                              data-cell-key={`${rowItem.day}-${rowItem.semester}`}
+                              data-cell-index={index}
+                              data-cell-semester={rowItem.semester}
+                              className={cn(
+                                "h-px align-middle border-r border-border relative p-2",
+                                isPrint ? "!print:border-r !print:border-black" : "",
+                                (selectedSwapSource && rowItem.semester === selectedSwapSource.semester)
+                                  ? "cursor-pointer hover:bg-primary/5 transition-colors"
+                                  : "cursor-default",
+                                anyHighlighted
+                                  ? "bg-emerald-100/50 dark:bg-emerald-900/20" + (isPrint ? " print:bg-transparent" : "")
+                                  : anyTeacherOff
+                                    ? "bg-red-100/30 dark:bg-red-950/10" + (isPrint ? " print:bg-transparent" : "")
+                                    : "bg-transparent" + (isPrint ? " print:bg-white" : "")
+                              )}
+                            >
+                              {/* CSS-driven drag overlays */}
+                              {!isPrint && (
+                                <>
+                                  <div className="drag-target-dashed absolute inset-0.5 rounded-lg border-2 border-dashed border-primary/45 bg-primary/5 pointer-events-none z-20 opacity-0 scale-95 transition-all duration-150" />
+                                  <div className="drag-target-hovered absolute inset-0.5 rounded-lg border-2 border-solid border-primary bg-primary/15 shadow-md shadow-primary/20 pointer-events-none z-20 opacity-0 transition-all duration-150" />
+                                </>
+                              )}
+                              {sessions ? (
+                                <>
+                                  {(() => {
+                                    if (isMulti) {
+                                      // Compute combined container states from all sessions
+                                      const isMultiHighlight = sessions.some(s => isMatch(s));
+                                      const isMultiTeacherOff = sessions.some(s => {
+                                        const tKey = s.teacherId ?? s.teacher;
+                                        const sTime = s.originalTime || "";
+                                        const cKey = tKey && sTime ? generateClassKey(s.department, s.semester, abbreviateDay(s.day), tKey, sTime) : "";
+                                        const offData = cKey ? classOffMap[cKey] : undefined;
+                                        return (offData?.status) || s.is_cancelled || (availabilityMap[tKey] === false);
+                                      });
+                                      const isMultiLab = sessions.every(s => checkIsLab(s));
+                                      const isMultiTheory = sessions.every(s => !checkIsLab(s));
+
+                                      const containerBgClass = isMultiTeacherOff
+                                        ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                                        : isMultiHighlight
+                                          ? "bg-background border-emerald-500 shadow-md"
+                                          : isMultiLab
+                                            ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40 hover:shadow-md"
+                                            : isMultiTheory
+                                              ? "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40 hover:shadow-md"
+                                              : "bg-slate-50/45 border-slate-200 dark:bg-slate-950/20 dark:border-slate-800/30 hover:border-teal-400/40 hover:shadow-md";
+
+                                      return (
+                                        <div className={cn(
+                                          "print:hidden w-full rounded-md border flex flex-row p-0.5 shadow-sm relative select-none justify-between items-stretch h-full min-h-[69px] gap-1",
+                                          "transition-all duration-150",
+                                          containerBgClass
+                                        )}>
+                                          {sessions.map((session, sIdx) => {
+                                            const teacherKey = session.teacherId ?? session.teacher;
+                                            const startTimeRaw = session.originalTime || "";
+                                            const key = teacherKey && startTimeRaw
+                                              ? generateClassKey(session.department, session.semester, abbreviateDay(session.day), teacherKey, startTimeRaw)
+                                              : "";
+                                            const classOffData = key ? classOffMap[key] : undefined;
+                                            const isClassOffToday = Boolean(classOffData?.status) || Boolean(session.is_cancelled);
+                                            const cancellationReason = classOffData?.reason || session.cancel_message || "No reason provided.";
+                                            const isTeacherOff = (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
+                                            const highlighted = isMatch(session);
+                                            const isLab = checkIsLab(session);
+
+                                            return (
+                                              <React.Fragment key={session.id}>
+                                                <div
+                                                  data-session-id={session.id}
+                                                  data-drag-source={selectedSwapSource?.id === session.id ? "1" : undefined}
+                                                  onPointerDown={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? (e) => startPointerDrag(e, session, isLab) : undefined}
+                                                  onPointerMove={onPointerMove}
+                                                  onPointerUp={onPointerUp}
+                                                  onPointerCancel={onPointerCancel}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (isClassOffToday) {
+                                                      onCellClick({ course: session.course, teacher: session.teacher, reason: cancellationReason });
+                                                    }
+                                                  }}
+                                                  className={cn(
+                                                    "relative flex-1 flex flex-col justify-between rounded px-1.5 py-1.5 transition-colors duration-150 min-w-0 select-none group/item",
+                                                    (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:bg-black/5 dark:hover:bg-white/5"
+                                                  )}
                                                 >
-                                                  <MoreVertical className="w-3 h-3 text-muted-foreground" />
-                                                </button>
-                                              </DropdownMenuTrigger>
-                                              <DropdownMenuContent
-                                                align="end"
-                                                className="w-48"
-                                                onPointerDown={(e) => e.stopPropagation()}
-                                                onMouseDown={(e) => e.stopPropagation()}
-                                              >
-                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                <DropdownMenuSeparator />
-                                                {!isClassOffToday ? (
-                                                  <DropdownMenuItem
-                                                    className="text-red-500 focus:text-red-500 cursor-pointer"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      onCancelClass?.(session);
-                                                    }}
-                                                  >
-                                                    <PowerOff className="size-4 mr-2 text-red-500" /> Cancel Class
-                                                  </DropdownMenuItem>
-                                                ) : (
-                                                  <>
-                                                    <DropdownMenuItem
-                                                      className="cursor-pointer"
-                                                      onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onReactivateClass?.(session);
-                                                      }}
-                                                    >
-                                                      <CheckCheck className="size-4 mr-2" /> Activate Class
-                                                    </DropdownMenuItem>
-                                                    {session.is_cancelled && (
-                                                      <DropdownMenuItem
-                                                        className="cursor-pointer"
-                                                        onClick={(e) => {
-                                                          e.stopPropagation();
-                                                          onUpdateCancelMessage?.(session);
-                                                        }}
-                                                      >
-                                                        <Pencil className="size-4 mr-2" /> Update Message
-                                                      </DropdownMenuItem>
+                                                  <div className="flex flex-col gap-0.5 items-start w-full">
+                                                    <div className="flex items-center justify-between gap-0.5 w-full max-w-full">
+                                                      <div className={cn(
+                                                        "text-[8.5px] font-bold tracking-[-0.05em] text-foreground truncate pr-3.5 w-full block",
+                                                        isClassOffToday && "opacity-70 line-through"
+                                                      )}>
+                                                        {session.course}
+                                                      </div>
+                                                      <LazyClassActionsDropdown
+                                                        isRoutineLocked={isRoutineLocked}
+                                                        isSubmitting={isSubmitting}
+                                                        session={session}
+                                                        setSelectedSwapSource={setSelectedSwapSource}
+                                                        onCancelClass={onCancelClass}
+                                                        onReactivateClass={onReactivateClass}
+                                                        onUpdateCancelMessage={onUpdateCancelMessage}
+                                                        isClassOffToday={isClassOffToday}
+                                                        isMulti={true}
+                                                      />
+                                                    </div>
+                                                  </div>
+                                                  <div className="flex flex-col items-start gap-0.5 w-full mt-1">
+                                                    <div className="flex items-center gap-1 text-[9px] text-muted-foreground font-medium truncate max-w-full">
+                                                      {selectedTeacher !== "All Teachers" ? (
+                                                        <><BookOpen className="w-2.5 h-2.5 opacity-70 shrink-0" /><span className="truncate">{session.semester}</span></>
+                                                      ) : (
+                                                        <><User className="w-2.5 h-2.5 opacity-70 shrink-0" /><span className="truncate">{getTeacherInitials(session.teacher)}</span></>
+                                                      )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-[9px] font-mono text-muted-foreground/80 truncate max-w-full">
+                                                      <MapPin className="w-2.5 h-2.5 opacity-70 shrink-0" />
+                                                      <span className="truncate">{session.room}</span>
+                                                    </div>
+                                                    {session.group_name && (
+                                                      <div className="flex items-center gap-1 text-[9px] font-medium text-muted-foreground/80 truncate max-w-full">
+                                                        <Users className="w-2.5 h-2.5 opacity-70 shrink-0" />
+                                                        <span className="truncate">{session.group_name.replace("Group ", "")}</span>
+                                                      </div>
                                                     )}
-                                                  </>
+                                                  </div>
+                                                </div>
+                                                {sIdx < sessions.length - 1 && (
+                                                  <div className="w-[1px] bg-border/40 self-stretch my-1 shrink-0" />
                                                 )}
-                                              </DropdownMenuContent>
-                                            </DropdownMenu>
+                                              </React.Fragment>
+                                            );
+                                          })}
+                                        </div>
+                                      );
+                                    }
+                                    const session = sessions[0];
+                                    const teacherKey = session.teacherId ?? session.teacher;
+                                    const startTimeRaw = session.originalTime || "";
+                                    const key = teacherKey && startTimeRaw
+                                      ? generateClassKey(session.department, session.semester, abbreviateDay(session.day), teacherKey, startTimeRaw)
+                                      : "";
+                                    const classOffData = key ? classOffMap[key] : undefined;
+                                    const isClassOffToday = Boolean(classOffData?.status) || Boolean(session.is_cancelled);
+                                    const cancellationReason = classOffData?.reason || session.cancel_message || "No reason provided.";
+                                    const isTeacherOff = (!!teacherKey && availabilityMap[teacherKey] === false) || isClassOffToday;
+                                    const highlighted = isMatch(session);
+                                    const isLab = checkIsLab(session);
+
+                                    return (
+                                      <motion.div
+                                        key={session.id}
+                                        data-session-id={session.id}
+                                        data-drag-source={selectedSwapSource?.id === session.id ? "1" : undefined}
+                                        onPointerDown={(!isRoutineLocked && !isClassOffToday && !isSubmitting) ? (e) => startPointerDrag(e, session, isLab) : undefined}
+                                        onPointerMove={onPointerMove}
+                                        onPointerUp={onPointerUp}
+                                        onPointerCancel={onPointerCancel}
+                                        className={cn(
+                                          "h-full w-full rounded-md border flex flex-col justify-between p-2 shadow-sm group print:hidden relative select-none",
+                                          "transition-colors duration-150",
+                                          (!isRoutineLocked && !isClassOffToday && !isSubmitting) && "cursor-grab active:cursor-grabbing hover:shadow-md",
+                                          isTeacherOff
+                                            ? "bg-red-50/50 border-red-500 ring-2 ring-red-400/40 dark:bg-red-900/10 hover:bg-red-100/50 dark:hover:bg-red-900/20"
+                                            : highlighted
+                                              ? "bg-background border-emerald-500 shadow-md"
+                                              : isLab
+                                                ? "bg-violet-50/40 border-violet-200 dark:bg-violet-950/20 dark:border-violet-800/30 hover:border-violet-400/40 hover:shadow-md"
+                                                : "bg-teal-50/40 border-teal-200 dark:bg-teal-950/20 dark:border-teal-800/30 hover:border-teal-400/40 hover:shadow-md"
+                                        )}
+                                      >
+                                        <div className="flex justify-between items-start w-full gap-1">
+                                          <div className="flex flex-col">
+                                            <span className={cn(
+                                              "text-xs font-extrabold tracking-tight leading-tight text-foreground",
+                                              isClassOffToday && "opacity-70"
+                                            )}>
+                                              {session.course}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center gap-0.5 shrink-0">
+                                            {isLab ? (
+                                              <span className={cn(
+                                                "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
+                                                isTeacherOff
+                                                  ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                  : "bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 border-violet-200/50 dark:border-violet-800/40"
+                                              )}>Lab</span>
+                                            ) : (
+                                              <span className={cn(
+                                                "text-[9px] font-black uppercase tracking-wider px-1 py-0.2 rounded border shrink-0",
+                                                isTeacherOff
+                                                  ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-red-200/50 dark:border-red-800/40"
+                                                  : "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 border-teal-200/50 dark:border-teal-800/40"
+                                              )}>Theory</span>
+                                            )}
+                                            <LazyClassActionsDropdown
+                                              isRoutineLocked={isRoutineLocked}
+                                              isSubmitting={isSubmitting}
+                                              session={session}
+                                              setSelectedSwapSource={setSelectedSwapSource}
+                                              onCancelClass={onCancelClass}
+                                              onReactivateClass={onReactivateClass}
+                                              onUpdateCancelMessage={onUpdateCancelMessage}
+                                              isClassOffToday={isClassOffToday}
+                                              isMulti={false}
+                                            />
+                                          </div>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 mt-1 w-full text-left">
+                                          <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                                            {selectedTeacher !== "All Teachers" ? (
+                                              <><BookOpen className="w-3 h-3 opacity-70" /><span>{session.semester}</span></>
+                                            ) : (
+                                              <><User className="w-3 h-3 opacity-70" /><span>{getTeacherInitials(session.teacher)}</span></>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
+                                            <MapPin className="w-3 h-3 opacity-70" />
+                                            <span>{session.room}</span>
+                                          </div>
+                                          {session.group_name ? (
+                                            <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80">
+                                              <Users className="w-3 h-3 opacity-70" />
+                                              <span>{session.group_name}</span>
+                                            </div>
+                                          ) : (
+                                            <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/80 invisible select-none pointer-events-none" aria-hidden="true">
+                                              <Users className="w-3 h-3 opacity-0" />
+                                              <span>Placeholder</span>
+                                            </div>
                                           )}
                                         </div>
-                                      </div>
-                                      <div className="flex flex-col gap-0.5 mt-1">
-                                        <div className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                                          <User className="w-3 h-3 opacity-70" />
-                                          <span>
-                                            {getTeacherInitials(session.teacher)}
+                                      </motion.div>
+                                    );
+                                  })()}
+                                  {/* Print view for multi or single sessions */}
+                                  <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1 gap-0.5">
+                                    {sessions.map((session, sIdx) => {
+                                      const teacherKey = session.teacherId ?? session.teacher;
+                                      const sTime = session.originalTime || "";
+                                      const cKey = teacherKey && sTime ? generateClassKey(session.department, session.semester, abbreviateDay(session.day), teacherKey, sTime) : "";
+                                      const offData = cKey ? classOffMap[cKey] : undefined;
+                                      const isTeacherOff = (offData?.status) || session.is_cancelled || (availabilityMap[teacherKey] === false);
+                                      return (
+                                        <div key={session.id} className={cn(
+                                          "w-full text-center",
+                                          isMulti && sIdx < sessions.length - 1 && "border-b border-black/20 pb-0.5 mb-0.5"
+                                        )}>
+                                          <span className="font-bold text-[11px] block">
+                                            {session.course}{selectedTeacher !== "All Teachers" ? ` (${session.semester.replace(" Semester", " Sem")})` : `, T-${getTeacherInitials(session.teacher)}`}
                                           </span>
+                                          <span className="font-bold text-[11px] block">
+                                            {session.room}{session.group_name ? ` - ${session.group_name}` : ""}
+                                          </span>
+                                          {isTeacherOff && (
+                                            <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label block">
+                                              (Cancelled)
+                                            </span>
+                                          )}
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-[10px] font-mono text-muted-foreground/80">
-                                          <MapPin className="w-3 h-3 opacity-70" />
-                                          <span>{session.room}</span>
-                                        </div>
-                                      </div>
-                                    </motion.div>
-                                    <div className="hidden print:flex flex-col items-center justify-center text-center text-black h-full w-full leading-tight py-1">
-                                      <span className="font-bold text-[11px]">
-                                        {session.course}, T-
-                                        {getTeacherInitials(session.teacher)}
-                                      </span>
-                                      <span className="font-bold text-[11px]">
-                                        {session.room}
-                                      </span>
-                                      {isTeacherOff && (
-                                        <span className="text-[8px] font-black uppercase mt-0.5 print-cancelled-label">
-                                          (Cancelled)
-                                        </span>
-                                      )}
-                                    </div>
-                                  </>
-                                ) : isBreakSlot(slot) ? (
-                                  <>
-                                    <div
-                                      className="absolute inset-0 opacity-10 print:hidden"
-                                      style={{
-                                        backgroundImage:
-                                          "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
-                                        backgroundSize: "4px 4px",
-                                      }}
-                                    />
-                                    <div className="h-full w-full min-h-[48px] flex items-center justify-center relative z-10 print:hidden">
-                                      <Utensils className="w-3 h-3 text-foreground/40" />
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="h-full w-full flex items-center justify-center min-h-[48px] print:min-h-0">
-                                    <div className="w-1 h-1 rounded-full bg-border print:hidden" />
+                                      );
+                                    })}
                                   </div>
-                                )}
-                              </TableCell>
-                            );
-                          })}
-                        </TrComponent>
-                      );
-                    })}
-                  </AnimatePresence>
-                </TbodyComponent>
+                                </>
+                              ) : isBreakSlot(slot) ? (
+                                <>
+                                  <div
+                                    className="absolute inset-0 opacity-10 print:hidden"
+                                    style={{
+                                      backgroundImage:
+                                        "linear-gradient(45deg, #000 25%, transparent 25%, transparent 50%, #000 50%, #000 75%, transparent 75%, transparent)",
+                                      backgroundSize: "4px 4px",
+                                    }}
+                                  />
+                                  <div className="h-full w-full min-h-[48px] flex items-center justify-center relative z-10 print:hidden">
+                                    <Utensils className="w-3 h-3 text-foreground/40" />
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center min-h-[48px] print:min-h-0">
+                                  <div className="w-1 h-1 rounded-full bg-border print:hidden" />
+                                </div>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
               );
             })}
           </Table>
@@ -1255,7 +1667,11 @@ const MemoizedRoutineTable = React.memo(
       return (
         <div className="w-full flex flex-col gap-6 print:gap-0 print:block">
           {/* Screen view: single table */}
-          <div ref={tableWrapperRef} className="w-full print:hidden">
+          <div
+            ref={tableWrapperRef}
+            className="w-full print:hidden"
+            data-dragging-semester={selectedSwapSource?.semester || undefined}
+          >
             {renderTable(schedule, false)}
           </div>
 
@@ -1268,6 +1684,34 @@ const MemoizedRoutineTable = React.memo(
               </div>
             ))}
           </div>
+
+          {/* Floating Swap Mode Bar */}
+          {selectedSwapSource && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-md bg-background/80 backdrop-blur-md border border-primary/20 shadow-2xl rounded-2xl p-4 flex items-center justify-between gap-4 animate-in slide-in-from-bottom duration-200 print:hidden">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                  <ArrowLeftRight className="h-5 w-5 animate-pulse" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs uppercase font-extrabold tracking-wider text-muted-foreground">Swap/Move Mode</span>
+                  <span className="text-sm font-bold text-foreground">
+                    Selected: {selectedSwapSource.course}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    Tap target slot for {selectedSwapSource.semester} Semester
+                  </span>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedSwapSource(null)}
+                className="hover:bg-muted font-bold text-xs"
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
 
           {/* Swap Confirmation Modal */}
           <Dialog
@@ -1447,6 +1891,10 @@ export default function AdminRoutinePage({
     setRedoStack([]);
   }, []);
 
+  // ── Data Management (Export / Import) ──────────────────────────────────────
+  const [dataManagementOpen, setDataManagementOpen] = useState(false);
+
+
 
   const [lockConfirmModal, setLockConfirmModal] = useState<{
     isOpen: boolean;
@@ -1469,6 +1917,25 @@ export default function AdminRoutinePage({
     ignoreWarnings: false,
   });
 
+  const [generateResultModal, setGenerateResultModal] = useState<{
+    isOpen: boolean;
+    success: boolean;
+    data: {
+      status?: string;
+      total_classes_required?: number;
+      successful_classes?: number;
+      dropped_classes?: number;
+      shortage_details?: string[] | any[];
+      message?: string;
+    } | null;
+    errorMsg?: string | null;
+  }>({
+    isOpen: false,
+    success: false,
+    data: null,
+    errorMsg: null,
+  });
+
   const openGenerateModal = () => {
     if (isRoutineLocked) return;
     setGenerateModal({
@@ -1488,8 +1955,40 @@ export default function AdminRoutinePage({
 
   const [selectedDept, setSelectedDept] = useState<string>("");
   const [selectedSemester, setSelectedSemester] = useState<string>("");
+  const [selectedTeacher, setSelectedTeacher] = useState<string>("All Teachers");
+
+  const isFilterDirty = useMemo(() => {
+    return (
+      (selectedSemester && selectedSemester !== "All Semesters") ||
+      (selectedTeacher && selectedTeacher !== "All Teachers") ||
+      inputValue !== ""
+    );
+  }, [selectedSemester, selectedTeacher, inputValue]);
+
+  const handleClearFilters = useCallback(() => {
+    setSelectedSemester("All Semesters");
+    setSelectedTeacher("All Teachers");
+    setInputValue("");
+  }, []);
 
   const localRoutineList = useSelector((s: RootState) => s.routine.routineList);
+
+  const teachersList = useMemo(() => {
+    if (!selectedDept) return ["All Teachers"];
+
+    const teachers = new Set<string>();
+    localRoutineList.forEach(item => {
+      if (item.department_name === selectedDept && item.teacher_name) {
+        teachers.add(item.teacher_name);
+      }
+    });
+
+    return ["All Teachers", ...Array.from(teachers).sort()];
+  }, [localRoutineList, selectedDept]);
+
+  useEffect(() => {
+    setSelectedTeacher("All Teachers");
+  }, [selectedDept]);
 
   const setLocalRoutineList = useCallback((updater: React.SetStateAction<APIRoutineItem[]>) => {
     if (typeof updater === "function") {
@@ -1556,7 +2055,7 @@ export default function AdminRoutinePage({
     }
   };
 
-  const handleReactivate = async (session: ClassSession) => {
+  const handleReactivate = useCallback(async (session: ClassSession) => {
     try {
       const res = await reactivateClass(session.id);
       if (res.success) {
@@ -1585,7 +2084,7 @@ export default function AdminRoutinePage({
     } catch (err: any) {
       toast.error(err.message || "An error occurred");
     }
-  };
+  }, [dispatch]);
 
   const isLoadingRoutine = useSelector((s: RootState) => s.routine.isLoading);
 
@@ -1611,7 +2110,7 @@ export default function AdminRoutinePage({
       return;
     }
     setGenerationVersion((prev) => prev + 1);
-  }, [localRoutineList, sortedTimeSlots, selectedDept, selectedSemester]);
+  }, [localRoutineList, sortedTimeSlots, selectedDept, selectedSemester, selectedTeacher]);
 
   const departments = useMemo(() => {
     if (dbDepartments.length > 0) {
@@ -1794,7 +2293,12 @@ export default function AdminRoutinePage({
 
     if (isFirstFetchRef.current) {
       isFirstFetchRef.current = false;
-      return;
+      const hasPreloadedDataForDept = routineList.length > 0 && routineList.every(
+        (item) => item.department_name === selectedDept
+      );
+      if (hasPreloadedDataForDept) {
+        return;
+      }
     }
 
     const fetchUpdatedRoutine = async () => {
@@ -1819,7 +2323,7 @@ export default function AdminRoutinePage({
     fetchUpdatedRoutine();
   }, [selectedDeptId, selectedSemesterId]);
 
-  const handleConfirmGenerate = async () => {
+  const handleConfirmGenerate = useCallback(async () => {
     if (isRoutineLocked) return;
     if (generateModal.departmentId === undefined) {
       toast.error("Please select a valid department to generate routine.");
@@ -1837,6 +2341,13 @@ export default function AdminRoutinePage({
       if (result.success) {
         dispatch(resetAll());
         toast.success("Routine generated successfully!");
+
+        setGenerateResultModal({
+          isOpen: true,
+          success: true,
+          data: result.data || null,
+          errorMsg: null
+        });
 
         setUndoStack((prev) => [
           ...prev,
@@ -1878,14 +2389,26 @@ export default function AdminRoutinePage({
         router.refresh();
       } else {
         toast.error(result.message || "Failed to generate routine");
+        setGenerateResultModal({
+          isOpen: true,
+          success: false,
+          data: result.data || null,
+          errorMsg: result.message || "Failed to generate routine"
+        });
       }
     } catch (err) {
       console.error(err);
       toast.error("An unexpected error occurred");
+      setGenerateResultModal({
+        isOpen: true,
+        success: false,
+        data: null,
+        errorMsg: "An unexpected error occurred. Please check console logs."
+      });
     } finally {
       setIsGenerating(false);
     }
-  };
+  }, [isRoutineLocked, generateModal, dispatch, dbDepartments, dbSemesters, router]);
 
 
   const initiateLockAction = () => {
@@ -1898,7 +2421,7 @@ export default function AdminRoutinePage({
     }
   };
 
-  const handleConfirmLockAction = () => {
+  const handleConfirmLockAction = useCallback(() => {
     const type = lockConfirmModal.type;
     const input = lockConfirmInput.trim();
 
@@ -1911,7 +2434,7 @@ export default function AdminRoutinePage({
       toast.success("Routine unlocked. Generation enabled.");
       setLockConfirmModal((prev) => ({ ...prev, isOpen: false }));
     }
-  };
+  }, [lockConfirmModal.type, lockConfirmInput, dispatch]);
 
   const handleCellClick = useCallback(
     (data: { course: string; teacher: string; reason: string }) => {
@@ -1955,51 +2478,42 @@ export default function AdminRoutinePage({
 
 
   const currentRoutineSchedule = useMemo(() => {
+    const isTeacherFiltered = selectedTeacher !== "All Teachers";
     const isAllSemesters = selectedSemester === "All Semesters";
-
-    const targetSemesters = isAllSemesters
-      ? semesters.filter((s) => s !== "All Semesters")
-      : [selectedSemester];
 
     const scheduleRows: {
       day: string;
       semester: string;
-      slots: (ClassSession | null)[];
+      slots: (ClassSession[] | null)[];
     }[] = [];
 
     const slotStartTimes = sortedTimeSlots.map((ts) => normalizeTime(ts.start_time));
     const uniqueCourses = new Set<string>();
 
-    DAYS_ORDER.forEach((day) => {
-      // Check if this day has any classes scheduled for the selected department
-      const dayHasAnyClasses = localRoutineList.some((item) => {
-        if (!selectedDept) return false;
-        return item.department_name === selectedDept && item.day_name === day;
-      });
-
-      targetSemesters.forEach((sem) => {
-        const rowSlots = Array(sortedTimeSlots.length).fill(
-          null
-        ) as (ClassSession | null)[];
-
-        const itemsForCell = localRoutineList.filter((item) => {
+    if (isTeacherFiltered) {
+      // Teacher mode: 1 row per day (with no semester column)
+      DAYS_ORDER.forEach((day) => {
+        // Get all classes of this teacher on this day
+        const teacherClasses = localRoutineList.filter((item) => {
           if (!selectedDept) return false;
-
           const matchDept = item.department_name === selectedDept;
-          const matchSem = item.semester_name === sem;
           const matchDay = item.day_name === day;
-
-          return matchDept && matchSem && matchDay;
+          const matchTeacher = item.teacher_name === selectedTeacher;
+          return matchDept && matchDay && matchTeacher;
         });
 
-        let hasContent = false;
+        if (teacherClasses.length === 0) return; // Hide day if teacher has no classes
 
-        itemsForCell.forEach((item) => {
+        const rowSlots = Array(sortedTimeSlots.length).fill(
+          null
+        ) as (ClassSession[] | null)[];
+
+        teacherClasses.forEach((item) => {
           const normalizedApiTime = normalizeTime(item.start_time);
           const slotIndex = slotStartTimes.indexOf(normalizedApiTime);
 
           if (slotIndex !== -1) {
-            rowSlots[slotIndex] = {
+            const session: ClassSession = {
               id: item.id,
               dayId: typeof item.day === 'string' ? parseInt(item.day, 10) : item.day,
               course: item.course_code,
@@ -2012,51 +2526,155 @@ export default function AdminRoutinePage({
               day: item.day_name,
               is_cancelled: Boolean(item.is_cancelled),
               cancel_message: item.cancel_message || null,
+              group_name: item.group_name || null,
+              course_type: item.course_type,
             };
+            if (rowSlots[slotIndex] === null) {
+              rowSlots[slotIndex] = [session];
+            } else {
+              rowSlots[slotIndex]!.push(session);
+            }
             uniqueCourses.add(item.course_code);
-            hasContent = true;
           }
         });
 
-        const shouldPush = isAllSemesters ? dayHasAnyClasses : hasContent;
-
-        if (shouldPush) {
-          scheduleRows.push({
-            day,
-            semester: sem,
-            slots: rowSlots,
-          });
-        }
+        scheduleRows.push({
+          day,
+          semester: "",
+          slots: rowSlots,
+        });
       });
-    });
+    } else {
+      // Normal mode: 1 row per semester under day
+      const targetSemesters = isAllSemesters
+        ? semesters.filter((s) => s !== "All Semesters")
+        : [selectedSemester];
+
+      DAYS_ORDER.forEach((day) => {
+        // Check if this day has any classes scheduled for the selected department
+        const dayHasAnyClasses = localRoutineList.some((item) => {
+          if (!selectedDept) return false;
+          return item.department_name === selectedDept && item.day_name === day;
+        });
+
+        targetSemesters.forEach((sem) => {
+          const rowSlots = Array(sortedTimeSlots.length).fill(
+            null
+          ) as (ClassSession[] | null)[];
+
+          const itemsForCell = localRoutineList.filter((item) => {
+            if (!selectedDept) return false;
+
+            const matchDept = item.department_name === selectedDept;
+            const matchSem = item.semester_name === sem;
+            const matchDay = item.day_name === day;
+
+            return matchDept && matchSem && matchDay;
+          });
+
+          let hasContent = false;
+
+          itemsForCell.forEach((item) => {
+            const normalizedApiTime = normalizeTime(item.start_time);
+            const slotIndex = slotStartTimes.indexOf(normalizedApiTime);
+
+            if (slotIndex !== -1) {
+              const session: ClassSession = {
+                id: item.id,
+                dayId: typeof item.day === 'string' ? parseInt(item.day, 10) : item.day,
+                course: item.course_code,
+                teacher: item.teacher_name,
+                room: item.room_number,
+                teacherId: item.teacher_name,
+                originalTime: item.start_time,
+                department: item.department_name,
+                semester: item.semester_name,
+                day: item.day_name,
+                is_cancelled: Boolean(item.is_cancelled),
+                cancel_message: item.cancel_message || null,
+                group_name: item.group_name || null,
+                course_type: item.course_type,
+              };
+              if (rowSlots[slotIndex] === null) {
+                rowSlots[slotIndex] = [session];
+              } else {
+                rowSlots[slotIndex]!.push(session);
+              }
+              uniqueCourses.add(item.course_code);
+              hasContent = true;
+            }
+          });
+
+          const shouldPush = isAllSemesters ? dayHasAnyClasses : hasContent;
+
+          if (shouldPush) {
+            scheduleRows.push({
+              day,
+              semester: sem,
+              slots: rowSlots,
+            });
+          }
+        });
+      });
+    }
 
     const totalCredits = uniqueCourses.size * 3;
 
     return {
       label: selectedDept || "Select Department",
-      subLabel:
-        selectedSemester === "All Semesters"
+      subLabel: isTeacherFiltered
+        ? `${selectedTeacher}'s Routine`
+        : selectedSemester === "All Semesters"
           ? "All Semesters"
           : `${selectedSemester} Semester`,
       totalCredits: totalCredits,
       schedule: scheduleRows,
       isEmpty: scheduleRows.length === 0,
-      isAllSemestersMode: isAllSemesters,
+      isAllSemestersMode: !isTeacherFiltered && isAllSemesters,
     };
-  }, [localRoutineList, selectedDept, selectedSemester, semesters, sortedTimeSlots]);
+  }, [localRoutineList, selectedDept, selectedSemester, semesters, sortedTimeSlots, selectedTeacher]);
 
   const printHeader = useMemo(() => (
-    <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center mb-3 pt-0 text-center w-full font-serif text-black">
+    <div className="hidden print:flex flex-col print:mt-0 bg-white items-center justify-center pt-0 text-center w-full font-serif text-black">
       <h1 className="text-2xl font-bold text-black mb-2 tracking-tight">
         Department of {currentRoutineSchedule.label}
+        {currentRoutineSchedule.isAllSemestersMode && " (All Routine)"}
       </h1>
-      <div className="border-2 border-black! border-double px-8 py-0.5 mb-2 print-header-border">
-        <h2 className="text-base font-bold uppercase text-black tracking-wide">
-          {currentRoutineSchedule.isAllSemestersMode ? "All Routine" : "Class Routine"}
-        </h2>
-      </div>
+      {(!currentRoutineSchedule.isAllSemestersMode || selectedTeacher !== "All Teachers") ? (
+        <>
+          <div className="border-2 border-black! border-double px-8 py-0.5 mb-3 print-header-border">
+            <h2 className="text-base font-bold uppercase text-black tracking-wide">
+              {selectedTeacher !== "All Teachers" ? `${selectedTeacher}'s Class Routine` : "Class Routine"}
+            </h2>
+          </div>
+          <table className="w-full border-collapse border border-black mb-6 text-xs text-black font-serif print-header-table">
+            <tbody>
+              <tr>
+                <td className="bg-gray-200 font-bold text-center w-[15%] py-1.5">Semester</td>
+                <td className="bg-white font-bold text-center w-[35%] py-1.5">
+                  {currentRoutineSchedule.subLabel.replace(" Semester", "")}
+                </td>
+                <td className="bg-gray-200 font-bold text-center w-[25%] py-1.5">Total Credit</td>
+                <td className="bg-white font-bold text-center w-[25%] py-1.5">
+                  {currentRoutineSchedule.totalCredits}
+                </td>
+              </tr>
+              {selectedTeacher !== "All Teachers" && (
+                <tr>
+                  <td className="bg-gray-200 font-bold text-center w-[15%] py-1.5">Teacher</td>
+                  <td colSpan={3} className="bg-white font-bold text-center py-1.5 font-sans">
+                    {selectedTeacher}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </>
+      ) : (
+        <div className="mb-6" />
+      )}
     </div>
-  ), [currentRoutineSchedule]);
+  ), [currentRoutineSchedule, selectedTeacher]);
 
   const validTeacherShortNames = useMemo(() => {
     const uniqueShortNames = new Set<string>();
@@ -2270,6 +2888,7 @@ export default function AdminRoutinePage({
             width: calc(100% - 2px) !important;
             margin-left: auto !important;
             margin-right: auto !important;
+            margin-bottom: 24px !important;
           }
 
           /* Ensure clear text and transparent backgrounds for print */
@@ -2416,6 +3035,16 @@ export default function AdminRoutinePage({
               )}
 
               <Button
+                onClick={() => setDataManagementOpen(true)}
+                variant="outline"
+                className="gap-2 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 hover:border-emerald-500/60 hidden md:flex"
+                title="Excel Export / Import / Sync"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                <span className="hidden lg:inline">Data Tools</span>
+              </Button>
+
+              <Button
                 onClick={() => window.print()}
                 variant="outline"
                 className="gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary hidden md:flex"
@@ -2441,7 +3070,7 @@ export default function AdminRoutinePage({
                 />
               </div>
 
-              { }
+              {/* Semester select filter */}
               <div className="flex-1 min-w-[150px]">
                 <CustomSelect
                   value={selectedSemester}
@@ -2451,6 +3080,16 @@ export default function AdminRoutinePage({
                     label: sem === "All Semesters" ? "All Semesters" : `${sem} Semester`
                   }))}
                   placeholder="Select Semester"
+                />
+              </div>
+
+              {/* Teacher select filter */}
+              <div className="flex-1 min-w-[180px]">
+                <CustomSelect
+                  value={selectedTeacher}
+                  onChange={setSelectedTeacher}
+                  options={teachersList.map((t) => ({ value: t, label: t }))}
+                  placeholder="Select Teacher"
                 />
               </div>
 
@@ -2485,6 +3124,27 @@ export default function AdminRoutinePage({
                 />
               </div>
             </motion.div>
+
+            <AnimatePresence>
+              {isFilterDirty && (
+                <motion.div
+                  variants={itemVariants}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="w-full sm:w-auto"
+                >
+                  <Button
+                    variant="ghost"
+                    onClick={handleClearFilters}
+                    className="gap-2 text-muted-foreground hover:text-foreground text-xs font-semibold px-4 h-12 rounded-xl border border-dashed border-border hover:border-muted-foreground/30 w-full sm:w-auto transition-all"
+                  >
+                    <X className="h-4 w-4" />
+                    Clear Filters
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
 
@@ -2633,6 +3293,7 @@ export default function AdminRoutinePage({
               <div className="overflow-x-auto w-full print:overflow-visible">
                 { }
                 <MemoizedRoutineTable
+                  key={selectedTeacher}
                   schedule={currentRoutineSchedule.schedule}
                   timeSlots={sortedTimeSlots}
                   isMatch={isMatch}
@@ -2649,6 +3310,7 @@ export default function AdminRoutinePage({
                   onReactivateClass={handleReactivateClass}
                   onUpdateCancelMessage={handleUpdateCancelMessage}
                   onHistoryAction={handleHistoryAction}
+                  selectedTeacher={selectedTeacher}
                 />
               </div>
             </motion.div>
@@ -2668,6 +3330,16 @@ export default function AdminRoutinePage({
 
       { }
       <ViewReasonDialog ref={viewReasonDialogRef} />
+
+      {/* ── Data Management Dialog ── */}
+      <DataManagementDialog
+        isOpen={dataManagementOpen}
+        onOpenChange={setDataManagementOpen}
+        onSuccess={() => refreshRoutine(true)}
+      />
+
+
+
 
       { }
       <Dialog
@@ -2953,6 +3625,148 @@ export default function AdminRoutinePage({
         confirmLabel={cancellationMode === "update" ? "Update Message" : "Confirm Cancellation"}
         initialReason={pendingCancellation?.initialReason}
       />
+
+      {/* Generate Routine Result Modal */}
+      <Dialog
+        open={generateResultModal.isOpen}
+        onOpenChange={(open) =>
+          setGenerateResultModal((prev) => ({ ...prev, isOpen: open }))
+        }
+      >
+        <DialogContent className="sm:max-w-[480px] p-6 rounded-2xl border bg-card text-card-foreground shadow-2xl font-lexend">
+          {generateResultModal.isOpen && (
+            <div className="space-y-6">
+              <DialogHeader className="text-center flex flex-col items-center">
+                <div className={cn(
+                  "size-12 rounded-full flex items-center justify-center mb-3 animate-bounce",
+                  generateResultModal.success 
+                    ? "bg-emerald-500/10 text-emerald-500 dark:bg-emerald-950/20" 
+                    : "bg-red-500/10 text-red-500 dark:bg-red-950/20"
+                )}>
+                  {generateResultModal.success ? (
+                    <CheckCircle2 className="size-7 stroke-[2.5]" />
+                  ) : (
+                    <AlertTriangle className="size-7 stroke-[2.5]" />
+                  )}
+                </div>
+                <DialogTitle className="text-xl font-bold">
+                  {generateResultModal.success ? "Routine Generated Successfully" : "Routine Generation Failed"}
+                </DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground mt-1">
+                  {generateResultModal.success 
+                    ? "The automatic scheduler has successfully generated class slots." 
+                    : "The scheduler encountered conflicts or resource constraints."}
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Success Info Block */}
+              {generateResultModal.success && generateResultModal.data && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-muted/30 border rounded-xl p-3 flex flex-col justify-center">
+                      <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Required</span>
+                      <span className="text-lg font-extrabold text-foreground mt-0.5">
+                        {generateResultModal.data.total_classes_required ?? "-"}
+                      </span>
+                    </div>
+                    <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 flex flex-col justify-center">
+                      <span className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">Successful</span>
+                      <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        {generateResultModal.data.successful_classes ?? "-"}
+                      </span>
+                    </div>
+                    <div className={cn(
+                      "border rounded-xl p-3 flex flex-col justify-center",
+                      (generateResultModal.data.dropped_classes ?? 0) > 0 
+                        ? "bg-red-500/5 border-red-500/20" 
+                        : "bg-muted/30"
+                    )}>
+                      <span className={cn(
+                        "text-[10px] uppercase font-bold tracking-wider",
+                        (generateResultModal.data.dropped_classes ?? 0) > 0 
+                          ? "text-red-600 dark:text-red-400" 
+                          : "text-muted-foreground"
+                      )}>Dropped</span>
+                      <span className={cn(
+                        "text-lg font-extrabold mt-0.5",
+                        (generateResultModal.data.dropped_classes ?? 0) > 0 
+                          ? "text-red-600 dark:text-red-400" 
+                          : "text-foreground"
+                      )}>
+                        {generateResultModal.data.dropped_classes ?? 0}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-muted/50 p-4 rounded-xl border border-border/80">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1.5">
+                      Scheduler Message
+                    </p>
+                    <p className="text-sm font-medium text-foreground/90">
+                      {generateResultModal.data.message || "No status message returned."}
+                    </p>
+                  </div>
+
+                  {Array.isArray(generateResultModal.data.shortage_details) && generateResultModal.data.shortage_details.length > 0 && (
+                    <div className="border border-amber-500/20 bg-amber-500/5 p-4 rounded-xl space-y-2">
+                      <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <AlertTriangle className="size-3.5" />
+                        Shortage / Conflict Warnings
+                      </p>
+                      <ul className="text-xs text-amber-600 dark:text-amber-300 list-disc pl-4 space-y-1">
+                        {generateResultModal.data.shortage_details.map((detail: any, idx: number) => (
+                          <li key={idx}>
+                            {typeof detail === "object" ? JSON.stringify(detail) : String(detail)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Error Info Block */}
+              {!generateResultModal.success && (
+                <div className="space-y-4">
+                  <div className="bg-red-500/5 border border-red-500/20 p-4 rounded-xl">
+                    <p className="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-widest mb-1.5">
+                      Error Message
+                    </p>
+                    <p className="text-sm font-medium text-red-600 dark:text-red-300">
+                      {generateResultModal.errorMsg || "An unknown error occurred during generation."}
+                    </p>
+                  </div>
+
+                  {generateResultModal.data && Array.isArray(generateResultModal.data.shortage_details) && generateResultModal.data.shortage_details.length > 0 && (
+                    <div className="border border-red-500/10 bg-red-500/5 p-4 rounded-xl space-y-2">
+                      <p className="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-widest flex items-center gap-1.5">
+                        <AlertTriangle className="size-3.5" />
+                        Details of Resource Shortages
+                      </p>
+                      <ul className="text-xs text-red-600 dark:text-red-300 list-disc pl-4 space-y-1">
+                        {generateResultModal.data.shortage_details.map((detail: any, idx: number) => (
+                          <li key={idx}>
+                            {typeof detail === "object" ? JSON.stringify(detail) : String(detail)}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <Button
+                  onClick={() => setGenerateResultModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium px-6 py-2 rounded-xl"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
